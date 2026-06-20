@@ -65,6 +65,55 @@ function reducer(state, action) {
     }
     case "SET_SETTING":
       return {...state, settings:{...state.settings,[action.key]:action.value}};
+
+    case "DELETE_PART":
+      return {...state, parts: state.parts.filter(p=>p.id!==action.id)};
+
+    case "DELETE_BUILD": {
+      const {buildId,returnParts}=action;
+      const build=state.builds.find(b=>b.id===buildId);
+      return {...state,
+        builds: state.builds.filter(b=>b.id!==buildId),
+        parts: returnParts
+          ? state.parts.map(p=>build?.partIds.includes(p.id)
+              ? {...p,status:"available",history:[...p.history,{date:today(),event:`Build "${build.name}" deleted — returned to inventory`}]}
+              : p)
+          : state.parts.filter(p=>!build?.partIds.includes(p.id))
+      };
+    }
+
+    // mode "parts-too" removes the bundle and every part that came from it.
+    // mode "keep-loose" removes only the bundle record, leaving its parts in inventory as untracked single parts.
+    case "DELETE_BUNDLE": {
+      const {bundleId,mode}=action;
+      if(mode==="parts-too"){
+        return {...state,
+          bundles: state.bundles.filter(b=>b.id!==bundleId),
+          parts: state.parts.filter(p=>p.bundleId!==bundleId)
+        };
+      }
+      return {...state,
+        bundles: state.bundles.filter(b=>b.id!==bundleId),
+        parts: state.parts.map(p=>p.bundleId===bundleId?{...p,bundleId:null,source:"Untracked (bundle deleted)"}:p)
+      };
+    }
+
+    // Logs a capital loss and removes the part from active inventory, keeping a record in sales
+    // (as a zero/negative-revenue "sale") so it still shows up in Dashboard/History analytics.
+    case "MARK_DEFECTIVE": {
+      const {id,reason}=action;
+      const part=state.parts.find(p=>p.id===id);
+      if(!part)return state;
+      const loss={id:uid(),partId:part.id,name:part.name,cost:part.allocatedCost,salePrice:0,profit:-part.allocatedCost,
+        buyerName:"",date:today(),writeOff:true,reason:reason||""};
+      return {...state,
+        sales:[...state.sales,loss],
+        parts: state.parts.map(p=>p.id===id
+          ? {...p,status:"defective",history:[...p.history,{date:today(),event:`Marked defective/write-off${reason?`: ${reason}`:""} — loss of ${fmt(part.allocatedCost)}`}]}
+          : p)
+      };
+    }
+
     default: return state;
   }
 }
@@ -123,6 +172,7 @@ const SC = {
   available:{bg:"rgba(6,78,59,0.5)",border:"#16a34a",color:"#6ee7b7"},
   in_build:{bg:"rgba(12,74,110,0.5)",border:"#0ea5e9",color:"#7dd3fc"},
   sold:{bg:"rgba(39,39,42,0.5)",border:"#52525b",color:"#a1a1aa"},
+  defective:{bg:"rgba(127,29,29,0.5)",border:"#ef4444",color:"#fca5a5"},
 };
 function Badge({s}) {
   const c=SC[s]||{};
@@ -132,17 +182,51 @@ function Badge({s}) {
 /* ═══════════════════════════════════════════
    PHOTO UPLOAD — single image, upload from gallery
 ═══════════════════════════════════════════ */
+/* ═══════════════════════════════════════════
+   IMAGE COMPRESSION — resize before upload so phone photos (3-5MB)
+   don't eat Railway disk space or slow down loading
+═══════════════════════════════════════════ */
+function compressImage(file,maxDimension=1280,quality=0.82){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    const reader=new FileReader();
+    reader.onerror=()=>reject(new Error("Could not read file"));
+    reader.onload=()=>{
+      img.onerror=()=>reject(new Error("Could not decode image"));
+      img.onload=()=>{
+        let {width,height}=img;
+        if(width>maxDimension||height>maxDimension){
+          if(width>height){height=Math.round(height*(maxDimension/width));width=maxDimension;}
+          else{width=Math.round(width*(maxDimension/height));height=maxDimension;}
+        }
+        const canvas=document.createElement("canvas");
+        canvas.width=width;canvas.height=height;
+        const ctx=canvas.getContext("2d");
+        ctx.drawImage(img,0,0,width,height);
+        canvas.toBlob(blob=>{
+          if(!blob){reject(new Error("Compression failed"));return;}
+          resolve(new File([blob],file.name.replace(/\.(png|heic|heif)$/i,".jpg"),{type:"image/jpeg"}));
+        },"image/jpeg",quality);
+      };
+      img.src=reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function PhotoUpload({photoUrl,photoRecordId,onChange,label="Photo"}) {
-  const [status,setStatus]=useState("idle"); // idle | uploading | error
+  const [status,setStatus]=useState("idle"); // idle | compressing | uploading | error
   const inputRef=useRef(null);
 
   const handleFile=async(file)=>{
     if(!file)return;
     if(!file.type.startsWith("image/")){setStatus("error");return;}
-    setStatus("uploading");
+    setStatus("compressing");
     try{
+      const compressed=await compressImage(file).catch(()=>file); // fall back to original if compression fails
+      setStatus("uploading");
       const form=new FormData();
-      form.append("photo",file);
+      form.append("photo",compressed);
       const res=await fetch("/photo",{method:"POST",body:form});
       if(!res.ok)throw new Error(`Upload failed (${res.status})`);
       const {url,recordId}=await res.json();
@@ -173,14 +257,16 @@ function PhotoUpload({photoUrl,photoRecordId,onChange,label="Photo"}) {
             background:"#ef4444",border:"2px solid #18181b",color:"#fff",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>✕</button>
         </div>
       ):(
-        <button type="button" onClick={()=>inputRef.current?.click()} disabled={status==="uploading"}
+        <button type="button" onClick={()=>inputRef.current?.click()} disabled={status==="uploading"||status==="compressing"}
           style={{width:96,height:96,borderRadius:10,border:"1.5px dashed #3f3f46",background:"#09090b",color:"#71717a",
-            display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,cursor:status==="uploading"?"wait":"pointer",
+            display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,cursor:(status==="uploading"||status==="compressing")?"wait":"pointer",
             fontSize:11,transition:"border-color 0.15s,color 0.15s"}}
-          onMouseEnter={e=>{if(status!=="uploading"){e.currentTarget.style.borderColor="#7c3aed";e.currentTarget.style.color="#a78bfa";}}}
+          onMouseEnter={e=>{if(status==="idle"){e.currentTarget.style.borderColor="#7c3aed";e.currentTarget.style.color="#a78bfa";}}}
           onMouseLeave={e=>{e.currentTarget.style.borderColor="#3f3f46";e.currentTarget.style.color="#71717a";}}>
-          {status==="uploading"?(
-            <span style={{animation:"spin 0.6s linear infinite",fontSize:18,display:"inline-block"}}>⟳</span>
+          {status==="compressing"?(
+            <><span style={{animation:"spin 0.6s linear infinite",fontSize:18,display:"inline-block"}}>⟳</span><span>Optimizing…</span></>
+          ):status==="uploading"?(
+            <><span style={{animation:"spin 0.6s linear infinite",fontSize:18,display:"inline-block"}}>⟳</span><span>Uploading…</span></>
           ):(
             <><span style={{fontSize:20}}>📷</span><span>Add photo</span></>
           )}
@@ -192,17 +278,74 @@ function PhotoUpload({photoUrl,photoRecordId,onChange,label="Photo"}) {
 }
 
 /* ═══════════════════════════════════════════
-   PHOTO THUMB — Polaroid-tilt display thumbnail (signature element)
+   DEFECTIVE MODAL — mark a part as defective/write-off, logs a capital loss
 ═══════════════════════════════════════════ */
-function PhotoThumb({url,size=52,seed=0}) {
+function DefectiveModal({part,onConfirm,onCancel}) {
+  const [reason,setReason]=useState("");
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onCancel}>
+      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:8}}>Mark as defective?</div>
+        <div style={{fontSize:13,color:"#a1a1aa",marginBottom:14,lineHeight:1.5}}>
+          "{part.name}" will be removed from active inventory and logged as a capital loss of <b style={{color:"#fca5a5"}}>{fmt(part.allocatedCost)}</b> on your Dashboard.
+        </div>
+        <Inp label="Reason (optional)" value={reason} onChange={e=>setReason(e.target.value)} placeholder="DOA, shorted during build, etc."/>
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:16}}>
+          <Btn variant="warn" onClick={()=>onConfirm(reason)} style={{width:"100%"}}>Mark Defective — Log Loss</Btn>
+          <Btn variant="ghost" onClick={onCancel} style={{width:"100%"}}>Cancel</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+function PhotoThumb({url,size=52,seed=0,onClick}) {
   if(!url)return null;
   // Deterministic slight tilt per item so the grid feels like a physical parts bin, not a uniform UI
   const tilt=((seed%5)-2)*1.6;
   return (
-    <div style={{width:size,height:size,flexShrink:0,transform:`rotate(${tilt}deg)`,transition:"transform 0.2s"}}
+    <div onClick={onClick} style={{width:size,height:size,flexShrink:0,transform:`rotate(${tilt}deg)`,transition:"transform 0.2s",cursor:onClick?"pointer":"default"}}
       onMouseEnter={e=>e.currentTarget.style.transform=`rotate(0deg) scale(1.06)`}
       onMouseLeave={e=>e.currentTarget.style.transform=`rotate(${tilt}deg) scale(1)`}>
       <img src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:7,border:"2px solid #27272a",boxShadow:"0 3px 8px rgba(0,0,0,0.4)",display:"block"}}/>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   LIGHTBOX — tap any photo to view full-screen
+═══════════════════════════════════════════ */
+function Lightbox({url,onClose}) {
+  if(!url)return null;
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:20,animation:"fadeUp 0.15s ease"}} onClick={onClose}>
+      <img src={url} alt="" style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain",borderRadius:8,boxShadow:"0 20px 60px rgba(0,0,0,0.7)"}}/>
+      <button onClick={onClose} style={{position:"absolute",top:18,right:18,width:36,height:36,borderRadius:"50%",
+        background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",color:"#fff",fontSize:16,cursor:"pointer",
+        display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   CONFIRM MODAL — generic "are you sure?" with optional extra choices
+═══════════════════════════════════════════ */
+function ConfirmModal({title,message,confirmLabel="Delete",danger=true,onConfirm,onCancel,extraChoices}) {
+  // extraChoices: optional array of {label, onClick} rendered as additional buttons
+  // (used for the bundle-delete "delete parts too vs keep loose" choice)
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onCancel}>
+      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:8}}>{title}</div>
+        <div style={{fontSize:13,color:"#a1a1aa",marginBottom:18,lineHeight:1.5}}>{message}</div>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {extraChoices?extraChoices.map((c,i)=>(
+            <Btn key={i} variant={i===0?"danger":"warn"} onClick={c.onClick} style={{width:"100%"}}>{c.label}</Btn>
+          )):(
+            <Btn variant={danger?"danger":"primary"} onClick={onConfirm} style={{width:"100%"}}>{confirmLabel}</Btn>
+          )}
+          <Btn variant="ghost" onClick={onCancel} style={{width:"100%"}}>Cancel</Btn>
+        </div>
+      </div>
     </div>
   );
 }
@@ -373,15 +516,19 @@ function EditPartModal({part,onClose,onSave}) {
 /* ═══════════════════════════════════════════
    DASHBOARD  (#6 capital at risk, #7 bundle P&L)
 ═══════════════════════════════════════════ */
-function Dashboard({state,setTab}) {
+function Dashboard({state,setTab,openLightbox}) {
   const {parts,sales,bundles}=state;
   const totalCapital=parts.reduce((s,p)=>s+p.allocatedCost,0);
   const totalRevenue=sales.reduce((s,x)=>s+x.salePrice,0);
   const totalCOGS=sales.reduce((s,x)=>s+x.cost,0);
   const totalProfit=totalRevenue-totalCOGS;
   const roi=totalCOGS>0?totalProfit/totalCOGS:0;
-  const atRisk=parts.filter(p=>p.status!=="sold").reduce((s,p)=>s+p.allocatedCost,0);
+  // Defective parts are a realized loss already counted in totalProfit (via their write-off sale),
+  // so they're excluded from "at risk" — that stat is only for capital still tied up in active inventory.
+  const atRisk=parts.filter(p=>p.status!=="sold"&&p.status!=="defective").reduce((s,p)=>s+p.allocatedCost,0);
   const recovered=parts.filter(p=>p.status==="sold").reduce((s,p)=>s+p.allocatedCost,0);
+  const writeOffLoss=sales.filter(s=>s.writeOff).reduce((s,x)=>s+Math.abs(x.profit),0);
+  const writeOffCount=parts.filter(p=>p.status==="defective").length;
   const available=parts.filter(p=>p.status==="available").length;
   const inBuild=parts.filter(p=>p.status==="in_build").length;
   const sold=parts.filter(p=>p.status==="sold").length;
@@ -393,7 +540,7 @@ function Dashboard({state,setTab}) {
     const soldParts=bParts.filter(p=>p.status==="sold");
     const unsoldParts=bParts.filter(p=>p.status!=="sold");
     const recovered=soldParts.reduce((s,p)=>{
-      const sale=sales.find(s=>s.name===p.name);
+      const sale=sales.find(s=>s.partId===p.id)||sales.find(s=>s.name===p.name);
       return s+(sale?sale.salePrice:0);
     },0);
     const unsoldMarket=unsoldParts.reduce((s,p)=>s+p.marketValue,0);
@@ -425,7 +572,7 @@ function Dashboard({state,setTab}) {
   // Insight: average days held before sale — flags whether inventory is moving or going stale
   const holdDurations=[];
   parts.filter(p=>p.status==="sold").forEach(p=>{
-    const sale=sales.find(s=>s.name===p.name);
+    const sale=sales.find(s=>s.partId===p.id)||sales.find(s=>s.name===p.name);
     const bought=p.history?.[0]?.date;
     if(sale&&bought){
       const d1=new Date(bought).getTime(),d2=new Date(sale.date).getTime();
@@ -450,6 +597,7 @@ function Dashboard({state,setTab}) {
         <StatBox label="Capital at Risk" value={fmt(atRisk)} color="#f59e0b" sub="locked in unsold parts"/>
         <StatBox label="Capital Recovered" value={fmt(recovered)} sub={`${parts.length>0?Math.round(recovered/totalCapital*100):0}% of total`}/>
         {avgDaysToSell!==null&&<StatBox label="Avg. Days to Sell" value={`${avgDaysToSell}d`} color="#38bdf8" sub={`across ${holdDurations.length} sold part${holdDurations.length===1?"":"s"}`}/>}
+        {writeOffCount>0&&<StatBox label="Write-offs" value={fmt(-writeOffLoss)} color="#f87171" sub={`${writeOffCount} defective part${writeOffCount===1?"":"s"}`}/>}
       </div>
 
       {/* Capital at risk bar  (#6) */}
@@ -754,14 +902,24 @@ function Buy({state,dispatch,toast}) {
 /* ═══════════════════════════════════════════
    INVENTORY  (#1 quick sell, #2 edit, #3 notes, #8 search, #10 buyer)
 ═══════════════════════════════════════════ */
-function Inventory({state,dispatch,toast,setTab}) {
+function Inventory({state,dispatch,toast,setTab,openLightbox}) {
   const [filter,setFilter]=useState("all");
   const [search,setSearch]=useState("");   // #8
   const [quickSell,setQuickSell]=useState(null);
   const [editing,setEditing]=useState(null);
-  const {parts,settings}=state;
+  const [deleting,setDeleting]=useState(null); // part pending delete confirmation
+  const [defectiveTarget,setDefectiveTarget]=useState(null); // part pending defective confirmation
+  const {parts,settings,builds,bundles}=state;
 
-  const filtered=parts.filter(p=>{
+  // Look up which build (by name) a part currently belongs to, for the "Used in Build X" status line
+  const buildNameFor=p=>{
+    if(p.status!=="in_build")return null;
+    const b=builds.find(b=>!b.dissolved&&b.partIds.includes(p.id));
+    return b?b.name:null;
+  };
+
+  const isBundleView=filter==="bundle";
+  const filtered=isBundleView?[]:parts.filter(p=>{
     if(filter!=="all"&&p.status!==filter)return false;
     if(search&&!p.name.toLowerCase().includes(search.toLowerCase())&&!p.category.toLowerCase().includes(search.toLowerCase()))return false;
     return true;
@@ -770,7 +928,7 @@ function Inventory({state,dispatch,toast,setTab}) {
   const handleQuickSell=(sp,buyer)=>{
     if(!quickSell)return;
     const p=quickSell;
-    const sale={id:uid(),name:p.name,cost:p.allocatedCost,salePrice:sp,profit:sp-p.allocatedCost,buyerName:buyer,date:today()};
+    const sale={id:uid(),partId:p.id,name:p.name,cost:p.allocatedCost,salePrice:sp,profit:sp-p.allocatedCost,buyerName:buyer,date:today()};
     dispatch({type:"SELL",mode:"part",id:p.id,sale});
     toast(`${p.name} sold for ${fmt(sp)} — profit ${fmt(sp-p.allocatedCost)} ✓`,sp-p.allocatedCost>=0?"success":"warn");
     setQuickSell(null);
@@ -782,42 +940,124 @@ function Inventory({state,dispatch,toast,setTab}) {
     setEditing(null);
   };
 
+  const confirmDelete=()=>{
+    if(deleting._isBundle){
+      // handled by the dual-choice modal instead — this path shouldn't fire for bundles
+      return;
+    }
+    dispatch({type:"DELETE_PART",id:deleting.id});
+    toast(`${deleting.name} deleted`,"warn");
+    setDeleting(null);
+  };
+
+  const deleteBundleWithParts=()=>{
+    dispatch({type:"DELETE_BUNDLE",bundleId:deleting.id,mode:"parts-too"});
+    toast(`"${deleting.name}" and its parts deleted`,"warn");
+    setDeleting(null);
+  };
+
+  const deleteBundleKeepParts=()=>{
+    dispatch({type:"DELETE_BUNDLE",bundleId:deleting.id,mode:"keep-loose"});
+    toast(`"${deleting.name}" removed — parts kept as loose inventory`,"warn");
+    setDeleting(null);
+  };
+
+  const confirmDefective=(reason)=>{
+    dispatch({type:"MARK_DEFECTIVE",id:defectiveTarget.id,reason});
+    toast(`${defectiveTarget.name} marked defective — logged as a loss`,"warn");
+    setDefectiveTarget(null);
+  };
+
   return (
     <div style={{display:"flex",flexDirection:"column",gap:18}}>
       {quickSell&&<QuickSellModal part={quickSell} onClose={()=>setQuickSell(null)} onConfirm={handleQuickSell} targetMargin={settings?.targetMargin||30}/>}
       {editing&&<EditPartModal part={editing} onClose={()=>setEditing(null)} onSave={handleEdit}/>}
+      {deleting&&!deleting._isBundle&&(
+        <ConfirmModal title="Delete this part?" message={`"${deleting.name}" will be permanently removed. This can't be undone.`}
+          onConfirm={confirmDelete} onCancel={()=>setDeleting(null)}/>
+      )}
+      {deleting&&deleting._isBundle&&(
+        <ConfirmModal title="Delete this bundle?" message={`What should happen to the parts that came from "${deleting.name}"?`}
+          onCancel={()=>setDeleting(null)}
+          extraChoices={[
+            {label:"Delete bundle + all its parts",onClick:deleteBundleWithParts},
+            {label:"Keep parts as loose inventory",onClick:deleteBundleKeepParts},
+          ]}/>
+      )}
+      {defectiveTarget&&(
+        <DefectiveModal part={defectiveTarget} onConfirm={confirmDefective} onCancel={()=>setDefectiveTarget(null)}/>
+      )}
 
       <div><h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Inventory</h2>
         <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>{parts.length} parts tracked</p></div>
 
       {/* Search  (#8) */}
-      <Inp label="" value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍  Search by name or category..."/>
+      {!isBundleView&&<Inp label="" value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍  Search by name or category..."/>}
 
       <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
-        {["all","available","in_build","sold"].map(f=>(
+        {["all","available","in_build","sold","defective","bundle"].map(f=>(
           <Btn key={f} variant={filter===f?"primary":"ghost"} onClick={()=>setFilter(f)}>
-            {f==="all"?"All":f.replace("_"," ")}
-            <span style={{background:"#3f3f46",borderRadius:99,padding:"1px 6px",fontSize:11,color:"#a1a1aa",marginLeft:2}}>
-              {f==="all"?parts.length:parts.filter(p=>p.status===f).length}
-            </span>
+            {f==="all"?"All":f==="bundle"?"📦 Bundles":f.replace("_"," ")}
+            {f!=="bundle"&&(
+              <span style={{background:"#3f3f46",borderRadius:99,padding:"1px 6px",fontSize:11,color:"#a1a1aa",marginLeft:2}}>
+                {f==="all"?parts.length:parts.filter(p=>p.status===f).length}
+              </span>
+            )}
           </Btn>
         ))}
       </div>
 
-      {filtered.length===0?(
+      {isBundleView?(
+        bundles.length===0?(
+          <Card style={{textAlign:"center",padding:36}}><div style={{color:"#52525b"}}>No bundles yet.</div></Card>
+        ):(
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            {bundles.map((b,i)=>{
+              const bParts=parts.filter(p=>p.bundleId===b.id);
+              return (
+                <Card key={b.id} style={{animation:`fadeUp 0.2s ease ${i*0.03}s both`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:12}}>
+                    <div style={{display:"flex",gap:11,minWidth:0}}>
+                      {b.photoUrl&&<PhotoThumb url={b.photoUrl} size={56} seed={i} onClick={()=>openLightbox(b.photoUrl)}/>}
+                      <div>
+                        <div style={{color:"#fff",fontWeight:700,fontSize:14}}>{b.name}</div>
+                        <div style={{color:"#71717a",fontSize:11,marginTop:2}}>{b.date} · {bParts.length} parts · paid {fmt(b.purchasePrice)}</div>
+                      </div>
+                    </div>
+                    <Btn small variant="danger" onClick={()=>setDeleting({...b,_isBundle:true})}>🗑</Btn>
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:8,borderTop:"1px solid #27272a",paddingTop:10}}>
+                    {bParts.map(p=>(
+                      <div key={p.id} style={{display:"flex",alignItems:"center",gap:9,fontSize:12}}>
+                        <PhotoThumb url={p.photoUrl} size={32} seed={p.id.length} onClick={p.photoUrl?()=>openLightbox(p.photoUrl):undefined}/>
+                        <span style={{color:"#d4d4d8",flex:1,minWidth:0}}>{p.name}</span>
+                        <span style={{color:"#52525b",fontSize:10}}>{p.category}</span>
+                        <Badge s={p.status}/>
+                        <span style={{fontFamily:"monospace",color:"#a1a1aa",fontSize:11}}>{fmt(p.allocatedCost)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )
+      ):filtered.length===0?(
         <Card style={{textAlign:"center",padding:36}}>
           <div style={{color:"#52525b"}}>{search?"No parts match your search.":"No parts here yet."}</div>
         </Card>
       ):(
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {filtered.map((p,i)=>(
+          {filtered.map((p,i)=>{
+            const inBuildName=buildNameFor(p);
+            return (
             <div key={p.id} style={{background:"#18181b",border:"1px solid #27272a",borderRadius:12,padding:14,
               animation:`fadeUp 0.2s ease ${i*0.03}s both`,transition:"border-color 0.15s"}}
               onMouseEnter={e=>e.currentTarget.style.borderColor="#52525b"}
               onMouseLeave={e=>e.currentTarget.style.borderColor="#27272a"}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
                 <div style={{display:"flex",gap:11,flex:1,minWidth:0}}>
-                  <PhotoThumb url={p.photoUrl} seed={i}/>
+                  <PhotoThumb url={p.photoUrl} seed={i} onClick={p.photoUrl?()=>openLightbox(p.photoUrl):undefined}/>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:4,flexWrap:"wrap"}}>
                       <span style={{color:"#fff",fontWeight:600,fontSize:14}}>{p.name}</span>
@@ -825,6 +1065,8 @@ function Inventory({state,dispatch,toast,setTab}) {
                       <Badge s={p.status}/>
                     </div>
                     <div style={{color:"#71717a",fontSize:11}}>{p.source}</div>
+                    {/* Status detail: which build this part is currently in */}
+                    {inBuildName&&<div style={{color:"#7dd3fc",fontSize:11,marginTop:2}}>Status: Used in {inBuildName}</div>}
                     {/* Notes  (#3) */}
                     {p.notes&&<div style={{color:"#a1a1aa",fontSize:11,marginTop:3,fontStyle:"italic"}}>📝 {p.notes}</div>}
                     {/* Buyer  (#10) */}
@@ -840,20 +1082,17 @@ function Inventory({state,dispatch,toast,setTab}) {
                   ))}
                 </div>
               </div>
-              {/* Action buttons  (#1 quick sell, #2 edit) */}
-              {p.status==="available"&&(
-                <div style={{display:"flex",gap:7,marginTop:11,borderTop:"1px solid #27272a",paddingTop:11}}>
-                  <Btn small variant="success" onClick={()=>setQuickSell(p)}>⚡ Quick Sell</Btn>
-                  <Btn small variant="ghost" onClick={()=>setEditing(p)}>✏️ Edit</Btn>
-                </div>
-              )}
-              {p.status!=="available"&&(
-                <div style={{display:"flex",gap:7,marginTop:11,borderTop:"1px solid #27272a",paddingTop:11}}>
-                  <Btn small variant="ghost" onClick={()=>setEditing(p)}>✏️ Edit</Btn>
-                </div>
-              )}
+              {/* Action buttons  (#1 quick sell, #2 edit, delete, defective) */}
+              <div style={{display:"flex",gap:7,marginTop:11,borderTop:"1px solid #27272a",paddingTop:11,flexWrap:"wrap"}}>
+                {p.status==="available"&&<Btn small variant="success" onClick={()=>setQuickSell(p)}>⚡ Quick Sell</Btn>}
+                <Btn small variant="ghost" onClick={()=>setEditing(p)}>✏️ Edit</Btn>
+                {p.status!=="sold"&&p.status!=="defective"&&(
+                  <Btn small variant="warn" onClick={()=>setDefectiveTarget(p)}>⚠️ Defective</Btn>
+                )}
+                <Btn small variant="danger" onClick={()=>setDeleting(p)}>🗑 Delete</Btn>
+              </div>
             </div>
-          ))}
+          );})}
         </div>
       )}
     </div>
@@ -863,11 +1102,12 @@ function Inventory({state,dispatch,toast,setTab}) {
 /* ═══════════════════════════════════════════
    BUILDS
 ═══════════════════════════════════════════ */
-function Builds({state,dispatch,toast}) {
+function Builds({state,dispatch,toast,openLightbox}) {
   const [creating,setCreating]=useState(false);
   const [buildName,setBuildName]=useState("");
   const [sel,setSel]=useState([]);
   const [buildPhoto,setBuildPhoto]=useState({photoUrl:"",photoRecordId:""});
+  const [deletingBuild,setDeletingBuild]=useState(null);
   const avail=state.parts.filter(p=>p.status==="available");
   const buildCost=avail.filter(p=>sel.includes(p.id)).reduce((s,p)=>s+p.allocatedCost,0);
   const buildMarket=avail.filter(p=>sel.includes(p.id)).reduce((s,p)=>s+p.marketValue,0);
@@ -880,9 +1120,28 @@ function Builds({state,dispatch,toast}) {
     setBuildName("");setSel([]);setCreating(false);setBuildPhoto({photoUrl:"",photoRecordId:""});
   };
   const dissolve=b=>{dispatch({type:"DISSOLVE_BUILD",buildId:b.id});toast(`"${b.name}" dissolved — parts returned`);};
+  const confirmDeleteBuild=()=>{
+    dispatch({type:"DELETE_BUILD",buildId:deletingBuild.id,returnParts:false});
+    toast(`"${deletingBuild.name}" deleted`,"warn");
+    setDeletingBuild(null);
+  };
+
+  // Marketplace-ready spec text, copied to clipboard for pasting into Facebook Marketplace etc.
+  const copySpecs=(build,bp)=>{
+    const lines=[`${build.name}`,"",...bp.map(p=>`• ${p.category}: ${p.name}${p.notes?` (${p.notes})`:""}`),"",`Asking price: ${fmt(bp.reduce((s,p)=>s+p.marketValue,0))}`];
+    const text=lines.join("\n");
+    navigator.clipboard?.writeText(text).then(
+      ()=>toast("Specs copied — paste into your listing ✓"),
+      ()=>toast("Couldn't copy — clipboard not available","error")
+    );
+  };
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
+      {deletingBuild&&(
+        <ConfirmModal title="Delete this build?" message={`"${deletingBuild.name}" will be permanently deleted. Its parts will be deleted too — they will NOT be returned to inventory. Use "Dissolve" instead if you want to keep the parts.`}
+          onConfirm={confirmDeleteBuild} onCancel={()=>setDeletingBuild(null)}/>
+      )}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
         <div><h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Builds</h2>
           <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>Group parts into a sellable PC.</p></div>
@@ -906,6 +1165,7 @@ function Builds({state,dispatch,toast}) {
                     background:checked?"rgba(124,58,237,0.1)":"transparent",
                     border:`1px solid ${checked?"#7c3aed":"#27272a"}`,borderRadius:8,padding:"7px 11px",transition:"all 0.12s"}}>
                     <input type="checkbox" checked={checked} onChange={()=>toggle(p.id)} style={{accentColor:"#7c3aed"}}/>
+                    <PhotoThumb url={p.photoUrl} size={32} seed={p.id.length}/>
                     <span style={{color:"#fff",fontSize:13,flex:1}}>{p.name}</span>
                     <span style={{background:"#27272a",color:"#a1a1aa",fontSize:10,padding:"2px 6px",borderRadius:4}}>{p.category}</span>
                     <span style={{fontFamily:"monospace",fontSize:11,color:"#d4d4d8"}}>{fmt(p.allocatedCost)}</span>
@@ -914,10 +1174,11 @@ function Builds({state,dispatch,toast}) {
               })}
             </div>
           )}
+          {/* Live running cost tally (#"component cost roll-up") */}
           {sel.length>0&&(
             <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #27272a"}}>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}>
-                <span style={{color:"#a1a1aa"}}>Build cost</span><span style={{fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(buildCost)}</span>
+                <span style={{color:"#a1a1aa"}}>Build cost so far ({sel.length} part{sel.length===1?"":"s"})</span><span style={{fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(buildCost)}</span>
               </div>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}>
                 <span style={{color:"#a1a1aa"}}>Market value</span><span style={{fontFamily:"monospace",color:"#d4d4d8"}}>{fmt(buildMarket)}</span>
@@ -943,7 +1204,7 @@ function Builds({state,dispatch,toast}) {
               <Card key={build.id}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,gap:10}}>
                   <div style={{display:"flex",gap:11,minWidth:0}}>
-                    {build.photoUrl&&<PhotoThumb url={build.photoUrl} size={56} seed={build.id.length}/>}
+                    {build.photoUrl&&<PhotoThumb url={build.photoUrl} size={56} seed={build.id.length} onClick={()=>openLightbox(build.photoUrl)}/>}
                     <div><div style={{color:"#fff",fontWeight:600,fontSize:14}}>{build.name}</div>
                       <div style={{color:"#71717a",fontSize:11,marginTop:2}}>{build.date} · {bp.length} parts</div></div>
                   </div>
@@ -959,7 +1220,11 @@ function Builds({state,dispatch,toast}) {
                     </span>
                   ))}
                 </div>
-                <Btn small variant="ghost" onClick={()=>dissolve(build)}>Dissolve Build</Btn>
+                <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+                  <Btn small variant="ghost" onClick={()=>dissolve(build)}>Dissolve Build</Btn>
+                  <Btn small variant="ghost" onClick={()=>copySpecs(build,bp)}>📋 Copy Specs for Listing</Btn>
+                  <Btn small variant="danger" onClick={()=>setDeletingBuild(build)}>🗑 Delete</Btn>
+                </div>
               </Card>
             );
           })}
@@ -972,12 +1237,13 @@ function Builds({state,dispatch,toast}) {
 /* ═══════════════════════════════════════════
    SELL  (#5 price suggestion, #10 buyer name)
 ═══════════════════════════════════════════ */
-function Sell({state,dispatch,toast}) {
+function Sell({state,dispatch,toast,openLightbox}) {
   const [mode,setMode]=useState("part");
   const [selId,setSelId]=useState("");
   const [salePrice,setSalePrice]=useState("");
   const [buyer,setBuyer]=useState("");   // #10
   const [loading,setLoading]=useState(false);
+  const [pickerOpen,setPickerOpen]=useState(false);
   const targetMargin=state.settings?.targetMargin||30;
 
   const avail=state.parts.filter(p=>p.status==="available");
@@ -989,33 +1255,64 @@ function Sell({state,dispatch,toast}) {
   const sp=parseFloat(salePrice)||0;
   const profit=sp-cost;
   const margin=cost>0?profit/cost:0;
+  const selectedPhoto=mode==="part"?tp?.photoUrl:tb?.photoUrl;
+  const selectedLabel=mode==="part"?tp?.name:tb?.name;
 
   const submit=()=>{
     if(!selId||!salePrice){toast("Select item and enter price","error");return;}
     setLoading(true);
     const name=mode==="part"?tp?.name:tb?.name;
     setTimeout(()=>{
-      dispatch({type:"SELL",mode,id:selId,sale:{id:uid(),name,cost,salePrice:sp,profit,buyerName:buyer,date:today()}});
+      dispatch({type:"SELL",mode,id:selId,sale:{id:uid(),partId:mode==="part"?selId:null,name,cost,salePrice:sp,profit,buyerName:buyer,date:today()}});
       toast(`${name} sold for ${fmt(sp)} — profit ${fmt(profit)} ✓`,profit>=0?"success":"warn");
       setSelId("");setSalePrice("");setBuyer("");setLoading(false);
     },400);
   };
+
+  const list=mode==="part"?avail:builds;
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
       <div><h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Sell</h2>
         <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>Record a sale and lock in your profit.</p></div>
       <div style={{display:"flex",gap:8}}>
-        <Btn variant={mode==="part"?"primary":"ghost"} onClick={()=>{setMode("part");setSelId("");}}>Sell Part</Btn>
-        <Btn variant={mode==="build"?"primary":"ghost"} onClick={()=>{setMode("build");setSelId("");}}>Sell Build</Btn>
+        <Btn variant={mode==="part"?"primary":"ghost"} onClick={()=>{setMode("part");setSelId("");setPickerOpen(false);}}>Sell Part</Btn>
+        <Btn variant={mode==="build"?"primary":"ghost"} onClick={()=>{setMode("build");setSelId("");setPickerOpen(false);}}>Sell Build</Btn>
       </div>
       <Card>
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
-          <Sel label={mode==="part"?"Select part":"Select build"} value={selId} onChange={e=>setSelId(e.target.value)}>
-            <option value="">— choose —</option>
-            {mode==="part"?avail.map(p=><option key={p.id} value={p.id}>{p.name} · {fmt(p.allocatedCost)}</option>)
-              :builds.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
-          </Sel>
+          {/* Photo-enabled picker — a native <select> can't render images, so this is a custom dropdown */}
+          <div>
+            <div style={{fontSize:12,color:"#a1a1aa",marginBottom:5}}>{mode==="part"?"Select part":"Select build"}</div>
+            <button type="button" onClick={()=>setPickerOpen(o=>!o)} style={{width:"100%",display:"flex",alignItems:"center",gap:10,
+              background:"#09090b",border:"1px solid #3f3f46",borderRadius:9,padding:"9px 12px",cursor:"pointer",textAlign:"left"}}>
+              {selId?(
+                <>
+                  <PhotoThumb url={selectedPhoto} size={34} seed={selId.length}/>
+                  <span style={{color:"#fff",fontSize:13,flex:1}}>{selectedLabel}</span>
+                  <span style={{fontFamily:"monospace",fontSize:12,color:"#a1a1aa"}}>{mode==="part"?fmt(tp?.allocatedCost||0):""}</span>
+                </>
+              ):<span style={{color:"#52525b",fontSize:13,flex:1}}>— choose —</span>}
+              <span style={{color:"#71717a",fontSize:11}}>{pickerOpen?"▲":"▼"}</span>
+            </button>
+            {pickerOpen&&(
+              <div style={{marginTop:6,border:"1px solid #27272a",borderRadius:9,overflow:"hidden",maxHeight:280,overflowY:"auto",animation:"fadeUp 0.15s ease"}}>
+                {list.length===0?(
+                  <div style={{padding:14,color:"#52525b",fontSize:13}}>Nothing available to sell.</div>
+                ):list.map(item=>(
+                  <button key={item.id} type="button" onClick={()=>{setSelId(item.id);setPickerOpen(false);}}
+                    style={{width:"100%",display:"flex",alignItems:"center",gap:10,background:selId===item.id?"rgba(124,58,237,0.12)":"#18181b",
+                      border:"none",borderBottom:"1px solid #27272a",padding:"9px 12px",cursor:"pointer",textAlign:"left"}}
+                    onMouseEnter={e=>e.currentTarget.style.background="rgba(124,58,237,0.08)"}
+                    onMouseLeave={e=>e.currentTarget.style.background=selId===item.id?"rgba(124,58,237,0.12)":"#18181b"}>
+                    <PhotoThumb url={item.photoUrl} size={34} seed={item.id.length}/>
+                    <span style={{color:"#fff",fontSize:13,flex:1}}>{item.name}</span>
+                    <span style={{fontFamily:"monospace",fontSize:12,color:"#a1a1aa"}}>{mode==="part"?fmt(item.allocatedCost):""}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {/* Price suggestion  (#5) */}
           {selId&&cost>0&&(
             <div style={{background:"rgba(124,58,237,0.08)",border:"1px solid rgba(124,58,237,0.25)",borderRadius:9,padding:"9px 12px",fontSize:12,color:"#a78bfa",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -1050,7 +1347,7 @@ function Sell({state,dispatch,toast}) {
 /* ═══════════════════════════════════════════
    HISTORY  (+ #4 CSV export)
 ═══════════════════════════════════════════ */
-function History({state}) {
+function History({state,openLightbox}) {
   const [sel,setSel]=useState("");
   const part=state.parts.find(p=>p.id===sel);
 
@@ -1058,8 +1355,8 @@ function History({state}) {
   const exportCSV=()=>{
     const rows=[["Name","Category","Source","Cost","Market Value","Status","Sale Price","Profit","Buyer","Date"]];
     state.parts.forEach(p=>{
-      const sale=state.sales.find(s=>s.name===p.name);
-      rows.push([p.name,p.category,p.source,p.allocatedCost,p.marketValue,p.status,sale?sale.salePrice:"",sale?sale.profit:"",sale?sale.buyerName||"":"",state.sales.find(s=>s.name===p.name)?.date||""]);
+      const sale=state.sales.find(s=>s.partId===p.id)||state.sales.find(s=>s.name===p.name);
+      rows.push([p.name,p.category,p.source,p.allocatedCost,p.marketValue,p.status,sale?sale.salePrice:"",sale?sale.profit:"",sale?sale.buyerName||"":"",sale?.date||""]);
     });
     const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
     const blob=new Blob([csv],{type:"text/csv"});
@@ -1086,7 +1383,7 @@ function History({state}) {
         <Card>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14,gap:10}}>
             <div style={{display:"flex",gap:11,minWidth:0}}>
-              {part.photoUrl&&<PhotoThumb url={part.photoUrl} size={56} seed={part.id.length}/>}
+              {part.photoUrl&&<PhotoThumb url={part.photoUrl} size={56} seed={part.id.length} onClick={()=>openLightbox(part.photoUrl)}/>}
               <div>
                 <div style={{color:"#fff",fontWeight:600,fontSize:15}}>{part.name}</div>
                 <div style={{color:"#71717a",fontSize:11,marginTop:2}}>{part.category} · {part.source}</div>
@@ -1237,6 +1534,8 @@ export default function App() {
   const [tab,setTab]=useState("Dashboard");
   const {toasts,toast}=useToast();
   const [theme,setTheme]=useState("dark");  // #9
+  const [lightboxUrl,setLightboxUrl]=useState(null);
+  const openLightbox=useCallback(url=>setLightboxUrl(url),[]);
 
   if(loadStatus==="loading"){
     return <div style={{minHeight:"100vh",background:"#09090b",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui,sans-serif"}}>Loading your data…</div>;
@@ -1323,14 +1622,16 @@ export default function App() {
 
       {/* Content */}
       <div key={tab} style={{maxWidth:740,margin:"0 auto",padding:"22px 16px calc(40px + env(safe-area-inset-bottom))",animation:"fadeUp 0.22s ease"}}>
-        {tab==="Dashboard" && <Dashboard state={state} setTab={setTab}/>}
+        {tab==="Dashboard" && <Dashboard state={state} setTab={setTab} openLightbox={openLightbox}/>}
         {tab==="Buy"       && <Buy state={state} dispatch={dispatch} toast={toast}/>}
-        {tab==="Inventory" && <Inventory state={state} dispatch={dispatch} toast={toast} setTab={setTab}/>}
-        {tab==="Builds"    && <Builds state={state} dispatch={dispatch} toast={toast}/>}
-        {tab==="Sell"      && <Sell state={state} dispatch={dispatch} toast={toast}/>}
-        {tab==="History"   && <History state={state}/>}
+        {tab==="Inventory" && <Inventory state={state} dispatch={dispatch} toast={toast} setTab={setTab} openLightbox={openLightbox}/>}
+        {tab==="Builds"    && <Builds state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/>}
+        {tab==="Sell"      && <Sell state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/>}
+        {tab==="History"   && <History state={state} openLightbox={openLightbox}/>}
         {tab==="Settings"  && <Settings state={state} dispatch={dispatch} toast={toast} theme={theme} setTheme={setTheme}/>}
       </div>
+
+      <Lightbox url={lightboxUrl} onClose={()=>setLightboxUrl(null)}/>
     </div>
   );
 }
