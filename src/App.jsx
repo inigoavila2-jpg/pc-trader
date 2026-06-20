@@ -129,6 +129,84 @@ function Badge({s}) {
   return <span style={{background:c.bg,border:`1px solid ${c.border}`,color:c.color,fontSize:10,padding:"2px 7px",borderRadius:6,fontFamily:"monospace",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:600,whiteSpace:"nowrap"}}>{s.replace("_"," ")}</span>;
 }
 
+/* ═══════════════════════════════════════════
+   PHOTO UPLOAD — single image, upload from gallery
+═══════════════════════════════════════════ */
+function PhotoUpload({photoUrl,photoRecordId,onChange,label="Photo"}) {
+  const [status,setStatus]=useState("idle"); // idle | uploading | error
+  const inputRef=useRef(null);
+
+  const handleFile=async(file)=>{
+    if(!file)return;
+    if(!file.type.startsWith("image/")){setStatus("error");return;}
+    setStatus("uploading");
+    try{
+      const form=new FormData();
+      form.append("photo",file);
+      const res=await fetch("/photo",{method:"POST",body:form});
+      if(!res.ok)throw new Error(`Upload failed (${res.status})`);
+      const {url,recordId}=await res.json();
+      // Clean up the old photo if one is being replaced — best effort, won't block the UI
+      if(photoRecordId){fetch(`/photo/${photoRecordId}`,{method:"DELETE"}).catch(()=>{});}
+      onChange({photoUrl:url,photoRecordId:recordId});
+      setStatus("idle");
+    }catch(err){
+      console.error("Photo upload error:",err);
+      setStatus("error");
+    }
+  };
+
+  const removePhoto=()=>{
+    if(photoRecordId){fetch(`/photo/${photoRecordId}`,{method:"DELETE"}).catch(()=>{});}
+    onChange({photoUrl:"",photoRecordId:""});
+  };
+
+  return (
+    <div>
+      <div style={{fontSize:12,color:"#a1a1aa",marginBottom:5}}>{label}</div>
+      <input ref={inputRef} type="file" accept="image/*" style={{display:"none"}}
+        onChange={e=>handleFile(e.target.files?.[0])}/>
+      {photoUrl?(
+        <div style={{position:"relative",display:"inline-block"}}>
+          <img src={photoUrl} alt="" style={{width:96,height:96,objectFit:"cover",borderRadius:10,border:"1px solid #3f3f46",display:"block"}}/>
+          <button onClick={removePhoto} type="button" style={{position:"absolute",top:-7,right:-7,width:22,height:22,borderRadius:"50%",
+            background:"#ef4444",border:"2px solid #18181b",color:"#fff",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>✕</button>
+        </div>
+      ):(
+        <button type="button" onClick={()=>inputRef.current?.click()} disabled={status==="uploading"}
+          style={{width:96,height:96,borderRadius:10,border:"1.5px dashed #3f3f46",background:"#09090b",color:"#71717a",
+            display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,cursor:status==="uploading"?"wait":"pointer",
+            fontSize:11,transition:"border-color 0.15s,color 0.15s"}}
+          onMouseEnter={e=>{if(status!=="uploading"){e.currentTarget.style.borderColor="#7c3aed";e.currentTarget.style.color="#a78bfa";}}}
+          onMouseLeave={e=>{e.currentTarget.style.borderColor="#3f3f46";e.currentTarget.style.color="#71717a";}}>
+          {status==="uploading"?(
+            <span style={{animation:"spin 0.6s linear infinite",fontSize:18,display:"inline-block"}}>⟳</span>
+          ):(
+            <><span style={{fontSize:20}}>📷</span><span>Add photo</span></>
+          )}
+        </button>
+      )}
+      {status==="error"&&<div style={{color:"#f87171",fontSize:11,marginTop:5}}>Upload failed — try again</div>}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   PHOTO THUMB — Polaroid-tilt display thumbnail (signature element)
+═══════════════════════════════════════════ */
+function PhotoThumb({url,size=52,seed=0}) {
+  if(!url)return null;
+  // Deterministic slight tilt per item so the grid feels like a physical parts bin, not a uniform UI
+  const tilt=((seed%5)-2)*1.6;
+  return (
+    <div style={{width:size,height:size,flexShrink:0,transform:`rotate(${tilt}deg)`,transition:"transform 0.2s"}}
+      onMouseEnter={e=>e.currentTarget.style.transform=`rotate(0deg) scale(1.06)`}
+      onMouseLeave={e=>e.currentTarget.style.transform=`rotate(${tilt}deg) scale(1)`}>
+      <img src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:7,border:"2px solid #27272a",boxShadow:"0 3px 8px rgba(0,0,0,0.4)",display:"block"}}/>
+    </div>
+  );
+}
+
 function Card({children,style={}}) {
   const [v,setV]=useState(false);
   useEffect(()=>{const t=setTimeout(()=>setV(true),30);return()=>clearTimeout(t);},[]);
@@ -266,22 +344,24 @@ function EditPartModal({part,onClose,onSave}) {
   const [cost,setCost]=useState(String(part.allocatedCost));
   const [market,setMarket]=useState(String(part.marketValue));
   const [notes,setNotes]=useState(part.notes||"");
+  const [photo,setPhoto]=useState({photoUrl:part.photoUrl||"",photoRecordId:part.photoRecordId||""});
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
-      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:24,width:"100%",maxWidth:420,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
+      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:24,width:"100%",maxWidth:420,animation:"fadeUp 0.2s ease",maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
         <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:16}}>Edit Part</div>
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <PhotoUpload label="Photo" photoUrl={photo.photoUrl} photoRecordId={photo.photoRecordId} onChange={setPhoto}/>
           <Inp label="Name" value={name} onChange={e=>setName(e.target.value)}/>
           <Sel label="Category" value={cat} onChange={e=>setCat(e.target.value)}>
             {CATEGORIES.map(c=><option key={c}>{c}</option>)}
           </Sel>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             <Inp label="Cost (₱)" type="number" value={cost} onChange={e=>setCost(e.target.value)}/>
             <Inp label="Market value (₱)" type="number" value={market} onChange={e=>setMarket(e.target.value)}/>
           </div>
           <Inp label="Notes (condition, extras, etc.)" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Tested working, fan slightly loud"/>
           <div style={{display:"flex",gap:8,marginTop:4}}>
-            <Btn onClick={()=>onSave({name,category:cat,allocatedCost:parseFloat(cost)||part.allocatedCost,marketValue:parseFloat(market)||part.marketValue,notes},`cost→${fmt(parseFloat(cost)||part.allocatedCost)}`)} style={{flex:1}}>Save Changes</Btn>
+            <Btn onClick={()=>onSave({name,category:cat,allocatedCost:parseFloat(cost)||part.allocatedCost,marketValue:parseFloat(market)||part.marketValue,notes,photoUrl:photo.photoUrl,photoRecordId:photo.photoRecordId},`cost→${fmt(parseFloat(cost)||part.allocatedCost)}`)} style={{flex:1}}>Save Changes</Btn>
             <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
           </div>
         </div>
@@ -320,6 +400,43 @@ function Dashboard({state,setTab}) {
     return {...b,bParts,soldParts,unsoldParts,recovered,unsoldMarket};
   });
 
+  // Insight: profit by category — which part types are actually worth buying
+  const categoryProfit = {};
+  sales.forEach(s=>{
+    const part=parts.find(p=>p.name===s.name);
+    const cat=part?.category||"Other";
+    if(!categoryProfit[cat])categoryProfit[cat]={profit:0,count:0};
+    categoryProfit[cat].profit+=s.profit;
+    categoryProfit[cat].count+=1;
+  });
+  const categoryRows=Object.entries(categoryProfit).sort((a,b)=>b[1].profit-a[1].profit);
+  const maxCatProfit=Math.max(1,...categoryRows.map(([,v])=>Math.abs(v.profit)));
+
+  // Insight: cumulative profit sparkline over sale sequence
+  let running=0;
+  const cumPoints=sales.map(s=>{running+=s.profit;return running;});
+  const sparkMax=Math.max(1,...cumPoints.map(Math.abs));
+  const sparkPath=cumPoints.length>1?cumPoints.map((v,i)=>{
+    const x=(i/(cumPoints.length-1))*100;
+    const y=50-(v/sparkMax)*45;
+    return `${i===0?"M":"L"}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" "):"";
+
+  // Insight: average days held before sale — flags whether inventory is moving or going stale
+  const holdDurations=[];
+  parts.filter(p=>p.status==="sold").forEach(p=>{
+    const sale=sales.find(s=>s.name===p.name);
+    const bought=p.history?.[0]?.date;
+    if(sale&&bought){
+      const d1=new Date(bought).getTime(),d2=new Date(sale.date).getTime();
+      if(!isNaN(d1)&&!isNaN(d2)){
+        const days=Math.max(0,Math.round((d2-d1)/86400000));
+        holdDurations.push(days);
+      }
+    }
+  });
+  const avgDaysToSell=holdDurations.length?Math.round(holdDurations.reduce((s,d)=>s+d,0)/holdDurations.length):null;
+
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
       <div>
@@ -332,6 +449,7 @@ function Dashboard({state,setTab}) {
         <StatBox label="Total Revenue" value={fmt(totalRevenue)} color="#34d399"/>
         <StatBox label="Capital at Risk" value={fmt(atRisk)} color="#f59e0b" sub="locked in unsold parts"/>
         <StatBox label="Capital Recovered" value={fmt(recovered)} sub={`${parts.length>0?Math.round(recovered/totalCapital*100):0}% of total`}/>
+        {avgDaysToSell!==null&&<StatBox label="Avg. Days to Sell" value={`${avgDaysToSell}d`} color="#38bdf8" sub={`across ${holdDurations.length} sold part${holdDurations.length===1?"":"s"}`}/>}
       </div>
 
       {/* Capital at risk bar  (#6) */}
@@ -357,6 +475,46 @@ function Dashboard({state,setTab}) {
           </Card>
         ))}
       </div>
+
+      {/* Insight: cumulative profit sparkline */}
+      {cumPoints.length>1&&(
+        <Card>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
+            <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em"}}>Profit Trend</div>
+            <div style={{fontSize:11,color:totalProfit>=0?"#34d399":"#f87171",fontFamily:"monospace"}}>{totalProfit>=0?"+":""}{fmt(totalProfit)} all-time</div>
+          </div>
+          <svg viewBox="0 0 100 50" style={{width:"100%",height:60,display:"block"}} preserveAspectRatio="none">
+            <line x1="0" y1="25" x2="100" y2="25" stroke="#27272a" strokeWidth="0.5"/>
+            <path d={sparkPath} fill="none" stroke={totalProfit>=0?"#34d399":"#f87171"} strokeWidth="2" vectorEffect="non-scaling-stroke"
+              style={{filter:`drop-shadow(0 0 4px ${totalProfit>=0?"rgba(52,211,153,0.4)":"rgba(248,113,113,0.4)"})`}}/>
+          </svg>
+          <div style={{fontSize:10,color:"#52525b",marginTop:2}}>Running profit across {sales.length} sale{sales.length===1?"":"s"}, in order</div>
+        </Card>
+      )}
+
+      {/* Insight: profit by category */}
+      {categoryRows.length>0&&(
+        <Card>
+          <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:14}}>Most Profitable Categories</div>
+          <div style={{display:"flex",flexDirection:"column",gap:11}}>
+            {categoryRows.map(([cat,v])=>{
+              const w=Math.abs(v.profit)/maxCatProfit*100;
+              const positive=v.profit>=0;
+              return (
+                <div key={cat}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                    <span style={{fontSize:12,color:"#d4d4d8"}}>{cat} <span style={{color:"#52525b"}}>({v.count} sold)</span></span>
+                    <span style={{fontSize:12,fontFamily:"monospace",fontWeight:700,color:positive?"#34d399":"#f87171"}}>{positive?"+":""}{fmt(v.profit)}</span>
+                  </div>
+                  <div style={{height:5,background:"#27272a",borderRadius:99}}>
+                    <div style={{height:"100%",width:`${w}%`,background:positive?"#22c55e":"#ef4444",borderRadius:99,transition:"width 0.7s cubic-bezier(0.34,1.2,0.64,1)"}}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       {/* Bundle P&L  (#7) */}
       {bundlePnl.length>0&&(
@@ -426,21 +584,34 @@ function Buy({state,dispatch,toast}) {
   const [mode,setMode]=useState("bundle");
   const [bundleName,setBundleName]=useState("");
   const [purchasePrice,setPurchasePrice]=useState("");
-  const [partRows,setPartRows]=useState([{id:uid(),name:"",category:"GPU",marketValue:""}]);
+  const [bundlePhoto,setBundlePhoto]=useState({photoUrl:"",photoRecordId:""});
+  const [partRows,setPartRows]=useState([{id:uid(),name:"",category:"GPU",marketValue:"",notes:"",photoUrl:"",photoRecordId:""}]);
   const [singleName,setSingleName]=useState("");
   const [singleCat,setSingleCat]=useState("GPU");
   const [singleCost,setSingleCost]=useState("");
   const [singleMarket,setSingleMarket]=useState("");
   const [singleNotes,setSingleNotes]=useState("");
+  const [singlePhoto,setSinglePhoto]=useState({photoUrl:"",photoRecordId:""});
   const [loading,setLoading]=useState(false);
 
   const totalMarket=partRows.reduce((s,r)=>s+(parseFloat(r.marketValue)||0),0);
   const paid=parseFloat(purchasePrice)||0;
   const dealScore=paid>0&&totalMarket>0?totalMarket/paid:null;
 
-  const addRow=()=>setPartRows(p=>[...p,{id:uid(),name:"",category:"GPU",marketValue:"",notes:""}]);
+  const addRow=()=>setPartRows(p=>[...p,{id:uid(),name:"",category:"GPU",marketValue:"",notes:"",photoUrl:"",photoRecordId:""}]);
   const removeRow=id=>setPartRows(p=>p.filter(r=>r.id!==id));
   const updateRow=(id,field,val)=>setPartRows(p=>p.map(r=>r.id===id?{...r,[field]:val}:r));
+
+  // Speed feature: duplicate the most recent bundle's structure (names/categories) so
+  // re-buying a similar batch doesn't mean re-typing everything from scratch.
+  const duplicateLastBundle=()=>{
+    const last=state.bundles[state.bundles.length-1];
+    if(!last)return;
+    const lastParts=state.parts.filter(p=>p.bundleId===last.id);
+    setBundleName(last.name);
+    setPartRows(lastParts.length?lastParts.map(p=>({id:uid(),name:p.name,category:p.category,marketValue:"",notes:"",photoUrl:"",photoRecordId:""})):[{id:uid(),name:"",category:"GPU",marketValue:"",notes:"",photoUrl:"",photoRecordId:""}]);
+    toast(`Loaded structure from "${last.name}" — update prices ✓`);
+  };
 
   const submitBundle=()=>{
     if(!bundleName||!purchasePrice||totalMarket===0){toast("Fill all fields and add part values","error");return;}
@@ -455,11 +626,14 @@ function Buy({state,dispatch,toast}) {
         const alloc=share*paid;
         return {id:uid(),name:r.name,category:r.category,marketValue:mv,allocatedCost:alloc,
           source:src,bundleId,status:"available",notes:r.notes||"",soldTo:"",
+          photoUrl:r.photoUrl||"",photoRecordId:r.photoRecordId||"",
           history:[{date:today(),event:`Bought via ${src} — allocated ${fmt(alloc)}`}]};
       });
-      dispatch({type:"ADD_BUNDLE",bundle:{id:bundleId,name:bundleName,purchasePrice:paid,totalMarket,date:today()},parts:newParts});
+      dispatch({type:"ADD_BUNDLE",bundle:{id:bundleId,name:bundleName,purchasePrice:paid,totalMarket,date:today(),
+        photoUrl:bundlePhoto.photoUrl,photoRecordId:bundlePhoto.photoRecordId},parts:newParts});
       toast(`Bundle added — ${newParts.length} parts in inventory ✓`);
-      setBundleName("");setPurchasePrice("");setPartRows([{id:uid(),name:"",category:"GPU",marketValue:""}]);
+      setBundleName("");setPurchasePrice("");setPartRows([{id:uid(),name:"",category:"GPU",marketValue:"",notes:"",photoUrl:"",photoRecordId:""}]);
+      setBundlePhoto({photoUrl:"",photoRecordId:""});
       setLoading(false);
     },400);
   };
@@ -472,9 +646,11 @@ function Buy({state,dispatch,toast}) {
       const market=parseFloat(singleMarket)||cost;
       dispatch({type:"ADD_PARTS",parts:[{id:uid(),name:singleName,category:singleCat,marketValue:market,
         allocatedCost:cost,source:"Direct purchase",bundleId:null,status:"available",notes:singleNotes,soldTo:"",
+        photoUrl:singlePhoto.photoUrl,photoRecordId:singlePhoto.photoRecordId,
         history:[{date:today(),event:`Bought for ${fmt(cost)}`}]}]});
       toast(`${singleName} added ✓`);
       setSingleName("");setSingleCost("");setSingleMarket("");setSingleNotes("");setSingleCat("GPU");
+      setSinglePhoto({photoUrl:"",photoRecordId:""});
       setLoading(false);
     },300);
   };
@@ -490,23 +666,35 @@ function Buy({state,dispatch,toast}) {
 
       {mode==="bundle"&&(
         <Card>
-          <div style={{fontWeight:600,fontSize:13,color:"#d4d4d8",marginBottom:14}}>Bundle Details</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:18}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <div style={{fontWeight:600,fontSize:13,color:"#d4d4d8"}}>Bundle Details</div>
+            {state.bundles.length>0&&(
+              <button onClick={duplicateLastBundle} style={{background:"none",border:"none",color:"#7c3aed",cursor:"pointer",fontSize:11.5,fontWeight:600,padding:0}}
+                onMouseEnter={e=>e.currentTarget.style.color="#a78bfa"} onMouseLeave={e=>e.currentTarget.style.color="#7c3aed"}>↻ Duplicate last bundle</button>
+            )}
+          </div>
+          <div style={{marginBottom:16}}>
+            <PhotoUpload label="Bundle photo (optional)" photoUrl={bundlePhoto.photoUrl} photoRecordId={bundlePhoto.photoRecordId} onChange={setBundlePhoto}/>
+          </div>
+          <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:18}}>
             <Inp label="Source / seller" value={bundleName} onChange={e=>setBundleName(e.target.value)} placeholder="FB Marketplace – Juan"/>
             <Inp label="You paid (₱)" type="number" value={purchasePrice} onChange={e=>setPurchasePrice(e.target.value)} placeholder="8000"/>
           </div>
           <div style={{fontWeight:600,fontSize:13,color:"#d4d4d8",marginBottom:10}}>Parts — enter estimated market value</div>
-          <div style={{display:"flex",flexDirection:"column",gap:9}}>
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
             {partRows.map((row,idx)=>(
-              <div key={row.id} style={{display:"grid",gridTemplateColumns:"1fr auto 90px 90px auto",gap:7,alignItems:"end",animation:"fadeUp 0.15s ease"}}>
-                <Inp label={idx===0?"Part name":""} value={row.name} onChange={e=>updateRow(row.id,"name",e.target.value)} placeholder="RX 580"/>
-                <Sel label={idx===0?"Cat":"."} value={row.category} onChange={e=>updateRow(row.id,"category",e.target.value)} style={{minWidth:90}}>
-                  {CATEGORIES.map(c=><option key={c}>{c}</option>)}
-                </Sel>
-                <Inp label={idx===0?"Market (₱)":""} type="number" value={row.marketValue} onChange={e=>updateRow(row.id,"marketValue",e.target.value)} placeholder="4000"/>
-                <Inp label={idx===0?"Notes":""} value={row.notes||""} onChange={e=>updateRow(row.id,"notes",e.target.value)} placeholder="condition"/>
-                <button onClick={()=>removeRow(row.id)} style={{background:"none",border:"none",color:"#52525b",cursor:"pointer",fontSize:17,paddingBottom:idx===0?0:2,transition:"color 0.1s"}}
-                  onMouseEnter={e=>e.currentTarget.style.color="#ef4444"} onMouseLeave={e=>e.currentTarget.style.color="#52525b"}>✕</button>
+              <div key={row.id} style={{display:"flex",gap:10,alignItems:"flex-start",animation:"fadeUp 0.15s ease",paddingBottom:12,borderBottom:idx<partRows.length-1?"1px solid #1f1f23":"none"}}>
+                <PhotoUpload label="" photoUrl={row.photoUrl} photoRecordId={row.photoRecordId} onChange={({photoUrl,photoRecordId})=>{updateRow(row.id,"photoUrl",photoUrl);updateRow(row.id,"photoRecordId",photoRecordId);}}/>
+                <div className="part-row" style={{display:"grid",gridTemplateColumns:"1fr auto 90px 90px auto",gap:7,alignItems:"end",flex:1}}>
+                  <Inp label={idx===0?"Part name":""} value={row.name} onChange={e=>updateRow(row.id,"name",e.target.value)} placeholder="RX 580"/>
+                  <Sel label={idx===0?"Cat":"."} value={row.category} onChange={e=>updateRow(row.id,"category",e.target.value)} style={{minWidth:90}}>
+                    {CATEGORIES.map(c=><option key={c}>{c}</option>)}
+                  </Sel>
+                  <Inp label={idx===0?"Market (₱)":""} type="number" value={row.marketValue} onChange={e=>updateRow(row.id,"marketValue",e.target.value)} placeholder="4000"/>
+                  <Inp label={idx===0?"Notes":""} value={row.notes||""} onChange={e=>updateRow(row.id,"notes",e.target.value)} placeholder="condition"/>
+                  <button onClick={()=>removeRow(row.id)} style={{background:"none",border:"none",color:"#52525b",cursor:"pointer",fontSize:20,padding:"6px 4px",minHeight:36,transition:"color 0.1s"}}
+                    onMouseEnter={e=>e.currentTarget.style.color="#ef4444"} onMouseLeave={e=>e.currentTarget.style.color="#52525b"}>✕ Remove</button>
+                </div>
               </div>
             ))}
           </div>
@@ -541,7 +729,10 @@ function Buy({state,dispatch,toast}) {
       {mode==="single"&&(
         <Card>
           <div style={{fontWeight:600,fontSize:13,color:"#d4d4d8",marginBottom:14}}>Single Part</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <div style={{marginBottom:16}}>
+            <PhotoUpload label="Photo (optional)" photoUrl={singlePhoto.photoUrl} photoRecordId={singlePhoto.photoRecordId} onChange={setSinglePhoto}/>
+          </div>
+          <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             <Inp label="Part name" value={singleName} onChange={e=>setSingleName(e.target.value)} placeholder="GTX 1060 6GB"/>
             <Sel label="Category" value={singleCat} onChange={e=>setSingleCat(e.target.value)}>
               {CATEGORIES.map(c=><option key={c}>{c}</option>)}
@@ -625,17 +816,20 @@ function Inventory({state,dispatch,toast,setTab}) {
               onMouseEnter={e=>e.currentTarget.style.borderColor="#52525b"}
               onMouseLeave={e=>e.currentTarget.style.borderColor="#27272a"}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:4,flexWrap:"wrap"}}>
-                    <span style={{color:"#fff",fontWeight:600,fontSize:14}}>{p.name}</span>
-                    <span style={{background:"#27272a",color:"#a1a1aa",fontSize:10,padding:"2px 6px",borderRadius:5}}>{p.category}</span>
-                    <Badge s={p.status}/>
+                <div style={{display:"flex",gap:11,flex:1,minWidth:0}}>
+                  <PhotoThumb url={p.photoUrl} seed={i}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:4,flexWrap:"wrap"}}>
+                      <span style={{color:"#fff",fontWeight:600,fontSize:14}}>{p.name}</span>
+                      <span style={{background:"#27272a",color:"#a1a1aa",fontSize:10,padding:"2px 6px",borderRadius:5}}>{p.category}</span>
+                      <Badge s={p.status}/>
+                    </div>
+                    <div style={{color:"#71717a",fontSize:11}}>{p.source}</div>
+                    {/* Notes  (#3) */}
+                    {p.notes&&<div style={{color:"#a1a1aa",fontSize:11,marginTop:3,fontStyle:"italic"}}>📝 {p.notes}</div>}
+                    {/* Buyer  (#10) */}
+                    {p.soldTo&&<div style={{color:"#71717a",fontSize:11,marginTop:2}}>Sold to: {p.soldTo}</div>}
                   </div>
-                  <div style={{color:"#71717a",fontSize:11}}>{p.source}</div>
-                  {/* Notes  (#3) */}
-                  {p.notes&&<div style={{color:"#a1a1aa",fontSize:11,marginTop:3,fontStyle:"italic"}}>📝 {p.notes}</div>}
-                  {/* Buyer  (#10) */}
-                  {p.soldTo&&<div style={{color:"#71717a",fontSize:11,marginTop:2}}>Sold to: {p.soldTo}</div>}
                 </div>
                 <div style={{display:"flex",gap:14,textAlign:"right",flexShrink:0}}>
                   {[["Cost",fmt(p.allocatedCost),"#fff"],["Market",fmt(p.marketValue),"#d4d4d8"],
@@ -673,6 +867,7 @@ function Builds({state,dispatch,toast}) {
   const [creating,setCreating]=useState(false);
   const [buildName,setBuildName]=useState("");
   const [sel,setSel]=useState([]);
+  const [buildPhoto,setBuildPhoto]=useState({photoUrl:"",photoRecordId:""});
   const avail=state.parts.filter(p=>p.status==="available");
   const buildCost=avail.filter(p=>sel.includes(p.id)).reduce((s,p)=>s+p.allocatedCost,0);
   const buildMarket=avail.filter(p=>sel.includes(p.id)).reduce((s,p)=>s+p.marketValue,0);
@@ -680,9 +875,9 @@ function Builds({state,dispatch,toast}) {
 
   const submit=()=>{
     if(!buildName||sel.length===0){toast("Name the build and pick parts","error");return;}
-    dispatch({type:"CREATE_BUILD",build:{id:uid(),name:buildName,partIds:sel,date:today()}});
+    dispatch({type:"CREATE_BUILD",build:{id:uid(),name:buildName,partIds:sel,date:today(),photoUrl:buildPhoto.photoUrl,photoRecordId:buildPhoto.photoRecordId}});
     toast(`Build "${buildName}" created ✓`);
-    setBuildName("");setSel([]);setCreating(false);
+    setBuildName("");setSel([]);setCreating(false);setBuildPhoto({photoUrl:"",photoRecordId:""});
   };
   const dissolve=b=>{dispatch({type:"DISSOLVE_BUILD",buildId:b.id});toast(`"${b.name}" dissolved — parts returned`);};
 
@@ -697,6 +892,9 @@ function Builds({state,dispatch,toast}) {
       {creating&&(
         <Card>
           <div style={{fontWeight:600,fontSize:13,color:"#d4d4d8",marginBottom:12}}>New Build</div>
+          <div style={{marginBottom:14}}>
+            <PhotoUpload label="Build photo (optional) — the finished PC" photoUrl={buildPhoto.photoUrl} photoRecordId={buildPhoto.photoRecordId} onChange={setBuildPhoto}/>
+          </div>
           <Inp label="Build name" value={buildName} onChange={e=>setBuildName(e.target.value)} placeholder="Gaming Rig #1"/>
           <div style={{fontSize:12,color:"#a1a1aa",margin:"12px 0 8px"}}>Select parts:</div>
           {avail.length===0?<div style={{color:"#52525b",fontSize:13}}>No available parts.</div>:(
@@ -743,10 +941,13 @@ function Builds({state,dispatch,toast}) {
             const market=bp.reduce((s,p)=>s+p.marketValue,0);
             return (
               <Card key={build.id}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-                  <div><div style={{color:"#fff",fontWeight:600,fontSize:14}}>{build.name}</div>
-                    <div style={{color:"#71717a",fontSize:11,marginTop:2}}>{build.date} · {bp.length} parts</div></div>
-                  <div style={{textAlign:"right"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,gap:10}}>
+                  <div style={{display:"flex",gap:11,minWidth:0}}>
+                    {build.photoUrl&&<PhotoThumb url={build.photoUrl} size={56} seed={build.id.length}/>}
+                    <div><div style={{color:"#fff",fontWeight:600,fontSize:14}}>{build.name}</div>
+                      <div style={{color:"#71717a",fontSize:11,marginTop:2}}>{build.date} · {bp.length} parts</div></div>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
                     <div style={{fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(cost)}</div>
                     <div style={{fontSize:10,color:"#71717a"}}>market {fmt(market)}</div>
                   </div>
@@ -883,12 +1084,15 @@ function History({state}) {
 
       {part&&(
         <Card>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
-            <div>
-              <div style={{color:"#fff",fontWeight:600,fontSize:15}}>{part.name}</div>
-              <div style={{color:"#71717a",fontSize:11,marginTop:2}}>{part.category} · {part.source}</div>
-              {part.notes&&<div style={{color:"#a1a1aa",fontSize:11,marginTop:3,fontStyle:"italic"}}>📝 {part.notes}</div>}
-              {part.soldTo&&<div style={{color:"#71717a",fontSize:11,marginTop:2}}>Sold to: {part.soldTo}</div>}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14,gap:10}}>
+            <div style={{display:"flex",gap:11,minWidth:0}}>
+              {part.photoUrl&&<PhotoThumb url={part.photoUrl} size={56} seed={part.id.length}/>}
+              <div>
+                <div style={{color:"#fff",fontWeight:600,fontSize:15}}>{part.name}</div>
+                <div style={{color:"#71717a",fontSize:11,marginTop:2}}>{part.category} · {part.source}</div>
+                {part.notes&&<div style={{color:"#a1a1aa",fontSize:11,marginTop:3,fontStyle:"italic"}}>📝 {part.notes}</div>}
+                {part.soldTo&&<div style={{color:"#71717a",fontSize:11,marginTop:2}}>Sold to: {part.soldTo}</div>}
+              </div>
             </div>
             <Badge s={part.status}/>
           </div>
@@ -1060,30 +1264,39 @@ export default function App() {
         @keyframes slideIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
         @keyframes spin{to{transform:rotate(360deg)}}
         *{box-sizing:border-box}
+        html,body{background:${bg};margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
         input[type=number]::-webkit-inner-spin-button{opacity:0.3}
         ::-webkit-scrollbar{width:4px;height:4px}
         ::-webkit-scrollbar-track{background:${isDark?"#18181b":"#f4f4f5"}}
         ::-webkit-scrollbar-thumb{background:${isDark?"#3f3f46":"#d4d4d8"};border-radius:99px}
+        input,select,textarea{font-size:16px;}
+        @media (max-width:640px){
+          .responsive-grid{grid-template-columns:1fr !important;gap:8px !important;}
+          .part-row{grid-template-columns:1fr !important;gap:8px !important;}
+          .header-stats{gap:10px !important;}
+          .header-stats .stat-label{font-size:9px !important;}
+          .tab-bar-inner button{padding:11px 11px !important;font-size:12.5px !important;}
+        }
       `}</style>
       <ToastContainer toasts={toasts}/>
 
       {/* Header */}
-      <div style={{borderBottom:`1px solid ${border}`,padding:"13px 20px",background:surface}}>
-        <div style={{maxWidth:740,margin:"0 auto",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <span style={{fontSize:22}}>🖥️</span>
-            <div>
-              <div style={{fontWeight:800,fontSize:15,color:txt,letterSpacing:"-0.02em"}}>PC Trader</div>
-              <div style={{fontSize:10,color:sub,letterSpacing:"0.07em"}}>BUY · BUILD · SELL</div>
+      <div style={{borderBottom:`1px solid ${border}`,padding:"calc(13px + env(safe-area-inset-top)) 16px 13px",background:surface}}>
+        <div style={{maxWidth:740,margin:"0 auto",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0,flexShrink:0}}>
+            <span style={{fontSize:20}}>🖥️</span>
+            <div style={{minWidth:0}}>
+              <div style={{fontWeight:800,fontSize:14,color:txt,letterSpacing:"-0.02em",whiteSpace:"nowrap"}}>PC Trader</div>
+              <div style={{fontSize:9,color:sub,letterSpacing:"0.06em",whiteSpace:"nowrap"}}>BUY · BUILD · SELL</div>
             </div>
           </div>
-          <div style={{display:"flex",gap:18,textAlign:"center"}}>
-            <div><div style={{fontSize:10,color:sub}}>Parts</div>
-              <div style={{fontFamily:"monospace",fontWeight:700,color:txt}}><AnimNum value={state.parts.length}/></div></div>
-            <div><div style={{fontSize:10,color:sub}}>Profit</div>
-              <div style={{fontFamily:"monospace",fontWeight:700,color:"#22c55e"}}>{fmt(state.sales.reduce((s,x)=>s+x.profit,0))}</div></div>
-            <div><div style={{fontSize:10,color:sub}}>Status</div>
-              <div style={{fontSize:11,fontWeight:600,color:saveStatus==="saving"?"#eab308":saveStatus==="error"?"#ef4444":"#22c55e"}}>
+          <div className="header-stats" style={{display:"flex",gap:14,textAlign:"center",flexShrink:0}}>
+            <div><div className="stat-label" style={{fontSize:10,color:sub}}>Parts</div>
+              <div style={{fontFamily:"monospace",fontWeight:700,color:txt,fontSize:13}}><AnimNum value={state.parts.length}/></div></div>
+            <div><div className="stat-label" style={{fontSize:10,color:sub}}>Profit</div>
+              <div style={{fontFamily:"monospace",fontWeight:700,color:"#22c55e",fontSize:13}}>{fmt(state.sales.reduce((s,x)=>s+x.profit,0))}</div></div>
+            <div><div className="stat-label" style={{fontSize:10,color:sub}}>Status</div>
+              <div style={{fontSize:10.5,fontWeight:600,color:saveStatus==="saving"?"#eab308":saveStatus==="error"?"#ef4444":"#22c55e",whiteSpace:"nowrap"}}>
                 {saveStatus==="saving"?"Saving…":saveStatus==="error"?"Save failed":"Synced ✓"}
               </div>
             </div>
@@ -1092,12 +1305,12 @@ export default function App() {
       </div>
 
       {/* Tab bar */}
-      <div style={{borderBottom:`1px solid ${border}`,overflowX:"auto",background:surface}}>
-        <div style={{maxWidth:740,margin:"0 auto",display:"flex"}}>
+      <div style={{borderBottom:`1px solid ${border}`,overflowX:"auto",background:surface,WebkitOverflowScrolling:"touch"}}>
+        <div className="tab-bar-inner" style={{maxWidth:740,margin:"0 auto",display:"flex"}}>
           {ALL_TABS.map(t=>(
             <button key={t} onClick={()=>setTab(t)} style={{
               padding:"11px 14px",fontSize:13,fontWeight:500,border:"none",cursor:"pointer",background:"none",
-              whiteSpace:"nowrap",transition:"all 0.15s",
+              whiteSpace:"nowrap",transition:"all 0.15s",flexShrink:0,
               color:tab===t?"#a78bfa":sub,
               borderBottom:`2px solid ${tab===t?"#7c3aed":"transparent"}`,
             }}
@@ -1109,7 +1322,7 @@ export default function App() {
       </div>
 
       {/* Content */}
-      <div key={tab} style={{maxWidth:740,margin:"0 auto",padding:"22px 18px",animation:"fadeUp 0.22s ease"}}>
+      <div key={tab} style={{maxWidth:740,margin:"0 auto",padding:"22px 16px calc(40px + env(safe-area-inset-bottom))",animation:"fadeUp 0.22s ease"}}>
         {tab==="Dashboard" && <Dashboard state={state} setTab={setTab}/>}
         {tab==="Buy"       && <Buy state={state} dispatch={dispatch} toast={toast}/>}
         {tab==="Inventory" && <Inventory state={state} dispatch={dispatch} toast={toast} setTab={setTab}/>}
