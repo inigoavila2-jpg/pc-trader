@@ -29,28 +29,54 @@ async function setup() {
   // Check if the "store" collection already exists (setup-db.js may be re-run)
   const existing = await fetch(`${PB_URL}/api/collections/store`, { headers });
   if (existing.ok) {
-    console.log('Collection "store" already exists — skipping creation ✓');
-    return;
+    console.log('Collection "store" already exists — skipping ✓');
+  } else {
+    // Create a single "store" collection with one JSON field
+    // Note: modern PocketBase uses "fields", not the old "schema" key
+    const create = await fetch(`${PB_URL}/api/collections`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        name: "store",
+        type: "base",
+        fields: [
+          { name: "data", type: "json", required: true }
+        ]
+      })
+    });
+
+    if (!create.ok) {
+      const errText = await create.text();
+      console.error(`"store" collection creation failed (${create.status}):`, errText);
+      process.exit(1);
+    }
+    console.log('Collection "store" created ✓');
   }
 
-  // Create a single "store" collection with one JSON field
-  // Note: modern PocketBase uses "fields", not the old "schema" key
-  const create = await fetch(`${PB_URL}/api/collections`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      name: "store",
-      type: "base",
-      fields: [
-        { name: "data", type: "json", required: true }
-      ]
-    })
-  });
+  // Check if the "photos" collection already exists
+  const existingPhotos = await fetch(`${PB_URL}/api/collections/photos`, { headers });
+  if (existingPhotos.ok) {
+    console.log('Collection "photos" already exists — skipping ✓');
+  } else {
+    // Photos collection — one file per record, used for part/bundle/build images
+    const createPhotos = await fetch(`${PB_URL}/api/collections`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        name: "photos",
+        type: "base",
+        fields: [
+          { name: "image", type: "file", required: true, maxSelect: 1, maxSize: 5242880 }
+        ]
+      })
+    });
 
-  if (!create.ok) {
-    const errText = await create.text();
-    console.error(`Collection creation failed (${create.status}):`, errText);
-    process.exit(1);
+    if (!createPhotos.ok) {
+      const errText = await createPhotos.text();
+      console.error(`"photos" collection creation failed (${createPhotos.status}):`, errText);
+      process.exit(1);
+    }
+    console.log('Collection "photos" created ✓');
   }
 
   console.log("Database ready ✓");

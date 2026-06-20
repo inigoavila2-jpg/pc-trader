@@ -1,5 +1,6 @@
 // server.js — Express server that bridges your React app to PocketBase
 const express = require("express");
+const multer = require("multer");
 const path = require("path");
 
 const PB_URL = process.env.PB_URL;
@@ -14,6 +15,10 @@ if (!PB_URL || !PB_EMAIL || !PB_PASS) {
 
 const app = express();
 app.use(express.json({ limit: "5mb" }));
+
+// In-memory storage for uploaded photos before forwarding to PocketBase.
+// 6MB cap leaves headroom under PocketBase's 5MB field limit after multipart overhead is stripped.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 6 * 1024 * 1024 } });
 
 // ---- PocketBase auth (cached + auto-refreshed) ----
 // PocketBase v0.23+ uses the _superusers auth collection, not the old /api/admins
@@ -118,6 +123,60 @@ app.post("/data", async (req, res) => {
 });
 
 app.get("/health", (req, res) => res.json({ ok: true }));
+
+// ---- Photo upload ----
+// Accepts a single image (multipart/form-data, field name "photo"), forwards it to
+// PocketBase's "photos" collection, and returns a public URL the browser can load directly.
+app.post("/photo", upload.single("photo"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    const token = await getPbToken();
+    const form = new FormData();
+    // PocketBase's Node fetch needs a Blob, not a raw Buffer, for multipart fields
+    const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
+    form.append("image", blob, req.file.originalname || "photo.jpg");
+
+    const pbRes = await fetch(`${PB_URL}/api/collections/photos/records`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+
+    if (!pbRes.ok) {
+      const text = await pbRes.text();
+      throw new Error(`PocketBase upload failed (${pbRes.status}): ${text}`);
+    }
+
+    const record = await pbRes.json();
+    const fileName = record.image;
+    const url = `${PB_URL}/api/files/photos/${record.id}/${fileName}`;
+    // recordId is returned too so the photo can be deleted later if replaced
+    res.json({ url, recordId: record.id });
+  } catch (err) {
+    console.error("Photo upload error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- Photo delete ----
+// Best-effort cleanup when a photo is replaced or removed, so old files don't pile up.
+app.delete("/photo/:recordId", async (req, res) => {
+  try {
+    const r = await pbFetch(`/api/collections/photos/records/${req.params.recordId}`, {
+      method: "DELETE",
+    });
+    // Treat "already gone" (404) as success too — nothing left to clean up
+    if (!r.ok && r.status !== 404) {
+      throw new Error(`PocketBase delete failed: ${r.status}`);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Photo delete error:", err.message);
+    // Non-fatal — don't block the user's UI flow over a cleanup failure
+    res.status(200).json({ ok: false, error: err.message });
+  }
+});
 
 // ---- Serve the built React app ----
 const distDir = path.join(__dirname, "dist");
