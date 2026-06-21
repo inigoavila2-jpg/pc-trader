@@ -69,6 +69,14 @@ function reducer(state, action) {
     case "DELETE_PART":
       return {...state, parts: state.parts.filter(p=>p.id!==action.id)};
 
+    case "DUPLICATE_PART": {
+      const src=state.parts.find(p=>p.id===action.id);
+      if(!src)return state;
+      const copy={...src,id:uid(),status:"available",soldTo:"",
+        history:[{date:today(),event:`Duplicated from "${src.name}"`}]};
+      return {...state, parts:[...state.parts,copy]};
+    }
+
     case "DELETE_BUILD": {
       const {buildId,returnParts}=action;
       const build=state.builds.find(b=>b.id===buildId);
@@ -330,8 +338,8 @@ function Lightbox({url,onClose}) {
    CONFIRM MODAL — generic "are you sure?" with optional extra choices
 ═══════════════════════════════════════════ */
 function ConfirmModal({title,message,confirmLabel="Delete",danger=true,onConfirm,onCancel,extraChoices}) {
-  // extraChoices: optional array of {label, onClick} rendered as additional buttons
-  // (used for the bundle-delete "delete parts too vs keep loose" choice)
+  // extraChoices: optional array of {label, onClick, variant} rendered as additional buttons
+  // (used for the bundle-delete and build-delete "what happens to the parts?" choices)
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onCancel}>
       <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
@@ -339,7 +347,7 @@ function ConfirmModal({title,message,confirmLabel="Delete",danger=true,onConfirm
         <div style={{fontSize:13,color:"#a1a1aa",marginBottom:18,lineHeight:1.5}}>{message}</div>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {extraChoices?extraChoices.map((c,i)=>(
-            <Btn key={i} variant={i===0?"danger":"warn"} onClick={c.onClick} style={{width:"100%"}}>{c.label}</Btn>
+            <Btn key={i} variant={c.variant||"warn"} onClick={c.onClick} style={{width:"100%"}}>{c.label}</Btn>
           )):(
             <Btn variant={danger?"danger":"primary"} onClick={onConfirm} style={{width:"100%"}}>{confirmLabel}</Btn>
           )}
@@ -384,10 +392,20 @@ function Btn({children,variant="primary",onClick,disabled=false,loading=false,sm
 
 function Inp({label,error,...props}) {
   const [f,setF]=useState(false);
+  // Centralized guard for numeric fields: strips a leading "-" so typing, pasting, or scrolling
+  // can't produce a negative cost/price/margin anywhere in the app. Applied here once rather than
+  // per call site, since `min="0"` alone only affects the spinner UI, not typed or pasted input.
+  const handleChange=props.type==="number"&&props.onChange
+    ? (e)=>{
+        if(e.target.value.startsWith("-")){e.target.value=e.target.value.replace(/^-+/,"");}
+        props.onChange(e);
+      }
+    : props.onChange;
   return (
     <label style={{display:"flex",flexDirection:"column",gap:4,fontSize:12,color:"#a1a1aa"}}>
       {label}
-      <input {...props} onFocus={e=>{setF(true);props.onFocus?.(e);}} onBlur={e=>{setF(false);props.onBlur?.(e);}}
+      <input {...props} onChange={handleChange} min={props.type==="number"?(props.min??0):props.min}
+        onFocus={e=>{setF(true);props.onFocus?.(e);}} onBlur={e=>{setF(false);props.onBlur?.(e);}}
         style={{background:"#27272a",border:`1px solid ${error?"#ef4444":f?"#7c3aed":"#3f3f46"}`,borderRadius:9,
           padding:"8px 11px",color:"#fff",fontSize:13,outline:"none",
           boxShadow:f?"0 0 0 3px rgba(124,58,237,0.15)":"none",transition:"all 0.15s",width:"100%",boxSizing:"border-box",...(props.style||{})}} />
@@ -902,9 +920,102 @@ function Buy({state,dispatch,toast}) {
 /* ═══════════════════════════════════════════
    INVENTORY  (#1 quick sell, #2 edit, #3 notes, #8 search, #10 buyer)
 ═══════════════════════════════════════════ */
+/* ═══════════════════════════════════════════
+   PART DETAIL SHEET — tap a card to see full details + actions,
+   instead of every action always being visible on the card itself
+═══════════════════════════════════════════ */
+function PartDetailSheet({part,buildName,onClose,openLightbox,onQuickSell,onEdit,onDefective,onDelete,onDuplicate,onAddToBuild}) {
+  const potential=part.marketValue-part.allocatedCost;
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",borderRadius:"18px 18px 0 0",width:"100%",maxWidth:520,
+        maxHeight:"88vh",overflowY:"auto",animation:"slideUp 0.22s cubic-bezier(0.22,1,0.36,1)",
+        paddingBottom:"calc(20px + env(safe-area-inset-bottom))"}}>
+        {/* Drag handle */}
+        <div style={{display:"flex",justifyContent:"center",padding:"10px 0 4px"}}>
+          <div style={{width:38,height:4,borderRadius:99,background:"#3f3f46"}}/>
+        </div>
+
+        {/* Photo */}
+        <div style={{width:"100%",aspectRatio:"16/10",background:"#09090b",display:"flex",alignItems:"center",justifyContent:"center",
+          cursor:part.photoUrl?"pointer":"default",borderBottom:"1px solid #27272a"}}
+          onClick={part.photoUrl?()=>openLightbox(part.photoUrl):undefined}>
+          {part.photoUrl?(
+            <img src={part.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+          ):(
+            <span style={{fontSize:48,opacity:0.25}}>🔧</span>
+          )}
+        </div>
+
+        <div style={{padding:"18px 20px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:14}}>
+            <div style={{color:"#fff",fontWeight:700,fontSize:19}}>{part.name}</div>
+            <Badge s={part.status}/>
+          </div>
+
+          {/* Purchase details */}
+          <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14,marginBottom:14}}>
+            <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Purchase Details</div>
+            {[["Bought",fmt(part.allocatedCost),"#fff"],["Market value",fmt(part.marketValue),"#d4d4d8"],
+              ["Potential profit",`${potential>=0?"+":""}${fmt(potential)}`,potential>=0?"#34d399":"#f87171"]
+            ].map(([l,v,c],i)=>(
+              <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:i<2?7:0,paddingTop:i===2?8:0,borderTop:i===2?"1px solid #27272a":"none"}}>
+                <span style={{color:"#a1a1aa"}}>{l}</span>
+                <span style={{fontFamily:"monospace",fontWeight:i===2?700:600,color:c}}>{v}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Category / source / date / status detail */}
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
+            <DetailRow label="Category" value={part.category}/>
+            <DetailRow label="Purchase Source" value={part.source}/>
+            {part.history?.[0]?.date&&<DetailRow label="Purchase Date" value={part.history[0].date}/>}
+            {buildName&&<DetailRow label="Status" value={`Used in ${buildName}`} valueColor="#7dd3fc"/>}
+            {part.soldTo&&<DetailRow label="Sold To" value={part.soldTo}/>}
+            {part.notes&&<DetailRow label="Notes" value={part.notes}/>}
+          </div>
+
+          {/* Actions */}
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {part.status==="available"&&(
+              <div style={{display:"flex",gap:8}}>
+                <Btn variant="success" onClick={onQuickSell} style={{flex:1}}>⚡ Quick Sell</Btn>
+                <Btn variant="ghost" onClick={onAddToBuild} style={{flex:1}}>🛠️ Add to Build</Btn>
+              </div>
+            )}
+            <div style={{display:"flex",gap:8}}>
+              <Btn variant="ghost" onClick={onEdit} style={{flex:1}}>✏️ Edit</Btn>
+              <Btn variant="ghost" onClick={onDuplicate} style={{flex:1}}>⧉ Duplicate</Btn>
+            </div>
+            <div style={{display:"flex",gap:8,marginTop:6,paddingTop:14,borderTop:"1px solid #27272a"}}>
+              {part.status!=="sold"&&part.status!=="defective"&&(
+                <Btn variant="warn" onClick={onDefective} style={{flex:1}}>⚠️ Mark Defective</Btn>
+              )}
+              <Btn variant="danger" onClick={onDelete} style={{flex:1}}>🗑 Delete</Btn>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailRow({label,value,valueColor="#fff"}) {
+  return (
+    <div>
+      <div style={{fontSize:11,color:"#71717a",marginBottom:2}}>{label}</div>
+      <div style={{fontSize:13,color:valueColor}}>{value}</div>
+    </div>
+  );
+}
+
 function Inventory({state,dispatch,toast,setTab,openLightbox}) {
-  const [filter,setFilter]=useState("all");
+  const [statusFilter,setStatusFilter]=useState("all");
+  const [catFilter,setCatFilter]=useState("all");
   const [search,setSearch]=useState("");   // #8
+  const [viewing,setViewing]=useState(null); // part shown in the detail sheet
+  const [bundleView,setBundleView]=useState(false);
   const [quickSell,setQuickSell]=useState(null);
   const [editing,setEditing]=useState(null);
   const [deleting,setDeleting]=useState(null); // part pending delete confirmation
@@ -918,9 +1029,11 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
     return b?b.name:null;
   };
 
-  const isBundleView=filter==="bundle";
-  const filtered=isBundleView?[]:parts.filter(p=>{
-    if(filter!=="all"&&p.status!==filter)return false;
+  const categoriesPresent=[...new Set(parts.map(p=>p.category))];
+
+  const filtered=parts.filter(p=>{
+    if(statusFilter!=="all"&&p.status!==statusFilter)return false;
+    if(catFilter!=="all"&&p.category!==catFilter)return false;
     if(search&&!p.name.toLowerCase().includes(search.toLowerCase())&&!p.category.toLowerCase().includes(search.toLowerCase()))return false;
     return true;
   });
@@ -931,7 +1044,7 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
     const sale={id:uid(),partId:p.id,name:p.name,cost:p.allocatedCost,salePrice:sp,profit:sp-p.allocatedCost,buyerName:buyer,date:today()};
     dispatch({type:"SELL",mode:"part",id:p.id,sale});
     toast(`${p.name} sold for ${fmt(sp)} — profit ${fmt(sp-p.allocatedCost)} ✓`,sp-p.allocatedCost>=0?"success":"warn");
-    setQuickSell(null);
+    setQuickSell(null);setViewing(null);
   };
 
   const handleEdit=(changes,desc)=>{
@@ -941,13 +1054,10 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
   };
 
   const confirmDelete=()=>{
-    if(deleting._isBundle){
-      // handled by the dual-choice modal instead — this path shouldn't fire for bundles
-      return;
-    }
+    if(deleting._isBundle)return; // handled by the dual-choice modal instead
     dispatch({type:"DELETE_PART",id:deleting.id});
     toast(`${deleting.name} deleted`,"warn");
-    setDeleting(null);
+    setDeleting(null);setViewing(null);
   };
 
   const deleteBundleWithParts=()=>{
@@ -965,11 +1075,23 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
   const confirmDefective=(reason)=>{
     dispatch({type:"MARK_DEFECTIVE",id:defectiveTarget.id,reason});
     toast(`${defectiveTarget.name} marked defective — logged as a loss`,"warn");
-    setDefectiveTarget(null);
+    setDefectiveTarget(null);setViewing(null);
+  };
+
+  const duplicatePart=(p)=>{
+    dispatch({type:"DUPLICATE_PART",id:p.id});
+    toast(`Duplicated ${p.name} ✓`);
+    setViewing(null);
+  };
+
+  const goAddToBuild=()=>{
+    setViewing(null);
+    toast("Pick this part (and any others) on the Builds tab to assemble a PC");
+    setTab("Builds");
   };
 
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:18}}>
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
       {quickSell&&<QuickSellModal part={quickSell} onClose={()=>setQuickSell(null)} onConfirm={handleQuickSell} targetMargin={settings?.targetMargin||30}/>}
       {editing&&<EditPartModal part={editing} onClose={()=>setEditing(null)} onSave={handleEdit}/>}
       {deleting&&!deleting._isBundle&&(
@@ -977,37 +1099,57 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
           onConfirm={confirmDelete} onCancel={()=>setDeleting(null)}/>
       )}
       {deleting&&deleting._isBundle&&(
-        <ConfirmModal title="Delete this bundle?" message={`What should happen to the parts that came from "${deleting.name}"?`}
+        <ConfirmModal title="Delete this bundle?" message={`What should happen to the parts that came from "${deleting.name}"? Most of the time you want to keep them as loose inventory.`}
           onCancel={()=>setDeleting(null)}
           extraChoices={[
-            {label:"Delete bundle + all its parts",onClick:deleteBundleWithParts},
-            {label:"Keep parts as loose inventory",onClick:deleteBundleKeepParts},
+            {label:"Delete bundle, keep parts as loose inventory (recommended)",onClick:deleteBundleKeepParts,variant:"success"},
+            {label:"Delete bundle AND permanently destroy its parts",onClick:deleteBundleWithParts,variant:"danger"},
           ]}/>
       )}
       {defectiveTarget&&(
         <DefectiveModal part={defectiveTarget} onConfirm={confirmDefective} onCancel={()=>setDefectiveTarget(null)}/>
+      )}
+      {viewing&&(
+        <PartDetailSheet part={viewing} buildName={buildNameFor(viewing)} onClose={()=>setViewing(null)}
+          openLightbox={openLightbox}
+          onQuickSell={()=>{setQuickSell(viewing);setViewing(null);}}
+          onEdit={()=>{setEditing(viewing);setViewing(null);}}
+          onDefective={()=>{setDefectiveTarget(viewing);setViewing(null);}}
+          onDelete={()=>{setDeleting(viewing);setViewing(null);}}
+          onDuplicate={()=>duplicatePart(viewing)}
+          onAddToBuild={goAddToBuild}/>
       )}
 
       <div><h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Inventory</h2>
         <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>{parts.length} parts tracked</p></div>
 
       {/* Search  (#8) */}
-      {!isBundleView&&<Inp label="" value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍  Search by name or category..."/>}
+      <Inp label="" value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍  Search by name or category..."/>
 
+      {/* Category filter chips */}
+      {categoriesPresent.length>0&&(
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          <Btn small variant={catFilter==="all"?"primary":"ghost"} onClick={()=>setCatFilter("all")}>All Categories</Btn>
+          {categoriesPresent.map(c=>(
+            <Btn key={c} small variant={catFilter===c?"primary":"ghost"} onClick={()=>setCatFilter(c)}>{c}</Btn>
+          ))}
+        </div>
+      )}
+
+      {/* Status filter chips */}
       <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
-        {["all","available","in_build","sold","defective","bundle"].map(f=>(
-          <Btn key={f} variant={filter===f?"primary":"ghost"} onClick={()=>setFilter(f)}>
-            {f==="all"?"All":f==="bundle"?"📦 Bundles":f.replace("_"," ")}
-            {f!=="bundle"&&(
-              <span style={{background:"#3f3f46",borderRadius:99,padding:"1px 6px",fontSize:11,color:"#a1a1aa",marginLeft:2}}>
-                {f==="all"?parts.length:parts.filter(p=>p.status===f).length}
-              </span>
-            )}
+        {["all","available","in_build","sold","defective"].map(f=>(
+          <Btn key={f} variant={!bundleView&&statusFilter===f?"primary":"ghost"} onClick={()=>{setStatusFilter(f);setBundleView(false);}}>
+            {f==="all"?"All":f.replace("_"," ")}
+            <span style={{background:"#3f3f46",borderRadius:99,padding:"1px 6px",fontSize:11,color:"#a1a1aa",marginLeft:2}}>
+              {f==="all"?parts.length:parts.filter(p=>p.status===f).length}
+            </span>
           </Btn>
         ))}
+        <Btn variant={bundleView?"primary":"ghost"} onClick={()=>setBundleView(true)}>📦 Bundles</Btn>
       </div>
 
-      {isBundleView?(
+      {bundleView?(
         bundles.length===0?(
           <Card style={{textAlign:"center",padding:36}}><div style={{color:"#52525b"}}>No bundles yet.</div></Card>
         ):(
@@ -1028,8 +1170,8 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
                   </div>
                   <div style={{display:"flex",flexDirection:"column",gap:8,borderTop:"1px solid #27272a",paddingTop:10}}>
                     {bParts.map(p=>(
-                      <div key={p.id} style={{display:"flex",alignItems:"center",gap:9,fontSize:12}}>
-                        <PhotoThumb url={p.photoUrl} size={32} seed={p.id.length} onClick={p.photoUrl?()=>openLightbox(p.photoUrl):undefined}/>
+                      <div key={p.id} onClick={()=>setViewing(p)} style={{display:"flex",alignItems:"center",gap:9,fontSize:12,cursor:"pointer"}}>
+                        <PhotoThumb url={p.photoUrl} size={32} seed={p.id.length}/>
                         <span style={{color:"#d4d4d8",flex:1,minWidth:0}}>{p.name}</span>
                         <span style={{color:"#52525b",fontSize:10}}>{p.category}</span>
                         <Badge s={p.status}/>
@@ -1047,52 +1189,40 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
           <div style={{color:"#52525b"}}>{search?"No parts match your search.":"No parts here yet."}</div>
         </Card>
       ):(
-        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        /* Marketplace-style 2-column card grid — replaces the old always-expanded list so
+           scanning 50-100+ parts is fast, with full detail only a tap away. */
+        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
           {filtered.map((p,i)=>{
-            const inBuildName=buildNameFor(p);
+            const potential=p.marketValue-p.allocatedCost;
             return (
-            <div key={p.id} style={{background:"#18181b",border:"1px solid #27272a",borderRadius:12,padding:14,
-              animation:`fadeUp 0.2s ease ${i*0.03}s both`,transition:"border-color 0.15s"}}
-              onMouseEnter={e=>e.currentTarget.style.borderColor="#52525b"}
-              onMouseLeave={e=>e.currentTarget.style.borderColor="#27272a"}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
-                <div style={{display:"flex",gap:11,flex:1,minWidth:0}}>
-                  <PhotoThumb url={p.photoUrl} seed={i} onClick={p.photoUrl?()=>openLightbox(p.photoUrl):undefined}/>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:4,flexWrap:"wrap"}}>
-                      <span style={{color:"#fff",fontWeight:600,fontSize:14}}>{p.name}</span>
-                      <span style={{background:"#27272a",color:"#a1a1aa",fontSize:10,padding:"2px 6px",borderRadius:5}}>{p.category}</span>
-                      <Badge s={p.status}/>
-                    </div>
-                    <div style={{color:"#71717a",fontSize:11}}>{p.source}</div>
-                    {/* Status detail: which build this part is currently in */}
-                    {inBuildName&&<div style={{color:"#7dd3fc",fontSize:11,marginTop:2}}>Status: Used in {inBuildName}</div>}
-                    {/* Notes  (#3) */}
-                    {p.notes&&<div style={{color:"#a1a1aa",fontSize:11,marginTop:3,fontStyle:"italic"}}>📝 {p.notes}</div>}
-                    {/* Buyer  (#10) */}
-                    {p.soldTo&&<div style={{color:"#71717a",fontSize:11,marginTop:2}}>Sold to: {p.soldTo}</div>}
-                  </div>
+              <div key={p.id} onClick={()=>setViewing(p)} style={{background:"#18181b",border:"1px solid #27272a",borderRadius:13,
+                padding:10,cursor:"pointer",animation:`fadeUp 0.18s ease ${Math.min(i*0.025,0.3)}s both`,transition:"border-color 0.15s,transform 0.1s"}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor="#52525b";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor="#27272a";}}
+                onMouseDown={e=>e.currentTarget.style.transform="scale(0.98)"}
+                onMouseUp={e=>e.currentTarget.style.transform="scale(1)"}>
+                <div style={{width:"100%",aspectRatio:"1",borderRadius:9,overflow:"hidden",background:"#09090b",marginBottom:8,
+                  display:"flex",alignItems:"center",justifyContent:"center",border:"1px solid #1f1f23"}}>
+                  {p.photoUrl?(
+                    <img src={p.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  ):(
+                    <span style={{fontSize:26,opacity:0.3}}>🔧</span>
+                  )}
                 </div>
-                <div style={{display:"flex",gap:14,textAlign:"right",flexShrink:0}}>
-                  {[["Cost",fmt(p.allocatedCost),"#fff"],["Market",fmt(p.marketValue),"#d4d4d8"],
-                    ["Potential",fmt(p.marketValue-p.allocatedCost),p.marketValue-p.allocatedCost>=0?"#34d399":"#f87171"]
-                  ].map(([l,v,c])=>(
-                    <div key={l}><div style={{fontSize:10,color:"#71717a"}}>{l}</div>
-                      <div style={{fontFamily:"monospace",fontSize:12,color:c,fontWeight:600}}>{v}</div></div>
-                  ))}
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:4,marginBottom:3}}>
+                  <Badge s={p.status}/>
+                  <span style={{color:"#52525b",fontSize:9,whiteSpace:"nowrap"}}>{p.category}</span>
+                </div>
+                <div style={{color:"#fff",fontWeight:600,fontSize:12.5,lineHeight:1.3,marginBottom:4,
+                  display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.name}</div>
+                <div style={{fontFamily:"monospace",fontWeight:700,color:"#fff",fontSize:13}}>{fmt(p.allocatedCost)}</div>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#71717a",marginTop:2}}>
+                  <span>Market {fmt(p.marketValue)}</span>
+                  <span style={{color:potential>=0?"#34d399":"#f87171",fontWeight:600}}>{potential>=0?"+":""}{fmt(potential)}</span>
                 </div>
               </div>
-              {/* Action buttons  (#1 quick sell, #2 edit, delete, defective) */}
-              <div style={{display:"flex",gap:7,marginTop:11,borderTop:"1px solid #27272a",paddingTop:11,flexWrap:"wrap"}}>
-                {p.status==="available"&&<Btn small variant="success" onClick={()=>setQuickSell(p)}>⚡ Quick Sell</Btn>}
-                <Btn small variant="ghost" onClick={()=>setEditing(p)}>✏️ Edit</Btn>
-                {p.status!=="sold"&&p.status!=="defective"&&(
-                  <Btn small variant="warn" onClick={()=>setDefectiveTarget(p)}>⚠️ Defective</Btn>
-                )}
-                <Btn small variant="danger" onClick={()=>setDeleting(p)}>🗑 Delete</Btn>
-              </div>
-            </div>
-          );})}
+            );
+          })}
         </div>
       )}
     </div>
@@ -1106,6 +1236,8 @@ function Builds({state,dispatch,toast,openLightbox}) {
   const [creating,setCreating]=useState(false);
   const [buildName,setBuildName]=useState("");
   const [sel,setSel]=useState([]);
+  const [activeCat,setActiveCat]=useState(null); // which category chip is currently expanded into a grid
+  const [pickerSearch,setPickerSearch]=useState("");
   const [buildPhoto,setBuildPhoto]=useState({photoUrl:"",photoRecordId:""});
   const [deletingBuild,setDeletingBuild]=useState(null);
   const avail=state.parts.filter(p=>p.status==="available");
@@ -1113,16 +1245,28 @@ function Builds({state,dispatch,toast,openLightbox}) {
   const buildMarket=avail.filter(p=>sel.includes(p.id)).reduce((s,p)=>s+p.marketValue,0);
   const toggle=id=>setSel(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
 
+  // Group available parts by category for the chip picker, in CATEGORIES order so common
+  // categories (CPU, GPU, RAM...) always appear first regardless of insertion order.
+  const categoriesPresent=CATEGORIES.filter(c=>avail.some(p=>p.category===c));
+  const partsInActiveCat=activeCat?avail.filter(p=>p.category===activeCat&&
+    (!pickerSearch||p.name.toLowerCase().includes(pickerSearch.toLowerCase()))):[];
+  const selectedCountByCat=cat=>avail.filter(p=>p.category===cat&&sel.includes(p.id)).length;
+
   const submit=()=>{
     if(!buildName||sel.length===0){toast("Name the build and pick parts","error");return;}
     dispatch({type:"CREATE_BUILD",build:{id:uid(),name:buildName,partIds:sel,date:today(),photoUrl:buildPhoto.photoUrl,photoRecordId:buildPhoto.photoRecordId}});
     toast(`Build "${buildName}" created ✓`);
-    setBuildName("");setSel([]);setCreating(false);setBuildPhoto({photoUrl:"",photoRecordId:""});
+    setBuildName("");setSel([]);setCreating(false);setBuildPhoto({photoUrl:"",photoRecordId:""});setActiveCat(null);
   };
   const dissolve=b=>{dispatch({type:"DISSOLVE_BUILD",buildId:b.id});toast(`"${b.name}" dissolved — parts returned`);};
-  const confirmDeleteBuild=()=>{
+  const deleteBuildKeepParts=()=>{
+    dispatch({type:"DELETE_BUILD",buildId:deletingBuild.id,returnParts:true});
+    toast(`"${deletingBuild.name}" deleted — parts returned to inventory`,"warn");
+    setDeletingBuild(null);
+  };
+  const deleteBuildAndParts=()=>{
     dispatch({type:"DELETE_BUILD",buildId:deletingBuild.id,returnParts:false});
-    toast(`"${deletingBuild.name}" deleted`,"warn");
+    toast(`"${deletingBuild.name}" and its parts permanently deleted`,"warn");
     setDeletingBuild(null);
   };
 
@@ -1139,8 +1283,12 @@ function Builds({state,dispatch,toast,openLightbox}) {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
       {deletingBuild&&(
-        <ConfirmModal title="Delete this build?" message={`"${deletingBuild.name}" will be permanently deleted. Its parts will be deleted too — they will NOT be returned to inventory. Use "Dissolve" instead if you want to keep the parts.`}
-          onConfirm={confirmDeleteBuild} onCancel={()=>setDeletingBuild(null)}/>
+        <ConfirmModal title="Delete this build?" message={`What should happen to the parts in "${deletingBuild.name}"? Most of the time you want to keep them — only purge them if they're truly gone (e.g. parted out / destroyed).`}
+          onCancel={()=>setDeletingBuild(null)}
+          extraChoices={[
+            {label:"Delete build, return parts to inventory (recommended)",onClick:deleteBuildKeepParts,variant:"success"},
+            {label:"Delete build AND permanently destroy its parts",onClick:deleteBuildAndParts,variant:"danger"},
+          ]}/>
       )}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
         <div><h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Builds</h2>
@@ -1155,30 +1303,78 @@ function Builds({state,dispatch,toast,openLightbox}) {
             <PhotoUpload label="Build photo (optional) — the finished PC" photoUrl={buildPhoto.photoUrl} photoRecordId={buildPhoto.photoRecordId} onChange={setBuildPhoto}/>
           </div>
           <Inp label="Build name" value={buildName} onChange={e=>setBuildName(e.target.value)} placeholder="Gaming Rig #1"/>
-          <div style={{fontSize:12,color:"#a1a1aa",margin:"12px 0 8px"}}>Select parts:</div>
+
+          {/* Category chips — tap a category to expand its parts into a card grid below.
+              A green checkmark + count shows once a category has at least one selected part. */}
+          <div style={{fontSize:12,color:"#a1a1aa",margin:"14px 0 8px"}}>Pick parts by category:</div>
           {avail.length===0?<div style={{color:"#52525b",fontSize:13}}>No available parts.</div>:(
-            <div style={{display:"flex",flexDirection:"column",gap:7}}>
-              {avail.map(p=>{
-                const checked=sel.includes(p.id);
-                return (
-                  <label key={p.id} style={{display:"flex",alignItems:"center",gap:9,cursor:"pointer",
-                    background:checked?"rgba(124,58,237,0.1)":"transparent",
-                    border:`1px solid ${checked?"#7c3aed":"#27272a"}`,borderRadius:8,padding:"7px 11px",transition:"all 0.12s"}}>
-                    <input type="checkbox" checked={checked} onChange={()=>toggle(p.id)} style={{accentColor:"#7c3aed"}}/>
-                    <PhotoThumb url={p.photoUrl} size={32} seed={p.id.length}/>
-                    <span style={{color:"#fff",fontSize:13,flex:1}}>{p.name}</span>
-                    <span style={{background:"#27272a",color:"#a1a1aa",fontSize:10,padding:"2px 6px",borderRadius:4}}>{p.category}</span>
-                    <span style={{fontFamily:"monospace",fontSize:11,color:"#d4d4d8"}}>{fmt(p.allocatedCost)}</span>
-                  </label>
-                );
-              })}
-            </div>
+            <>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+                {categoriesPresent.map(cat=>{
+                  const count=selectedCountByCat(cat);
+                  const isActive=activeCat===cat;
+                  return (
+                    <button key={cat} onClick={()=>{setActiveCat(isActive?null:cat);setPickerSearch("");}}
+                      style={{display:"flex",alignItems:"center",gap:5,padding:"7px 12px",borderRadius:99,fontSize:12.5,fontWeight:600,cursor:"pointer",
+                        border:`1px solid ${isActive?"#7c3aed":count>0?"#16a34a":"#3f3f46"}`,
+                        background:isActive?"rgba(124,58,237,0.15)":count>0?"rgba(6,78,59,0.35)":"#09090b",
+                        color:isActive?"#a78bfa":count>0?"#6ee7b7":"#d4d4d8",transition:"all 0.15s"}}>
+                      {count>0&&<span>✓</span>}
+                      <span>{cat}</span>
+                      <span style={{opacity:0.7}}>({avail.filter(p=>p.category===cat).length}{count>0?`, ${count} picked`:""})</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {activeCat&&(
+                <div style={{marginBottom:14,animation:"fadeUp 0.18s ease"}}>
+                  <Inp label="" value={pickerSearch} onChange={e=>setPickerSearch(e.target.value)} placeholder={`🔍  Search ${activeCat}...`}/>
+                  {partsInActiveCat.length===0?(
+                    <div style={{color:"#52525b",fontSize:13,padding:"14px 0"}}>No {activeCat} parts match.</div>
+                  ):(
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginTop:10}}>
+                      {partsInActiveCat.map(p=>{
+                        const checked=sel.includes(p.id);
+                        return (
+                          <div key={p.id} onClick={()=>toggle(p.id)} style={{cursor:"pointer",borderRadius:11,padding:9,
+                            border:`1.5px solid ${checked?"#7c3aed":"#27272a"}`,background:checked?"rgba(124,58,237,0.1)":"#09090b",
+                            transition:"all 0.12s",position:"relative"}}>
+                            {checked&&<div style={{position:"absolute",top:6,right:6,width:18,height:18,borderRadius:"50%",
+                              background:"#7c3aed",color:"#fff",fontSize:11,display:"flex",alignItems:"center",justifyContent:"center"}}>✓</div>}
+                            <div style={{width:"100%",aspectRatio:"1",borderRadius:8,overflow:"hidden",background:"#18181b",marginBottom:6,
+                              display:"flex",alignItems:"center",justifyContent:"center"}}>
+                              {p.photoUrl?<img src={p.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:20,opacity:0.3}}>🔧</span>}
+                            </div>
+                            <div style={{color:"#fff",fontSize:12,fontWeight:600,lineHeight:1.3,marginBottom:3,
+                              display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.name}</div>
+                            <div style={{fontFamily:"monospace",fontSize:11.5,color:"#d4d4d8"}}>{fmt(p.allocatedCost)}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
-          {/* Live running cost tally (#"component cost roll-up") */}
+
+          {/* Sticky-feeling build summary — selected parts grouped, with live cost roll-up */}
           {sel.length>0&&(
-            <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #27272a"}}>
+            <div style={{marginTop:4,paddingTop:12,borderTop:"1px solid #27272a"}}>
+              <div style={{fontSize:12,color:"#a1a1aa",marginBottom:8}}>Selected ({sel.length}):</div>
+              <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:10,maxHeight:160,overflowY:"auto"}}>
+                {avail.filter(p=>sel.includes(p.id)).map(p=>(
+                  <div key={p.id} style={{display:"flex",alignItems:"center",gap:8,fontSize:12}}>
+                    <PhotoThumb url={p.photoUrl} size={26} seed={p.id.length}/>
+                    <span style={{color:"#d4d4d8",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</span>
+                    <span style={{fontFamily:"monospace",color:"#71717a"}}>{fmt(p.allocatedCost)}</span>
+                    <button onClick={()=>toggle(p.id)} style={{background:"none",border:"none",color:"#52525b",cursor:"pointer",fontSize:14,padding:"2px 4px"}}>✕</button>
+                  </div>
+                ))}
+              </div>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}>
-                <span style={{color:"#a1a1aa"}}>Build cost so far ({sel.length} part{sel.length===1?"":"s"})</span><span style={{fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(buildCost)}</span>
+                <span style={{color:"#a1a1aa"}}>Build cost so far</span><span style={{fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(buildCost)}</span>
               </div>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}>
                 <span style={{color:"#a1a1aa"}}>Market value</span><span style={{fontFamily:"monospace",color:"#d4d4d8"}}>{fmt(buildMarket)}</span>
@@ -1187,7 +1383,7 @@ function Builds({state,dispatch,toast,openLightbox}) {
           )}
           <div style={{display:"flex",gap:8,marginTop:12}}>
             <Btn onClick={submit} disabled={!buildName||sel.length===0}>Save Build</Btn>
-            <Btn variant="ghost" onClick={()=>{setCreating(false);setSel([]);setBuildName("");}}>Cancel</Btn>
+            <Btn variant="ghost" onClick={()=>{setCreating(false);setSel([]);setBuildName("");setActiveCat(null);}}>Cancel</Btn>
           </div>
         </Card>
       )}
@@ -1242,6 +1438,8 @@ function Sell({state,dispatch,toast,openLightbox}) {
   const [selId,setSelId]=useState("");
   const [salePrice,setSalePrice]=useState("");
   const [buyer,setBuyer]=useState("");   // #10
+  const [convoLink,setConvoLink]=useState(""); // link to the chat/conversation where the sale was agreed
+  const [proofPhoto,setProofPhoto]=useState({photoUrl:"",photoRecordId:""}); // screenshot/photo proof of the transaction
   const [loading,setLoading]=useState(false);
   const [pickerOpen,setPickerOpen]=useState(false);
   const targetMargin=state.settings?.targetMargin||30;
@@ -1263,9 +1461,10 @@ function Sell({state,dispatch,toast,openLightbox}) {
     setLoading(true);
     const name=mode==="part"?tp?.name:tb?.name;
     setTimeout(()=>{
-      dispatch({type:"SELL",mode,id:selId,sale:{id:uid(),partId:mode==="part"?selId:null,name,cost,salePrice:sp,profit,buyerName:buyer,date:today()}});
+      dispatch({type:"SELL",mode,id:selId,sale:{id:uid(),partId:mode==="part"?selId:null,name,cost,salePrice:sp,profit,buyerName:buyer,date:today(),
+        convoLink:convoLink.trim(),proofPhotoUrl:proofPhoto.photoUrl,proofPhotoRecordId:proofPhoto.photoRecordId}});
       toast(`${name} sold for ${fmt(sp)} — profit ${fmt(profit)} ✓`,profit>=0?"success":"warn");
-      setSelId("");setSalePrice("");setBuyer("");setLoading(false);
+      setSelId("");setSalePrice("");setBuyer("");setConvoLink("");setProofPhoto({photoUrl:"",photoRecordId:""});setLoading(false);
     },400);
   };
 
@@ -1281,8 +1480,10 @@ function Sell({state,dispatch,toast,openLightbox}) {
       </div>
       <Card>
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
-          {/* Photo-enabled picker — a native <select> can't render images, so this is a custom dropdown */}
-          <div>
+          {/* Photo-enabled picker — a native <select> can't render images, so this is a custom dropdown.
+              The options panel is absolutely positioned so it floats over the form instead of
+              pushing the Sale price / Record Sale button down the page as the list grows. */}
+          <div style={{position:"relative"}}>
             <div style={{fontSize:12,color:"#a1a1aa",marginBottom:5}}>{mode==="part"?"Select part":"Select build"}</div>
             <button type="button" onClick={()=>setPickerOpen(o=>!o)} style={{width:"100%",display:"flex",alignItems:"center",gap:10,
               background:"#09090b",border:"1px solid #3f3f46",borderRadius:9,padding:"9px 12px",cursor:"pointer",textAlign:"left"}}>
@@ -1296,21 +1497,27 @@ function Sell({state,dispatch,toast,openLightbox}) {
               <span style={{color:"#71717a",fontSize:11}}>{pickerOpen?"▲":"▼"}</span>
             </button>
             {pickerOpen&&(
-              <div style={{marginTop:6,border:"1px solid #27272a",borderRadius:9,overflow:"hidden",maxHeight:280,overflowY:"auto",animation:"fadeUp 0.15s ease"}}>
-                {list.length===0?(
-                  <div style={{padding:14,color:"#52525b",fontSize:13}}>Nothing available to sell.</div>
-                ):list.map(item=>(
-                  <button key={item.id} type="button" onClick={()=>{setSelId(item.id);setPickerOpen(false);}}
-                    style={{width:"100%",display:"flex",alignItems:"center",gap:10,background:selId===item.id?"rgba(124,58,237,0.12)":"#18181b",
-                      border:"none",borderBottom:"1px solid #27272a",padding:"9px 12px",cursor:"pointer",textAlign:"left"}}
-                    onMouseEnter={e=>e.currentTarget.style.background="rgba(124,58,237,0.08)"}
-                    onMouseLeave={e=>e.currentTarget.style.background=selId===item.id?"rgba(124,58,237,0.12)":"#18181b"}>
-                    <PhotoThumb url={item.photoUrl} size={34} seed={item.id.length}/>
-                    <span style={{color:"#fff",fontSize:13,flex:1}}>{item.name}</span>
-                    <span style={{fontFamily:"monospace",fontSize:12,color:"#a1a1aa"}}>{mode==="part"?fmt(item.allocatedCost):""}</span>
-                  </button>
-                ))}
-              </div>
+              <>
+                {/* Invisible backdrop — click outside the panel to close without selecting anything */}
+                <div onClick={()=>setPickerOpen(false)} style={{position:"fixed",inset:0,zIndex:40}}/>
+                <div style={{position:"absolute",top:"100%",left:0,right:0,marginTop:6,background:"#18181b",
+                  border:"1px solid #3f3f46",borderRadius:9,overflow:"hidden",maxHeight:280,overflowY:"auto",
+                  animation:"fadeUp 0.15s ease",boxShadow:"0 12px 28px rgba(0,0,0,0.55)",zIndex:50}}>
+                  {list.length===0?(
+                    <div style={{padding:14,color:"#52525b",fontSize:13}}>Nothing available to sell.</div>
+                  ):list.map(item=>(
+                    <button key={item.id} type="button" onClick={()=>{setSelId(item.id);setPickerOpen(false);}}
+                      style={{width:"100%",display:"flex",alignItems:"center",gap:10,background:selId===item.id?"rgba(124,58,237,0.12)":"#18181b",
+                        border:"none",borderBottom:"1px solid #27272a",padding:"9px 12px",cursor:"pointer",textAlign:"left"}}
+                      onMouseEnter={e=>e.currentTarget.style.background="rgba(124,58,237,0.08)"}
+                      onMouseLeave={e=>e.currentTarget.style.background=selId===item.id?"rgba(124,58,237,0.12)":"#18181b"}>
+                      <PhotoThumb url={item.photoUrl} size={34} seed={item.id.length}/>
+                      <span style={{color:"#fff",fontSize:13,flex:1}}>{item.name}</span>
+                      <span style={{fontFamily:"monospace",fontSize:12,color:"#a1a1aa"}}>{mode==="part"?fmt(item.allocatedCost):""}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
           </div>
           {/* Price suggestion  (#5) */}
@@ -1325,6 +1532,9 @@ function Sell({state,dispatch,toast,openLightbox}) {
           <Inp label="Sale price (₱)" type="number" value={salePrice} onChange={e=>setSalePrice(e.target.value)} placeholder="5000"/>
           {/* Buyer name  (#10) */}
           <Inp label="Buyer name (optional)" value={buyer} onChange={e=>setBuyer(e.target.value)} placeholder="Juan dela Cruz"/>
+          {/* Conversation link + transaction proof photo — useful for disputes or just keeping a record */}
+          <Inp label="Conversation link (optional)" value={convoLink} onChange={e=>setConvoLink(e.target.value)} placeholder="https://m.me/... or FB Marketplace chat link"/>
+          <PhotoUpload label="Proof of transaction (optional) — screenshot or photo" photoUrl={proofPhoto.photoUrl} photoRecordId={proofPhoto.photoRecordId} onChange={setProofPhoto}/>
           {selId&&sp>0&&(
             <div style={{background:"#09090b",borderRadius:9,padding:13,border:"1px solid #27272a",animation:"fadeUp 0.2s ease"}}>
               {[["Cost",fmt(cost),"#fff"],["Sale price",fmt(sp),"#fff"],
@@ -1414,12 +1624,20 @@ function History({state,openLightbox}) {
           <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>All Sales</div>
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             {[...state.sales].reverse().map(s=>(
-              <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #27272a"}}>
-                <div>
-                  <div style={{color:"#fff",fontSize:13,fontWeight:500}}>{s.name}</div>
-                  <div style={{color:"#71717a",fontSize:10}}>{s.date}{s.buyerName?` · ${s.buyerName}`:""}</div>
+              <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"8px 0",borderBottom:"1px solid #27272a",gap:10}}>
+                <div style={{display:"flex",gap:9,minWidth:0}}>
+                  {s.proofPhotoUrl&&<PhotoThumb url={s.proofPhotoUrl} size={36} seed={s.id.length} onClick={()=>openLightbox(s.proofPhotoUrl)}/>}
+                  <div style={{minWidth:0}}>
+                    <div style={{color:"#fff",fontSize:13,fontWeight:500}}>{s.name}</div>
+                    <div style={{color:"#71717a",fontSize:10}}>{s.date}{s.buyerName?` · ${s.buyerName}`:""}</div>
+                    {s.convoLink&&(
+                      <a href={s.convoLink} target="_blank" rel="noopener noreferrer" style={{color:"#7dd3fc",fontSize:10,textDecoration:"none"}}>
+                        🔗 View conversation
+                      </a>
+                    )}
+                  </div>
                 </div>
-                <div style={{textAlign:"right"}}>
+                <div style={{textAlign:"right",flexShrink:0}}>
                   <div style={{fontFamily:"monospace",fontSize:13,color:"#fff"}}>{fmt(s.salePrice)}</div>
                   <div style={{fontFamily:"monospace",fontSize:11,color:s.profit>=0?"#34d399":"#f87171"}}>{s.profit>=0?"+":""}{fmt(s.profit)}</div>
                 </div>
@@ -1561,6 +1779,7 @@ export default function App() {
       <style>{`
         @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
         @keyframes slideIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
+        @keyframes slideUp{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}
         @keyframes spin{to{transform:rotate(360deg)}}
         *{box-sizing:border-box}
         html,body{background:${bg};margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
