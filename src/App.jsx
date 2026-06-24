@@ -10,8 +10,17 @@ const today = () => new Date().toLocaleDateString("en-PH",{year:"numeric",month:
 let _id = Date.now();
 const uid = () => `id_${_id++}`;
 const CATEGORIES = ["GPU","CPU","Motherboard","CPU+MB","RAM","PSU","Storage","Cooler","Case","Monitor","Other"];
+
+// Every built-in category is a PC part by definition. Custom categories (added via the
+// "+ Add Category" picker) carry their own domain in state.customCategories, looked up at
+// render/dispatch time rather than re-derived from the category name string.
+function domainOf(category, customCategories){
+  if(CATEGORIES.includes(category))return "pc_part";
+  const custom=customCategories?.find(c=>c.name===category);
+  return custom?custom.domain:"pc_part"; // safe default — never silently misfile into General Assets
+}
 const TABS = ["Dashboard","Buy","Inventory","Builds","Sell","History"];
-const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ targetMargin:30 } };
+const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ targetMargin:30 }, customCategories:[], quickNotes:[] };
 
 /* ═══════════════════════════════════════════
    REDUCER
@@ -66,8 +75,88 @@ function reducer(state, action) {
     case "SET_SETTING":
       return {...state, settings:{...state.settings,[action.key]:action.value}};
 
-    case "DELETE_PART":
+    // Dynamic Tag Generation — saves a new category permanently with its domain (PC Part or
+    // General Asset), so it persists across sessions and appears in future dropdowns.
+    case "ADD_CATEGORY": {
+      const {name,domain}=action;
+      if(!name||state.customCategories?.some(c=>c.name===name)||CATEGORIES.includes(name))return state;
+      return {...state, customCategories:[...(state.customCategories||[]),{name,domain}]};
+    }
+
+    // Quick Actions toolbar's "Note" option — a fast scratchpad entry with no other fields,
+    // for jotting something down on the spot without opening a full form.
+    case "ADD_QUICK_NOTE": {
+      if(!action.text?.trim())return state;
+      return {...state, quickNotes:[...(state.quickNotes||[]),{id:uid(),text:action.text.trim(),date:today()}]};
+    }
+    case "DELETE_QUICK_NOTE":
+      return {...state, quickNotes:(state.quickNotes||[]).filter(n=>n.id!==action.id)};
+
+    // Reverses a completed sale: removes it from active totals (soft-deleted, not erased — kept
+    // for the "Returned sales" filter), and returns the part(s)/build back to available inventory.
+    case "UNDO_SALE": {
+      const {saleId,reason}=action;
+      const sale=state.sales.find(s=>s.id===saleId);
+      if(!sale)return state;
+      let parts=state.parts;
+      let builds=state.builds;
+      if(sale.buildId){
+        const build=state.builds.find(b=>b.id===sale.buildId);
+        builds=state.builds.map(b=>b.id===sale.buildId?{...b,sold:false}:b);
+        parts=state.parts.map(p=>build?.partIds.includes(p.id)
+          ? {...p,status:"available",soldTo:"",history:[...p.history,{date:today(),event:`Sale undone (${reason}) — returned to inventory`}]}
+          : p);
+      } else if(sale.partId){
+        parts=state.parts.map(p=>p.id===sale.partId
+          ? {...p,status:"available",soldTo:"",history:[...p.history,{date:today(),event:`Sale undone (${reason}) — returned to inventory`}]}
+          : p);
+      }
+      return {...state, parts, builds,
+        sales: state.sales.map(s=>s.id===saleId?{...s,returned:true,returnReason:reason,returnedAt:today()}:s)
+      };
+    }
+
+    case "EDIT_SALE": {
+      const {saleId,changes}=action;
+      return {...state, sales: state.sales.map(s=>s.id===saleId
+        ? {...s,...changes,profit:(changes.salePrice??s.salePrice)-s.cost,edited:true,editedAt:today()}
+        : s)};
+    }
+
+    // Soft-deletes a sale record. mode "record-only" just hides it from active lists (kept for
+    // the "Deleted records" filter). mode "undo-and-return" also reverses the sale like UNDO_SALE.
+    case "DELETE_SALE": {
+      const {saleId,mode}=action;
+      const sale=state.sales.find(s=>s.id===saleId);
+      if(!sale)return state;
+      let parts=state.parts;
+      let builds=state.builds;
+      if(mode==="undo-and-return"){
+        if(sale.buildId){
+          const build=state.builds.find(b=>b.id===sale.buildId);
+          builds=state.builds.map(b=>b.id===sale.buildId?{...b,sold:false}:b);
+          parts=state.parts.map(p=>build?.partIds.includes(p.id)
+            ? {...p,status:"available",soldTo:"",history:[...p.history,{date:today(),event:"Sale record deleted — returned to inventory"}]}
+            : p);
+        } else if(sale.partId){
+          parts=state.parts.map(p=>p.id===sale.partId
+            ? {...p,status:"available",soldTo:"",history:[...p.history,{date:today(),event:"Sale record deleted — returned to inventory"}]}
+            : p);
+        }
+      }
+      return {...state, parts, builds,
+        sales: state.sales.map(s=>s.id===saleId?{...s,deleted:true,deletedAt:today(),returned:mode==="undo-and-return"||s.returned}:s)
+      };
+    }
+
+    case "DELETE_PART": {
+      const target=state.parts.find(p=>p.id===action.id);
+      // A part inside an active build must be removed from that build first (dissolve, or
+      // remove it from the build) before it can be deleted — otherwise the build's partIds
+      // would point at a part that no longer exists, breaking its cost basis and profit math.
+      if(target?.status==="in_build")return state;
       return {...state, parts: state.parts.filter(p=>p.id!==action.id)};
+    }
 
     case "DUPLICATE_PART": {
       const src=state.parts.find(p=>p.id===action.id);
@@ -414,7 +503,7 @@ function Inp({label,error,...props}) {
   );
 }
 
-function Sel({label,children,...props}) {
+function Sel({label,children,style,...props}) {
   const [f,setF]=useState(false);
   return (
     <label style={{display:"flex",flexDirection:"column",gap:4,fontSize:12,color:"#a1a1aa"}}>
@@ -422,10 +511,71 @@ function Sel({label,children,...props}) {
       <select {...props} onFocus={()=>setF(true)} onBlur={()=>setF(false)}
         style={{background:"#27272a",border:`1px solid ${f?"#7c3aed":"#3f3f46"}`,borderRadius:9,
           padding:"8px 11px",color:"#fff",fontSize:13,outline:"none",
-          boxShadow:f?"0 0 0 3px rgba(124,58,237,0.15)":"none",transition:"all 0.15s",width:"100%",boxSizing:"border-box"}}>
+          boxShadow:f?"0 0 0 3px rgba(124,58,237,0.15)":"none",transition:"all 0.15s",width:"100%",boxSizing:"border-box",...style}}>
         {children}
       </select>
     </label>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   CATEGORY PICKER — built-in PC categories + any custom categories the user has added,
+   with a "+ Add Category" entry that opens an inline name + domain (PC Part / General Asset) form.
+   This is the Domain Firewall's front door: every category gets a domain at creation time.
+═══════════════════════════════════════════ */
+function CategoryPicker({label,value,onChange,customCategories,dispatch,style}) {
+  const [adding,setAdding]=useState(false);
+  const [newName,setNewName]=useState("");
+  const [newDomain,setNewDomain]=useState("pc_part");
+
+  const handleSelect=(e)=>{
+    if(e.target.value==="__add__"){setAdding(true);return;}
+    onChange(e.target.value);
+  };
+
+  const confirmAdd=()=>{
+    const name=newName.trim();
+    if(!name)return;
+    dispatch({type:"ADD_CATEGORY",name,domain:newDomain});
+    onChange(name);
+    setAdding(false);setNewName("");setNewDomain("pc_part");
+  };
+
+  if(adding){
+    return (
+      <div style={{display:"flex",flexDirection:"column",gap:8,padding:11,background:"#09090b",border:"1px solid #3f3f46",borderRadius:9,...style}}>
+        <div style={{fontSize:12,color:"#a1a1aa"}}>New category name</div>
+        <Inp label="" value={newName} onChange={e=>setNewName(e.target.value)} placeholder="e.g. Smartphone, Vehicle, Peripheral"/>
+        <div style={{fontSize:12,color:"#a1a1aa",marginTop:2}}>What kind of item is this?</div>
+        <div style={{display:"flex",gap:7}}>
+          <button onClick={()=>setNewDomain("pc_part")} style={{flex:1,padding:"8px 10px",borderRadius:8,fontSize:12,cursor:"pointer",
+            border:`1.5px solid ${newDomain==="pc_part"?"#7c3aed":"#3f3f46"}`,background:newDomain==="pc_part"?"rgba(124,58,237,0.12)":"transparent",
+            color:newDomain==="pc_part"?"#a78bfa":"#a1a1aa"}}>🖥️ PC Part<div style={{fontSize:10,opacity:0.7,marginTop:2}}>Usable in Builds</div></button>
+          <button onClick={()=>setNewDomain("general_asset")} style={{flex:1,padding:"8px 10px",borderRadius:8,fontSize:12,cursor:"pointer",
+            border:`1.5px solid ${newDomain==="general_asset"?"#7c3aed":"#3f3f46"}`,background:newDomain==="general_asset"?"rgba(124,58,237,0.12)":"transparent",
+            color:newDomain==="general_asset"?"#a78bfa":"#a1a1aa"}}>📦 General Asset<div style={{fontSize:10,opacity:0.7,marginTop:2}}>Not for PC builds</div></button>
+        </div>
+        <div style={{display:"flex",gap:7,marginTop:2}}>
+          <Btn small onClick={confirmAdd} disabled={!newName.trim()} style={{flex:1}}>Add Category</Btn>
+          <Btn small variant="ghost" onClick={()=>{setAdding(false);setNewName("");}}>Cancel</Btn>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Sel label={label} value={value} onChange={handleSelect} style={style}>
+      <optgroup label="PC Parts">
+        {CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+        {(customCategories||[]).filter(c=>c.domain==="pc_part").map(c=><option key={c.name} value={c.name}>{c.name}</option>)}
+      </optgroup>
+      {(customCategories||[]).some(c=>c.domain==="general_asset")&&(
+        <optgroup label="General Assets">
+          {(customCategories||[]).filter(c=>c.domain==="general_asset").map(c=><option key={c.name} value={c.name}>{c.name}</option>)}
+        </optgroup>
+      )}
+      <option value="__add__">+ Add Category...</option>
+    </Sel>
   );
 }
 
@@ -499,7 +649,7 @@ function QuickSellModal({part,onClose,onConfirm,targetMargin}) {
 /* ═══════════════════════════════════════════
    EDIT PART MODAL  (#2)
 ═══════════════════════════════════════════ */
-function EditPartModal({part,onClose,onSave}) {
+function EditPartModal({part,onClose,onSave,dispatch,customCategories}) {
   const [name,setName]=useState(part.name);
   const [cat,setCat]=useState(part.category);
   const [cost,setCost]=useState(String(part.allocatedCost));
@@ -513,9 +663,7 @@ function EditPartModal({part,onClose,onSave}) {
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           <PhotoUpload label="Photo" photoUrl={photo.photoUrl} photoRecordId={photo.photoRecordId} onChange={setPhoto}/>
           <Inp label="Name" value={name} onChange={e=>setName(e.target.value)}/>
-          <Sel label="Category" value={cat} onChange={e=>setCat(e.target.value)}>
-            {CATEGORIES.map(c=><option key={c}>{c}</option>)}
-          </Sel>
+          <CategoryPicker label="Category" value={cat} onChange={setCat} customCategories={customCategories} dispatch={dispatch}/>
           <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             <Inp label="Cost (₱)" type="number" value={cost} onChange={e=>setCost(e.target.value)}/>
             <Inp label="Market value (₱)" type="number" value={market} onChange={e=>setMarket(e.target.value)}/>
@@ -534,8 +682,12 @@ function EditPartModal({part,onClose,onSave}) {
 /* ═══════════════════════════════════════════
    DASHBOARD  (#6 capital at risk, #7 bundle P&L)
 ═══════════════════════════════════════════ */
-function Dashboard({state,setTab,openLightbox}) {
-  const {parts,sales,bundles}=state;
+function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
+  const {parts,bundles}=state;
+  // Deleted sale records are kept (soft-delete, for the "Deleted records" filter in History) but
+  // must never count toward live profit/revenue. Returned sales ARE deleted from active totals too —
+  // a returned sale means the money didn't actually stay made.
+  const sales=state.sales.filter(s=>!s.deleted&&!s.returned);
   const totalCapital=parts.reduce((s,p)=>s+p.allocatedCost,0);
   const totalRevenue=sales.reduce((s,x)=>s+x.salePrice,0);
   const totalCOGS=sales.reduce((s,x)=>s+x.cost,0);
@@ -609,6 +761,52 @@ function Dashboard({state,setTab,openLightbox}) {
         <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>Live figures from your inventory.</p>
       </div>
 
+      {/* Liquidity Waterfall — paper profit can hide a cash crunch: you can show ₱50k profit
+          and still have ₱0 in your wallet if it's all sitting in unsold inventory. This makes
+          that visible at a glance. Kept alongside (not replacing) the profit/ROI stats below,
+          since those answer a different question — "am I profitable" vs "am I liquid" — and
+          both matter for a healthy flipping business. */}
+      <Card>
+        <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:4}}>Liquidity</div>
+        <div style={{fontSize:11,color:"#52525b",marginBottom:16}}>Where your capital actually is right now</div>
+        {(()=>{
+          const maxVal=Math.max(totalCapital,atRisk,totalRevenue,1);
+          const barH=v=>Math.max(4,Math.round((v/maxVal)*120));
+          const bars=[
+            {label:"Deployed",sub:"ever spent buying",value:totalCapital,color:"#ef4444"},
+            {label:"Locked",sub:"sitting unsold",value:atRisk,color:"#f59e0b"},
+            {label:"Recovered",sub:"cash back from sales",value:totalRevenue,color:"#22c55e"},
+          ];
+          const lockedRatio=totalCapital>0?atRisk/totalCapital:0;
+          return (
+            <>
+              <div style={{display:"flex",justifyContent:"space-around",alignItems:"flex-end",height:150,marginBottom:8}}>
+                {bars.map(b=>(
+                  <div key={b.label} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,width:"30%"}}>
+                    <div style={{fontSize:12,fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(b.value)}</div>
+                    <div style={{width:"100%",maxWidth:64,height:barH(b.value),background:b.color,borderRadius:"6px 6px 2px 2px",
+                      transition:"height 0.6s cubic-bezier(0.34,1.2,0.64,1)",boxShadow:`0 0 14px ${b.color}55`}}/>
+                  </div>
+                ))}
+              </div>
+              <div style={{display:"flex",justifyContent:"space-around",marginBottom:lockedRatio>0.5?12:0}}>
+                {bars.map(b=>(
+                  <div key={b.label} style={{width:"30%",textAlign:"center"}}>
+                    <div style={{fontSize:11,color:"#d4d4d8",fontWeight:600}}>{b.label}</div>
+                    <div style={{fontSize:10,color:"#52525b"}}>{b.sub}</div>
+                  </div>
+                ))}
+              </div>
+              {lockedRatio>0.5&&(
+                <div style={{background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:9,padding:"9px 12px",fontSize:12,color:"#fbbf24"}}>
+                  ⚠️ {pct(lockedRatio)} of everything you've ever spent is still sitting unsold. Consider moving some inventory to free up cash.
+                </div>
+              )}
+            </>
+          );
+        })()}
+      </Card>
+
       <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12}}>
         <StatBox label="Total Profit" value={fmt(totalProfit)} color={totalProfit>=0?"#34d399":"#f87171"} sub={`ROI ${pct(roi)}`}/>
         <StatBox label="Total Revenue" value={fmt(totalRevenue)} color="#34d399"/>
@@ -641,6 +839,26 @@ function Dashboard({state,setTab,openLightbox}) {
           </Card>
         ))}
       </div>
+
+      {/* Quick Notes — jotted from the floating [+] button's Note action */}
+      {(state.quickNotes||[]).length>0&&(
+        <Card>
+          <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>Quick Notes</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {[...state.quickNotes].reverse().map(n=>(
+              <div key={n.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,
+                background:"#09090b",border:"1px solid #27272a",borderRadius:9,padding:"9px 11px"}}>
+                <div style={{minWidth:0}}>
+                  <div style={{color:"#d4d4d8",fontSize:13,lineHeight:1.4,whiteSpace:"pre-wrap"}}>{n.text}</div>
+                  <div style={{color:"#52525b",fontSize:10,marginTop:4}}>{n.date}</div>
+                </div>
+                <button onClick={()=>dispatch({type:"DELETE_QUICK_NOTE",id:n.id})}
+                  style={{background:"none",border:"none",color:"#52525b",cursor:"pointer",fontSize:14,padding:"2px 4px",flexShrink:0}}>✕</button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Insight: cumulative profit sparkline */}
       {cumPoints.length>1&&(
@@ -853,9 +1071,7 @@ function Buy({state,dispatch,toast}) {
                 <PhotoUpload label="" photoUrl={row.photoUrl} photoRecordId={row.photoRecordId} onChange={({photoUrl,photoRecordId})=>{updateRow(row.id,"photoUrl",photoUrl);updateRow(row.id,"photoRecordId",photoRecordId);}}/>
                 <div className="part-row" style={{display:"grid",gridTemplateColumns:"1fr auto 90px 90px auto",gap:7,alignItems:"end",flex:1}}>
                   <Inp label={idx===0?"Part name":""} value={row.name} onChange={e=>updateRow(row.id,"name",e.target.value)} placeholder="RX 580"/>
-                  <Sel label={idx===0?"Cat":"."} value={row.category} onChange={e=>updateRow(row.id,"category",e.target.value)} style={{minWidth:90}}>
-                    {CATEGORIES.map(c=><option key={c}>{c}</option>)}
-                  </Sel>
+                  <CategoryPicker label={idx===0?"Cat":"."} value={row.category} onChange={v=>updateRow(row.id,"category",v)} customCategories={state.customCategories} dispatch={dispatch} style={{minWidth:90}}/>
                   <Inp label={idx===0?"Market (₱)":""} type="number" value={row.marketValue} onChange={e=>updateRow(row.id,"marketValue",e.target.value)} placeholder="4000"/>
                   <Inp label={idx===0?"Notes":""} value={row.notes||""} onChange={e=>updateRow(row.id,"notes",e.target.value)} placeholder="condition"/>
                   <button onClick={()=>removeRow(row.id)} style={{background:"none",border:"none",color:"#52525b",cursor:"pointer",fontSize:20,padding:"6px 4px",minHeight:36,transition:"color 0.1s"}}
@@ -900,9 +1116,7 @@ function Buy({state,dispatch,toast}) {
           </div>
           <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             <Inp label="Part name" value={singleName} onChange={e=>setSingleName(e.target.value)} placeholder="GTX 1060 6GB"/>
-            <Sel label="Category" value={singleCat} onChange={e=>setSingleCat(e.target.value)}>
-              {CATEGORIES.map(c=><option key={c}>{c}</option>)}
-            </Sel>
+            <CategoryPicker label="Category" value={singleCat} onChange={setSingleCat} customCategories={state.customCategories} dispatch={dispatch}/>
             <Inp label="Cost (₱)" type="number" value={singleCost} onChange={e=>setSingleCost(e.target.value)} placeholder="3000"/>
             <Inp label="Market value (₱, optional)" type="number" value={singleMarket} onChange={e=>setSingleMarket(e.target.value)} placeholder="3500"/>
           </div>
@@ -924,7 +1138,7 @@ function Buy({state,dispatch,toast}) {
    PART DETAIL SHEET — tap a card to see full details + actions,
    instead of every action always being visible on the card itself
 ═══════════════════════════════════════════ */
-function PartDetailSheet({part,buildName,onClose,openLightbox,onQuickSell,onEdit,onDefective,onDelete,onDuplicate,onAddToBuild}) {
+function PartDetailSheet({part,buildName,onClose,openLightbox,onQuickSell,onEdit,onDefective,onDelete,onDuplicate,onAddToBuild,onGoToBuild}) {
   const potential=part.marketValue-part.allocatedCost;
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
@@ -988,12 +1202,21 @@ function PartDetailSheet({part,buildName,onClose,openLightbox,onQuickSell,onEdit
               <Btn variant="ghost" onClick={onEdit} style={{flex:1}}>✏️ Edit</Btn>
               <Btn variant="ghost" onClick={onDuplicate} style={{flex:1}}>⧉ Duplicate</Btn>
             </div>
-            <div style={{display:"flex",gap:8,marginTop:6,paddingTop:14,borderTop:"1px solid #27272a"}}>
-              {part.status!=="sold"&&part.status!=="defective"&&(
-                <Btn variant="warn" onClick={onDefective} style={{flex:1}}>⚠️ Mark Defective</Btn>
-              )}
-              <Btn variant="danger" onClick={onDelete} style={{flex:1}}>🗑 Delete</Btn>
-            </div>
+            {part.status==="in_build"?(
+              <div style={{marginTop:6,paddingTop:14,borderTop:"1px solid #27272a"}}>
+                <div style={{fontSize:12,color:"#71717a",lineHeight:1.5,marginBottom:8}}>
+                  This part is used in <strong style={{color:"#7dd3fc"}}>{buildName}</strong>. Dissolve that build first to free it up before editing its defective/delete status here.
+                </div>
+                <Btn variant="ghost" onClick={onGoToBuild} style={{width:"100%"}}>🛠️ Go to {buildName}</Btn>
+              </div>
+            ):(
+              <div style={{display:"flex",gap:8,marginTop:6,paddingTop:14,borderTop:"1px solid #27272a"}}>
+                {part.status!=="sold"&&part.status!=="defective"&&(
+                  <Btn variant="warn" onClick={onDefective} style={{flex:1}}>⚠️ Mark Defective</Btn>
+                )}
+                <Btn variant="danger" onClick={onDelete} style={{flex:1}}>🗑 Delete</Btn>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1055,6 +1278,10 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
 
   const confirmDelete=()=>{
     if(deleting._isBundle)return; // handled by the dual-choice modal instead
+    if(deleting.status==="in_build"){
+      toast(`Can't delete — "${deleting.name}" is still in a build. Dissolve that build first.`,"error");
+      setDeleting(null);return;
+    }
     dispatch({type:"DELETE_PART",id:deleting.id});
     toast(`${deleting.name} deleted`,"warn");
     setDeleting(null);setViewing(null);
@@ -1090,10 +1317,16 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
     setTab("Builds");
   };
 
+  const goToBuild=()=>{
+    setViewing(null);
+    toast("Find this build on the Builds tab to dissolve it");
+    setTab("Builds");
+  };
+
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
       {quickSell&&<QuickSellModal part={quickSell} onClose={()=>setQuickSell(null)} onConfirm={handleQuickSell} targetMargin={settings?.targetMargin||30}/>}
-      {editing&&<EditPartModal part={editing} onClose={()=>setEditing(null)} onSave={handleEdit}/>}
+      {editing&&<EditPartModal part={editing} onClose={()=>setEditing(null)} onSave={handleEdit} dispatch={dispatch} customCategories={state.customCategories}/>}
       {deleting&&!deleting._isBundle&&(
         <ConfirmModal title="Delete this part?" message={`"${deleting.name}" will be permanently removed. This can't be undone.`}
           onConfirm={confirmDelete} onCancel={()=>setDeleting(null)}/>
@@ -1117,7 +1350,8 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
           onDefective={()=>{setDefectiveTarget(viewing);setViewing(null);}}
           onDelete={()=>{setDeleting(viewing);setViewing(null);}}
           onDuplicate={()=>duplicatePart(viewing)}
-          onAddToBuild={goAddToBuild}/>
+          onAddToBuild={goAddToBuild}
+          onGoToBuild={goToBuild}/>
       )}
 
       <div><h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Inventory</h2>
@@ -1232,6 +1466,88 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
 /* ═══════════════════════════════════════════
    BUILDS
 ═══════════════════════════════════════════ */
+/* ═══════════════════════════════════════════
+   BUILD DETAIL SHEET — tap a build card to see full cost breakdown, components, and actions,
+   matching the exact same pattern as PartDetailSheet / TransactionDetailSheet for consistency.
+═══════════════════════════════════════════ */
+function BuildDetailSheet({build,parts,onClose,openLightbox,onDissolve,onCopySpecs,onDelete}) {
+  const cost=parts.reduce((s,p)=>s+p.allocatedCost,0);
+  const market=parts.reduce((s,p)=>s+p.marketValue,0);
+  const potential=market-cost;
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",borderRadius:"18px 18px 0 0",width:"100%",maxWidth:520,
+        maxHeight:"88vh",overflowY:"auto",animation:"slideUp 0.22s cubic-bezier(0.22,1,0.36,1)",
+        paddingBottom:"calc(20px + env(safe-area-inset-bottom))"}}>
+        <div style={{display:"flex",justifyContent:"center",padding:"10px 0 4px"}}>
+          <div style={{width:38,height:4,borderRadius:99,background:"#3f3f46"}}/>
+        </div>
+
+        <div style={{width:"100%",aspectRatio:"16/10",background:"#09090b",display:"flex",alignItems:"center",justifyContent:"center",
+          cursor:build.photoUrl?"pointer":"default",borderBottom:"1px solid #27272a"}}
+          onClick={build.photoUrl?()=>openLightbox(build.photoUrl):undefined}>
+          {build.photoUrl?(
+            <img src={build.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+          ):(
+            <span style={{fontSize:48,opacity:0.25}}>🖥️</span>
+          )}
+        </div>
+
+        <div style={{padding:"18px 20px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:14}}>
+            <div style={{color:"#fff",fontWeight:700,fontSize:19}}>{build.name}</div>
+            <span style={{fontSize:11,fontWeight:700,color:"#7dd3fc",textTransform:"uppercase",letterSpacing:"0.05em"}}>Active Build</span>
+          </div>
+
+          {/* Cost breakdown */}
+          <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14,marginBottom:14}}>
+            <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Cost Breakdown</div>
+            {[["Total cost",fmt(cost),"#fff"],["Market value",fmt(market),"#d4d4d8"],
+              ["Potential profit",`${potential>=0?"+":""}${fmt(potential)}`,potential>=0?"#34d399":"#f87171"]
+            ].map(([l,v,c],i)=>(
+              <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:i<2?7:0,paddingTop:i===2?8:0,borderTop:i===2?"1px solid #27272a":"none"}}>
+                <span style={{color:"#a1a1aa"}}>{l}</span>
+                <span style={{fontFamily:"monospace",fontWeight:i===2?700:600,color:c}}>{v}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Components */}
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Components ({parts.length})</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {parts.map(p=>(
+                <div key={p.id} style={{display:"flex",alignItems:"center",gap:9}}>
+                  <PhotoThumb url={p.photoUrl} size={32} seed={p.id.length} onClick={p.photoUrl?()=>openLightbox(p.photoUrl):undefined}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{color:"#fff",fontSize:13}}>{p.name}</div>
+                    <div style={{color:"#71717a",fontSize:10}}>{p.category}</div>
+                  </div>
+                  <span style={{fontFamily:"monospace",fontSize:12,color:"#d4d4d8"}}>{fmt(p.allocatedCost)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Transaction history */}
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
+            <DetailRow label="Created" value={build.date}/>
+          </div>
+
+          {/* Actions */}
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <Btn variant="ghost" onClick={onDissolve} style={{width:"100%"}}>↩️ Dissolve Build — Return Parts to Inventory</Btn>
+            <Btn variant="ghost" onClick={onCopySpecs} style={{width:"100%"}}>📋 Copy Specs for Listing</Btn>
+            <div style={{paddingTop:6,borderTop:"1px solid #27272a",marginTop:6}}>
+              <Btn variant="danger" onClick={onDelete} style={{width:"100%"}}>🗑 Delete Build</Btn>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Builds({state,dispatch,toast,openLightbox}) {
   const [creating,setCreating]=useState(false);
   const [buildName,setBuildName]=useState("");
@@ -1240,14 +1556,20 @@ function Builds({state,dispatch,toast,openLightbox}) {
   const [pickerSearch,setPickerSearch]=useState("");
   const [buildPhoto,setBuildPhoto]=useState({photoUrl:"",photoRecordId:""});
   const [deletingBuild,setDeletingBuild]=useState(null);
-  const avail=state.parts.filter(p=>p.status==="available");
+  const [viewingBuild,setViewingBuild]=useState(null); // build shown in the detail sheet
+  // Domain Firewall: Builds must never see General Assets (phones, vehicles, etc.), only PC Parts.
+  // This is enforced at the data-access layer here, not just hidden in the UI, so there's no path
+  // for a non-PC item to end up selected into a build's partIds.
+  const avail=state.parts.filter(p=>p.status==="available"&&domainOf(p.category,state.customCategories)==="pc_part");
   const buildCost=avail.filter(p=>sel.includes(p.id)).reduce((s,p)=>s+p.allocatedCost,0);
   const buildMarket=avail.filter(p=>sel.includes(p.id)).reduce((s,p)=>s+p.marketValue,0);
   const toggle=id=>setSel(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
 
-  // Group available parts by category for the chip picker, in CATEGORIES order so common
-  // categories (CPU, GPU, RAM...) always appear first regardless of insertion order.
-  const categoriesPresent=CATEGORIES.filter(c=>avail.some(p=>p.category===c));
+  // Group available parts by category for the chip picker. Built-in categories come first (in
+  // their fixed order), followed by any custom PC Part categories the user has added — custom
+  // General Asset categories never reach this list at all, since `avail` already excludes them.
+  const customPcPartCats=(state.customCategories||[]).filter(c=>c.domain==="pc_part").map(c=>c.name);
+  const categoriesPresent=[...CATEGORIES,...customPcPartCats].filter(c=>avail.some(p=>p.category===c));
   const partsInActiveCat=activeCat?avail.filter(p=>p.category===activeCat&&
     (!pickerSearch||p.name.toLowerCase().includes(pickerSearch.toLowerCase()))):[];
   const selectedCountByCat=cat=>avail.filter(p=>p.category===cat&&sel.includes(p.id)).length;
@@ -1290,6 +1612,15 @@ function Builds({state,dispatch,toast,openLightbox}) {
             {label:"Delete build AND permanently destroy its parts",onClick:deleteBuildAndParts,variant:"danger"},
           ]}/>
       )}
+      {viewingBuild&&(()=>{
+        const bp=state.parts.filter(p=>viewingBuild.partIds.includes(p.id));
+        return (
+          <BuildDetailSheet build={viewingBuild} parts={bp} onClose={()=>setViewingBuild(null)} openLightbox={openLightbox}
+            onDissolve={()=>{dissolve(viewingBuild);setViewingBuild(null);}}
+            onCopySpecs={()=>copySpecs(viewingBuild,bp)}
+            onDelete={()=>{setDeletingBuild(viewingBuild);setViewingBuild(null);}}/>
+        );
+      })()}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
         <div><h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Builds</h2>
           <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>Group parts into a sellable PC.</p></div>
@@ -1391,35 +1722,47 @@ function Builds({state,dispatch,toast,openLightbox}) {
       {state.builds.filter(b=>!b.dissolved&&!b.sold).length===0&&!creating?(
         <Card style={{textAlign:"center",padding:36}}><div style={{color:"#52525b"}}>No active builds.</div></Card>
       ):(
-        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
           {state.builds.filter(b=>!b.dissolved&&!b.sold).map(build=>{
             const bp=state.parts.filter(p=>build.partIds.includes(p.id));
             const cost=bp.reduce((s,p)=>s+p.allocatedCost,0);
             const market=bp.reduce((s,p)=>s+p.marketValue,0);
             return (
-              <Card key={build.id}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,gap:10}}>
-                  <div style={{display:"flex",gap:11,minWidth:0}}>
-                    {build.photoUrl&&<PhotoThumb url={build.photoUrl} size={56} seed={build.id.length} onClick={()=>openLightbox(build.photoUrl)}/>}
-                    <div><div style={{color:"#fff",fontWeight:600,fontSize:14}}>{build.name}</div>
+              <Card key={build.id} style={{padding:0,overflow:"hidden",cursor:"pointer"}} onClick={()=>setViewingBuild(build)}>
+                {/* Hero image — same large-photo treatment as the part/transaction detail sheets,
+                    so a finished build reads as a real listing rather than a data row. Tapping
+                    anywhere on the card (including the photo) opens the detail sheet, matching
+                    the same tap-to-open pattern used for Inventory parts and History transactions —
+                    actions live inside that sheet instead of always-visible buttons on the card. */}
+                <div style={{width:"100%",aspectRatio:"16/9",background:"#09090b",display:"flex",alignItems:"center",justifyContent:"center",borderBottom:"1px solid #27272a"}}>
+                  {build.photoUrl?(
+                    <img src={build.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  ):(
+                    <span style={{fontSize:40,opacity:0.25}}>🖥️</span>
+                  )}
+                </div>
+
+                <div style={{padding:16}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:11,gap:10}}>
+                    <div><div style={{color:"#fff",fontWeight:700,fontSize:15}}>{build.name}</div>
                       <div style={{color:"#71717a",fontSize:11,marginTop:2}}>{build.date} · {bp.length} parts</div></div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(cost)}</div>
+                      <div style={{fontSize:10,color:"#71717a"}}>market {fmt(market)}</div>
+                    </div>
                   </div>
-                  <div style={{textAlign:"right",flexShrink:0}}>
-                    <div style={{fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(cost)}</div>
-                    <div style={{fontSize:10,color:"#71717a"}}>market {fmt(market)}</div>
+
+                  {/* Component badge tags — core parts at a glance */}
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {bp.map(p=>(
+                      <span key={p.id} style={{display:"inline-flex",alignItems:"center",gap:5,background:"#27272a",border:"1px solid #3f3f46",
+                        borderRadius:99,fontSize:11,padding:"4px 10px",color:"#d4d4d8"}}>
+                        <span style={{color:"#a78bfa",fontWeight:600}}>{p.category}</span>
+                        <span>{p.name}</span>
+                        <span style={{color:"#71717a"}}>{fmt(p.allocatedCost)}</span>
+                      </span>
+                    ))}
                   </div>
-                </div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:10}}>
-                  {bp.map(p=>(
-                    <span key={p.id} style={{background:"#27272a",border:"1px solid #3f3f46",borderRadius:5,fontSize:11,padding:"2px 7px",color:"#d4d4d8"}}>
-                      {p.name} <span style={{color:"#71717a"}}>{fmt(p.allocatedCost)}</span>
-                    </span>
-                  ))}
-                </div>
-                <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
-                  <Btn small variant="ghost" onClick={()=>dissolve(build)}>Dissolve Build</Btn>
-                  <Btn small variant="ghost" onClick={()=>copySpecs(build,bp)}>📋 Copy Specs for Listing</Btn>
-                  <Btn small variant="danger" onClick={()=>setDeletingBuild(build)}>🗑 Delete</Btn>
                 </div>
               </Card>
             );
@@ -1449,7 +1792,8 @@ function Sell({state,dispatch,toast,openLightbox}) {
   const tp=avail.find(p=>p.id===selId);
   const tb=builds.find(b=>b.id===selId);
   const cost=mode==="part"?tp?.allocatedCost||0:tb?state.parts.filter(p=>tb.partIds.includes(p.id)).reduce((s,p)=>s+p.allocatedCost,0):0;
-  const suggested=cost>0?Math.round(cost*(1+targetMargin/100)):0;  // #5
+  const marketVal=mode==="part"?tp?.marketValue||0:tb?state.parts.filter(p=>tb.partIds.includes(p.id)).reduce((s,p)=>s+p.marketValue,0):0;
+  const suggestedCostPlus=cost>0?Math.round(cost*(1+targetMargin/100)):0;  // #5
   const sp=parseFloat(salePrice)||0;
   const profit=sp-cost;
   const margin=cost>0?profit/cost:0;
@@ -1461,7 +1805,7 @@ function Sell({state,dispatch,toast,openLightbox}) {
     setLoading(true);
     const name=mode==="part"?tp?.name:tb?.name;
     setTimeout(()=>{
-      dispatch({type:"SELL",mode,id:selId,sale:{id:uid(),partId:mode==="part"?selId:null,name,cost,salePrice:sp,profit,buyerName:buyer,date:today(),
+      dispatch({type:"SELL",mode,id:selId,sale:{id:uid(),partId:mode==="part"?selId:null,buildId:mode==="build"?selId:null,name,cost,salePrice:sp,profit,buyerName:buyer,date:today(),
         convoLink:convoLink.trim(),proofPhotoUrl:proofPhoto.photoUrl,proofPhotoRecordId:proofPhoto.photoRecordId}});
       toast(`${name} sold for ${fmt(sp)} — profit ${fmt(profit)} ✓`,profit>=0?"success":"warn");
       setSelId("");setSalePrice("");setBuyer("");setConvoLink("");setProofPhoto({photoUrl:"",photoRecordId:""});setLoading(false);
@@ -1520,13 +1864,26 @@ function Sell({state,dispatch,toast,openLightbox}) {
               </>
             )}
           </div>
-          {/* Price suggestion  (#5) */}
-          {selId&&cost>0&&(
-            <div style={{background:"rgba(124,58,237,0.08)",border:"1px solid rgba(124,58,237,0.25)",borderRadius:9,padding:"9px 12px",fontSize:12,color:"#a78bfa",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span>Suggested price at {targetMargin}% margin</span>
-              <button onClick={()=>setSalePrice(String(suggested))} style={{background:"#7c3aed",border:"none",color:"#fff",borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>
-                Use {fmt(suggested)}
-              </button>
+          {/* Price suggestion  (#5) — two options, since anchoring only to cost-plus-margin
+              undersells when the item's real market value is much higher than what it cost to acquire. */}
+          {selId&&(cost>0||marketVal>0)&&(
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {cost>0&&(
+                <div style={{background:"rgba(124,58,237,0.08)",border:"1px solid rgba(124,58,237,0.25)",borderRadius:9,padding:"9px 12px",fontSize:12,color:"#a78bfa",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span>Cost + {targetMargin}% margin</span>
+                  <button onClick={()=>setSalePrice(String(suggestedCostPlus))} style={{background:"#7c3aed",border:"none",color:"#fff",borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                    Use {fmt(suggestedCostPlus)}
+                  </button>
+                </div>
+              )}
+              {marketVal>0&&(
+                <div style={{background:"rgba(14,165,233,0.08)",border:"1px solid rgba(14,165,233,0.25)",borderRadius:9,padding:"9px 12px",fontSize:12,color:"#7dd3fc",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span>Use market price</span>
+                  <button onClick={()=>setSalePrice(String(marketVal))} style={{background:"#0ea5e9",border:"none",color:"#fff",borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                    Use {fmt(marketVal)}
+                  </button>
+                </div>
+              )}
             </div>
           )}
           <Inp label="Sale price (₱)" type="number" value={salePrice} onChange={e=>setSalePrice(e.target.value)} placeholder="5000"/>
@@ -1557,15 +1914,86 @@ function Sell({state,dispatch,toast,openLightbox}) {
 /* ═══════════════════════════════════════════
    HISTORY  (+ #4 CSV export)
 ═══════════════════════════════════════════ */
-function History({state,openLightbox}) {
+function History({state,dispatch,toast,openLightbox}) {
+  const [view,setView]=useState("transactions"); // "transactions" | "partTimeline"
   const [sel,setSel]=useState("");
+  const [search,setSearch]=useState("");
+  const [typeFilter,setTypeFilter]=useState("all"); // all | part | build | returned | deleted
+  const [dateFrom,setDateFrom]=useState("");
+  const [dateTo,setDateTo]=useState("");
+  const [plFilter,setPlFilter]=useState("all"); // all | profit | loss
+  const [viewingSale,setViewingSale]=useState(null);
+  const [editingSale,setEditingSale]=useState(null);
+  const [undoingSale,setUndoingSale]=useState(null);
+  const [deletingSale,setDeletingSale]=useState(null);
   const part=state.parts.find(p=>p.id===sel);
+
+  const allSales=state.sales;
+  const activeSales=allSales.filter(s=>!s.deleted&&!s.returned&&!s.writeOff);
+
+  const filtered=allSales.filter(s=>{
+    if(s.writeOff)return false; // write-offs are losses, not sales transactions — shown on Dashboard instead
+    if(typeFilter==="returned"&&!s.returned)return false;
+    if(typeFilter==="deleted"&&!s.deleted)return false;
+    if(typeFilter==="part"&&(s.deleted||s.returned||s.buildId))return false;
+    if(typeFilter==="build"&&(s.deleted||s.returned||!s.buildId))return false;
+    if(typeFilter==="all"&&(s.deleted||s.returned))return false; // "all" means all *active* transactions
+    if(search){
+      const q=search.toLowerCase();
+      if(!s.name.toLowerCase().includes(q)&&!(s.buyerName||"").toLowerCase().includes(q))return false;
+    }
+    if(dateFrom&&new Date(s.date)<new Date(dateFrom))return false;
+    if(dateTo&&new Date(s.date)>new Date(dateTo))return false;
+    if(plFilter==="profit"&&s.profit<0)return false;
+    if(plFilter==="loss"&&s.profit>=0)return false;
+    return true;
+  });
+
+  // Sales Analytics  — computed over active (non-deleted, non-returned) sales only
+  const totalRevenue=activeSales.reduce((s,x)=>s+x.salePrice,0);
+  const totalProfitAll=activeSales.reduce((s,x)=>s+x.profit,0);
+  const totalLosses=activeSales.filter(s=>s.profit<0).reduce((s,x)=>s+Math.abs(x.profit),0);
+  const partsSoldCount=activeSales.filter(s=>!s.buildId).length;
+  const buildsSoldCount=activeSales.filter(s=>s.buildId).length;
+  const avgProfit=activeSales.length?totalProfitAll/activeSales.length:0;
+  const catTotals={};
+  activeSales.forEach(s=>{
+    const p=state.parts.find(p=>p.id===s.partId);
+    const cat=p?.category||(s.buildId?"Build":"Other");
+    catTotals[cat]=(catTotals[cat]||0)+s.profit;
+  });
+  const bestCategory=Object.entries(catTotals).sort((a,b)=>b[1]-a[1])[0];
+  const bestItem=[...activeSales].sort((a,b)=>b.profit-a.profit)[0];
+
+  const undoSale=(reason)=>{
+    dispatch({type:"UNDO_SALE",saleId:undoingSale.id,reason});
+    toast(`"${undoingSale.name}" sale undone — returned to inventory`,"warn");
+    setUndoingSale(null);setViewingSale(null);
+  };
+
+  const saveEdit=(changes)=>{
+    dispatch({type:"EDIT_SALE",saleId:editingSale.id,changes});
+    toast("Transaction updated ✓");
+    setEditingSale(null);
+  };
+
+  const deleteRecordOnly=()=>{
+    dispatch({type:"DELETE_SALE",saleId:deletingSale.id,mode:"record-only"});
+    toast("Transaction record deleted","warn");
+    setDeletingSale(null);setViewingSale(null);
+  };
+
+  const deleteAndReturn=()=>{
+    dispatch({type:"DELETE_SALE",saleId:deletingSale.id,mode:"undo-and-return"});
+    toast("Transaction deleted — item returned to inventory","warn");
+    setDeletingSale(null);setViewingSale(null);
+  };
 
   // #4 Export CSV
   const exportCSV=()=>{
     const rows=[["Name","Category","Source","Cost","Market Value","Status","Sale Price","Profit","Buyer","Date"]];
     state.parts.forEach(p=>{
-      const sale=state.sales.find(s=>s.partId===p.id)||state.sales.find(s=>s.name===p.name);
+      const sale=state.sales.find(s=>s.partId===p.id&&!s.deleted&&!s.returned)||state.sales.find(s=>s.name===p.name&&!s.deleted&&!s.returned);
       rows.push([p.name,p.category,p.source,p.allocatedCost,p.marketValue,p.status,sale?sale.salePrice:"",sale?sale.profit:"",sale?sale.buyerName||"":"",sale?.date||""]);
     });
     const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
@@ -1575,81 +2003,275 @@ function History({state,openLightbox}) {
     URL.revokeObjectURL(url);
   };
 
+  const statusOf=s=>s.deleted?"deleted":s.returned?"returned":"completed";
+  const statusColor={completed:"#6ee7b7",returned:"#fbbf24",deleted:"#71717a"};
+
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:20}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-        <div><h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>History</h2>
-          <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>Part movement log + data export.</p></div>
-        {/* CSV Export  (#4) */}
-        <Btn variant="ghost" onClick={exportCSV} disabled={state.parts.length===0}>⬇ Export CSV</Btn>
-      </div>
-
-      <Sel label="Select part" value={sel} onChange={e=>setSel(e.target.value)}>
-        <option value="">— choose a part —</option>
-        {state.parts.map(p=><option key={p.id} value={p.id}>{p.name} ({p.status})</option>)}
-      </Sel>
-
-      {part&&(
-        <Card>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14,gap:10}}>
-            <div style={{display:"flex",gap:11,minWidth:0}}>
-              {part.photoUrl&&<PhotoThumb url={part.photoUrl} size={56} seed={part.id.length} onClick={()=>openLightbox(part.photoUrl)}/>}
-              <div>
-                <div style={{color:"#fff",fontWeight:600,fontSize:15}}>{part.name}</div>
-                <div style={{color:"#71717a",fontSize:11,marginTop:2}}>{part.category} · {part.source}</div>
-                {part.notes&&<div style={{color:"#a1a1aa",fontSize:11,marginTop:3,fontStyle:"italic"}}>📝 {part.notes}</div>}
-                {part.soldTo&&<div style={{color:"#71717a",fontSize:11,marginTop:2}}>Sold to: {part.soldTo}</div>}
-              </div>
-            </div>
-            <Badge s={part.status}/>
-          </div>
-          <div style={{position:"relative",paddingLeft:16}}>
-            <div style={{position:"absolute",left:0,top:0,bottom:0,width:1,background:"#3f3f46"}}/>
-            <div style={{display:"flex",flexDirection:"column",gap:14}}>
-              {part.history.map((h,i)=>(
-                <div key={i} style={{position:"relative",animation:`fadeUp 0.2s ease ${i*0.04}s both`}}>
-                  <div style={{position:"absolute",left:-20,top:4,width:7,height:7,borderRadius:"50%",background:"#7c3aed"}}/>
-                  <div style={{fontSize:10,color:"#71717a"}}>{h.date}</div>
-                  <div style={{fontSize:13,color:"#d4d4d8",marginTop:2}}>{h.event}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      {viewingSale&&(
+        <TransactionDetailSheet sale={viewingSale} state={state} openLightbox={openLightbox} onClose={()=>setViewingSale(null)}
+          onEdit={()=>{setEditingSale(viewingSale);setViewingSale(null);}}
+          onUndo={()=>{setUndoingSale(viewingSale);setViewingSale(null);}}
+          onDelete={()=>{setDeletingSale(viewingSale);setViewingSale(null);}}/>
+      )}
+      {editingSale&&<EditSaleModal sale={editingSale} onClose={()=>setEditingSale(null)} onSave={saveEdit}/>}
+      {undoingSale&&<ReturnReasonModal title="Undo this sale?" sale={undoingSale} onConfirm={undoSale} onCancel={()=>setUndoingSale(null)}/>}
+      {deletingSale&&(
+        <ConfirmModal title="Delete this transaction?" message={`What should happen to "${deletingSale.name}"?`}
+          onCancel={()=>setDeletingSale(null)}
+          extraChoices={[
+            {label:"Delete record only (item stays sold)",onClick:deleteRecordOnly,variant:"warn"},
+            {label:"Delete & return item to inventory",onClick:deleteAndReturn,variant:"success"},
+          ]}/>
       )}
 
-      {/* Sales summary */}
-      {state.sales.length>0&&(
-        <Card>
-          <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>All Sales</div>
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {[...state.sales].reverse().map(s=>(
-              <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"8px 0",borderBottom:"1px solid #27272a",gap:10}}>
-                <div style={{display:"flex",gap:9,minWidth:0}}>
-                  {s.proofPhotoUrl&&<PhotoThumb url={s.proofPhotoUrl} size={36} seed={s.id.length} onClick={()=>openLightbox(s.proofPhotoUrl)}/>}
-                  <div style={{minWidth:0}}>
-                    <div style={{color:"#fff",fontSize:13,fontWeight:500}}>{s.name}</div>
-                    <div style={{color:"#71717a",fontSize:10}}>{s.date}{s.buyerName?` · ${s.buyerName}`:""}</div>
-                    {s.convoLink&&(
-                      <a href={s.convoLink} target="_blank" rel="noopener noreferrer" style={{color:"#7dd3fc",fontSize:10,textDecoration:"none"}}>
-                        🔗 View conversation
-                      </a>
-                    )}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+        <div><h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>History</h2>
+          <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>Transactions, sales analytics, and part movement.</p></div>
+        <Btn variant="ghost" onClick={exportCSV} disabled={state.parts.length===0}>⬇ CSV</Btn>
+      </div>
+
+      <div style={{display:"flex",gap:7}}>
+        <Btn small variant={view==="transactions"?"primary":"ghost"} onClick={()=>setView("transactions")}>Transactions</Btn>
+        <Btn small variant={view==="partTimeline"?"primary":"ghost"} onClick={()=>setView("partTimeline")}>Part Timeline</Btn>
+      </div>
+
+      {view==="partTimeline"?(
+        <>
+          <Sel label="Select part" value={sel} onChange={e=>setSel(e.target.value)}>
+            <option value="">— choose a part —</option>
+            {state.parts.map(p=><option key={p.id} value={p.id}>{p.name} ({p.status})</option>)}
+          </Sel>
+          {part&&(
+            <Card>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14,gap:10}}>
+                <div style={{display:"flex",gap:11,minWidth:0}}>
+                  {part.photoUrl&&<PhotoThumb url={part.photoUrl} size={56} seed={part.id.length} onClick={()=>openLightbox(part.photoUrl)}/>}
+                  <div>
+                    <div style={{color:"#fff",fontWeight:600,fontSize:15}}>{part.name}</div>
+                    <div style={{color:"#71717a",fontSize:11,marginTop:2}}>{part.category} · {part.source}</div>
+                    {part.notes&&<div style={{color:"#a1a1aa",fontSize:11,marginTop:3,fontStyle:"italic"}}>📝 {part.notes}</div>}
+                    {part.soldTo&&<div style={{color:"#71717a",fontSize:11,marginTop:2}}>Sold to: {part.soldTo}</div>}
                   </div>
                 </div>
-                <div style={{textAlign:"right",flexShrink:0}}>
-                  <div style={{fontFamily:"monospace",fontSize:13,color:"#fff"}}>{fmt(s.salePrice)}</div>
-                  <div style={{fontFamily:"monospace",fontSize:11,color:s.profit>=0?"#34d399":"#f87171"}}>{s.profit>=0?"+":""}{fmt(s.profit)}</div>
+                <Badge s={part.status}/>
+              </div>
+              <div style={{position:"relative",paddingLeft:16}}>
+                <div style={{position:"absolute",left:0,top:0,bottom:0,width:1,background:"#3f3f46"}}/>
+                <div style={{display:"flex",flexDirection:"column",gap:14}}>
+                  {part.history.map((h,i)=>(
+                    <div key={i} style={{position:"relative",animation:`fadeUp 0.2s ease ${i*0.04}s both`}}>
+                      <div style={{position:"absolute",left:-20,top:4,width:7,height:7,borderRadius:"50%",background:"#7c3aed"}}/>
+                      <div style={{fontSize:10,color:"#71717a"}}>{h.date}</div>
+                      <div style={{fontSize:13,color:"#d4d4d8",marginTop:2}}>{h.event}</div>
+                    </div>
+                  ))}
                 </div>
+              </div>
+            </Card>
+          )}
+          {state.parts.length===0&&(
+            <Card style={{textAlign:"center",padding:36}}><div style={{color:"#52525b"}}>No parts yet.</div></Card>
+          )}
+        </>
+      ):(
+        <>
+          {/* Sales Analytics */}
+          {activeSales.length>0&&(
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
+              <StatBox label="Total Revenue" value={fmt(totalRevenue)} color="#34d399"/>
+              <StatBox label="Total Profit" value={fmt(totalProfitAll)} color={totalProfitAll>=0?"#34d399":"#f87171"}/>
+              <StatBox label="Total Losses" value={fmt(-totalLosses)} color="#f87171"/>
+              <StatBox label="Avg. Profit / Sale" value={fmt(avgProfit)}/>
+              <StatBox label="Parts Sold" value={String(partsSoldCount)}/>
+              <StatBox label="Builds Sold" value={String(buildsSoldCount)}/>
+              {bestCategory&&<StatBox label="Best Category" value={bestCategory[0]} sub={`+${fmt(bestCategory[1])} profit`} color="#38bdf8"/>}
+              {bestItem&&<StatBox label="Most Profitable Sale" value={bestItem.name} sub={`+${fmt(bestItem.profit)}`} color="#38bdf8"/>}
+            </div>
+          )}
+
+          {/* Search + filters */}
+          <Inp label="" value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍  Search by item or buyer name..."/>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {[["all","All"],["part","Parts only"],["build","Builds only"],["returned","Returned"],["deleted","Deleted"]].map(([v,l])=>(
+              <Btn key={v} small variant={typeFilter===v?"primary":"ghost"} onClick={()=>setTypeFilter(v)}>{l}</Btn>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {[["all","All P/L"],["profit","Profit only"],["loss","Loss only"]].map(([v,l])=>(
+              <Btn key={v} small variant={plFilter===v?"primary":"ghost"} onClick={()=>setPlFilter(v)}>{l}</Btn>
+            ))}
+          </div>
+          <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <Inp label="From date" type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}/>
+            <Inp label="To date" type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}/>
+          </div>
+
+          {/* Transaction card grid — marketplace style */}
+          {filtered.length===0?(
+            <Card style={{textAlign:"center",padding:36}}><div style={{color:"#52525b"}}>No transactions match.</div></Card>
+          ):(
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
+              {[...filtered].reverse().map((s,i)=>{
+                const linkedPart=state.parts.find(p=>p.id===s.partId);
+                const linkedBuild=state.builds.find(b=>b.id===s.buildId);
+                const img=s.proofPhotoUrl||linkedPart?.photoUrl||linkedBuild?.photoUrl;
+                const status=statusOf(s);
+                return (
+                  <div key={s.id} onClick={()=>setViewingSale(s)} style={{background:"#18181b",border:"1px solid #27272a",borderRadius:13,
+                    padding:10,cursor:"pointer",animation:`fadeUp 0.18s ease ${Math.min(i*0.025,0.3)}s both`,transition:"border-color 0.15s",opacity:status==="deleted"?0.55:1}}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor="#52525b"}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor="#27272a"}>
+                    <div style={{width:"100%",aspectRatio:"1",borderRadius:9,overflow:"hidden",background:"#09090b",marginBottom:8,
+                      display:"flex",alignItems:"center",justifyContent:"center",border:"1px solid #1f1f23"}}>
+                      {img?<img src={img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:26,opacity:0.3}}>{s.buildId?"🖥️":"🔧"}</span>}
+                    </div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:4,marginBottom:3}}>
+                      <span style={{fontSize:9,fontWeight:700,color:statusColor[status],textTransform:"uppercase",letterSpacing:"0.05em"}}>{status}</span>
+                      <span style={{color:"#52525b",fontSize:9}}>{s.buildId?"BUILD":"PART"}</span>
+                    </div>
+                    <div style={{color:"#fff",fontWeight:600,fontSize:12.5,lineHeight:1.3,marginBottom:4,
+                      display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{s.name}</div>
+                    <div style={{fontFamily:"monospace",fontWeight:700,color:"#fff",fontSize:13}}>{fmt(s.salePrice)}</div>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#71717a",marginTop:2}}>
+                      <span>{s.date}</span>
+                      <span style={{color:s.profit>=0?"#34d399":"#f87171",fontWeight:600}}>{s.profit>=0?"+":""}{fmt(s.profit)}</span>
+                    </div>
+                    {s.buyerName&&<div style={{color:"#52525b",fontSize:10,marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>👤 {s.buyerName}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   TRANSACTION DETAIL SHEET — tap a History card for full transaction info + actions
+═══════════════════════════════════════════ */
+function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,onDelete}) {
+  const status=sale.deleted?"deleted":sale.returned?"returned":"completed";
+  const statusColor={completed:"#6ee7b7",returned:"#fbbf24",deleted:"#71717a"}[status];
+  const linkedPart=state.parts.find(p=>p.id===sale.partId);
+  const linkedBuild=state.builds.find(b=>b.id===sale.buildId);
+  const img=sale.proofPhotoUrl||linkedPart?.photoUrl||linkedBuild?.photoUrl;
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",borderRadius:"18px 18px 0 0",width:"100%",maxWidth:520,
+        maxHeight:"88vh",overflowY:"auto",animation:"slideUp 0.22s cubic-bezier(0.22,1,0.36,1)",
+        paddingBottom:"calc(20px + env(safe-area-inset-bottom))"}}>
+        <div style={{display:"flex",justifyContent:"center",padding:"10px 0 4px"}}><div style={{width:38,height:4,borderRadius:99,background:"#3f3f46"}}/></div>
+        <div style={{width:"100%",aspectRatio:"16/10",background:"#09090b",display:"flex",alignItems:"center",justifyContent:"center",
+          cursor:img?"pointer":"default",borderBottom:"1px solid #27272a"}}
+          onClick={img?()=>openLightbox(img):undefined}>
+          {img?<img src={img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:48,opacity:0.25}}>{sale.buildId?"🖥️":"🔧"}</span>}
+        </div>
+        <div style={{padding:"18px 20px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:14}}>
+            <div style={{color:"#fff",fontWeight:700,fontSize:19}}>{sale.name}</div>
+            <span style={{fontSize:11,fontWeight:700,color:statusColor,textTransform:"uppercase",letterSpacing:"0.05em"}}>{status}</span>
+          </div>
+
+          <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14,marginBottom:14}}>
+            <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Transaction</div>
+            {[["Cost price",fmt(sale.cost),"#fff"],["Sale price",fmt(sale.salePrice),"#fff"],
+              ["Profit / Loss",`${sale.profit>=0?"+":""}${fmt(sale.profit)}`,sale.profit>=0?"#34d399":"#f87171"]
+            ].map(([l,v,c],i)=>(
+              <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:i<2?7:0,paddingTop:i===2?8:0,borderTop:i===2?"1px solid #27272a":"none"}}>
+                <span style={{color:"#a1a1aa"}}>{l}</span>
+                <span style={{fontFamily:"monospace",fontWeight:i===2?700:600,color:c}}>{v}</span>
               </div>
             ))}
           </div>
-        </Card>
-      )}
 
-      {state.parts.length===0&&(
-        <Card style={{textAlign:"center",padding:36}}><div style={{color:"#52525b"}}>No parts yet.</div></Card>
-      )}
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
+            <DetailRow label="Buyer" value={sale.buyerName||"—"}/>
+            <DetailRow label="Sale Date" value={sale.date}/>
+            {sale.convoLink&&(
+              <div>
+                <div style={{fontSize:11,color:"#71717a",marginBottom:2}}>Conversation</div>
+                <a href={sale.convoLink} target="_blank" rel="noopener noreferrer" style={{color:"#7dd3fc",fontSize:13}}>🔗 Open conversation link</a>
+              </div>
+            )}
+            {sale.notes&&<DetailRow label="Notes" value={sale.notes}/>}
+            {sale.edited&&<DetailRow label="Last Edited" value={sale.editedAt} valueColor="#71717a"/>}
+            {sale.returned&&<DetailRow label="Return Reason" value={sale.returnReason||"—"} valueColor="#fbbf24"/>}
+          </div>
+
+          {!sale.deleted&&(
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              <Btn variant="ghost" onClick={onEdit}>✏️ Edit Transaction</Btn>
+              {!sale.returned&&<Btn variant="warn" onClick={onUndo}>↩️ Undo Sale</Btn>}
+              <div style={{paddingTop:6,borderTop:"1px solid #27272a",marginTop:6}}>
+                <Btn variant="danger" onClick={onDelete} style={{width:"100%"}}>🗑 Delete Transaction</Btn>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   EDIT SALE MODAL — modify transaction details without deleting the record
+═══════════════════════════════════════════ */
+function EditSaleModal({sale,onClose,onSave}) {
+  const [salePrice,setSalePrice]=useState(String(sale.salePrice));
+  const [buyerName,setBuyerName]=useState(sale.buyerName||"");
+  const [notes,setNotes]=useState(sale.notes||"");
+  const [date,setDate]=useState(sale.date);
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:24,width:"100%",maxWidth:420,animation:"fadeUp 0.2s ease",maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:4}}>Edit Transaction</div>
+        <div style={{fontSize:12,color:"#71717a",marginBottom:16}}>{sale.name}</div>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <Inp label="Sale price (₱)" type="number" value={salePrice} onChange={e=>setSalePrice(e.target.value)}/>
+          <Inp label="Buyer name" value={buyerName} onChange={e=>setBuyerName(e.target.value)}/>
+          <Inp label="Sale date" value={date} onChange={e=>setDate(e.target.value)} placeholder="Jun 20, 2026"/>
+          <Inp label="Notes" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Add a note about this sale"/>
+          <div style={{fontSize:11,color:"#52525b"}}>Edits are logged with a timestamp for transparency.</div>
+          <div style={{display:"flex",gap:8,marginTop:4}}>
+            <Btn onClick={()=>onSave({salePrice:parseFloat(salePrice)||sale.salePrice,buyerName,notes,date})} style={{flex:1}}>Save Changes</Btn>
+            <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   RETURN REASON MODAL — used for Undo Sale
+═══════════════════════════════════════════ */
+function ReturnReasonModal({title,sale,onConfirm,onCancel}) {
+  const [reason,setReason]=useState("Buyer cancelled");
+  const [other,setOther]=useState("");
+  const reasons=["Buyer cancelled","Product returned","Incorrect sale entry","Other"];
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onCancel}>
+      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:6}}>{title}</div>
+        <div style={{fontSize:13,color:"#a1a1aa",marginBottom:16}}>"{sale.name}" will be returned to inventory and the profit/loss reversed.</div>
+        <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:14}}>
+          {reasons.map(r=>(
+            <label key={r} style={{display:"flex",alignItems:"center",gap:9,cursor:"pointer",padding:"7px 10px",borderRadius:8,
+              border:`1px solid ${reason===r?"#7c3aed":"#27272a"}`,background:reason===r?"rgba(124,58,237,0.1)":"transparent"}}>
+              <input type="radio" checked={reason===r} onChange={()=>setReason(r)} style={{accentColor:"#7c3aed"}}/>
+              <span style={{color:"#fff",fontSize:13}}>{r}</span>
+            </label>
+          ))}
+        </div>
+        {reason==="Other"&&<Inp label="Specify reason" value={other} onChange={e=>setOther(e.target.value)} placeholder="What happened?"/>}
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:14}}>
+          <Btn variant="warn" onClick={()=>onConfirm(reason==="Other"?(other||"Other"):reason)} style={{width:"100%"}}>Confirm Undo</Btn>
+          <Btn variant="ghost" onClick={onCancel} style={{width:"100%"}}>Cancel</Btn>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1712,6 +2334,182 @@ function Settings({state,dispatch,toast,theme,setTheme}) {
 ═══════════════════════════════════════════ */
 const ALL_TABS=["Dashboard","Buy","Inventory","Builds","Sell","History","Settings"];
 
+/* ═══════════════════════════════════════════
+   QUICK ACTIONS FAB — floating [+] button with a radial menu for Quick Buy / Quick Sell / Note.
+   Deliberately minimal: no photos, no notes-on-purchase, just the fields needed to lock in a
+   deal on the spot. Full detail (photos, condition notes, etc.) can be added later via Edit.
+═══════════════════════════════════════════ */
+function QuickActionsFab({state,dispatch,toast}) {
+  const [open,setOpen]=useState(false);
+  const [modal,setModal]=useState(null); // null | "buy" | "sell" | "note"
+
+  const actions=[
+    {key:"buy",icon:"🛒",label:"Quick Buy"},
+    {key:"sell",icon:"💵",label:"Quick Sell"},
+    {key:"note",icon:"📝",label:"Note"},
+  ];
+
+  return (
+    <>
+      {open&&<div onClick={()=>setOpen(false)} style={{position:"fixed",inset:0,zIndex:899,background:"rgba(0,0,0,0.35)"}}/>}
+
+      <div style={{position:"fixed",right:18,bottom:"calc(20px + env(safe-area-inset-bottom))",zIndex:900,
+        display:"flex",flexDirection:"column",alignItems:"flex-end",gap:12}}>
+        {open&&actions.map((a,i)=>(
+          <button key={a.key} onClick={()=>{setModal(a.key);setOpen(false);}}
+            style={{display:"flex",alignItems:"center",gap:9,cursor:"pointer",
+              background:"#18181b",border:"1px solid #3f3f46",borderRadius:99,padding:"10px 16px 10px 14px",
+              boxShadow:"0 6px 18px rgba(0,0,0,0.5)",animation:`fadeUp 0.18s ease ${(actions.length-1-i)*0.04}s both`}}>
+            <span style={{fontSize:17}}>{a.icon}</span>
+            <span style={{color:"#fff",fontSize:13,fontWeight:600,whiteSpace:"nowrap"}}>{a.label}</span>
+          </button>
+        ))}
+
+        <button onClick={()=>setOpen(o=>!o)} style={{width:56,height:56,borderRadius:"50%",border:"none",cursor:"pointer",
+          background:"#7c3aed",color:"#fff",fontSize:26,display:"flex",alignItems:"center",justifyContent:"center",
+          boxShadow:"0 8px 22px rgba(124,58,237,0.5)",transform:open?"rotate(45deg)":"rotate(0deg)",transition:"transform 0.2s"}}>
+          +
+        </button>
+      </div>
+
+      {modal==="buy"&&<QuickBuyModal state={state} dispatch={dispatch} toast={toast} onClose={()=>setModal(null)}/>}
+      {modal==="sell"&&<QuickSellPickerModal state={state} dispatch={dispatch} toast={toast} onClose={()=>setModal(null)}/>}
+      {modal==="note"&&<QuickNoteModal dispatch={dispatch} toast={toast} onClose={()=>setModal(null)}/>}
+    </>
+  );
+}
+
+function QuickBuyModal({state,dispatch,toast,onClose}) {
+  const [name,setName]=useState("");
+  const [cat,setCat]=useState("Other");
+  const [cost,setCost]=useState("");
+
+  const submit=()=>{
+    if(!name||!cost){toast("Enter a name and cost","error");return;}
+    const c=parseFloat(cost);
+    dispatch({type:"ADD_PARTS",parts:[{id:uid(),name,category:cat,marketValue:c,allocatedCost:c,
+      source:"Quick Buy",bundleId:null,status:"available",notes:"",soldTo:"",photoUrl:"",photoRecordId:"",
+      history:[{date:today(),event:`Quick Buy — bought for ${fmt(c)}`}]}]});
+    toast(`${name} added ✓ — add photos/details later via Edit`);
+    onClose();
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:4}}>🛒 Quick Buy</div>
+        <div style={{fontSize:12,color:"#71717a",marginBottom:16}}>Lock it in fast — fill in the rest later.</div>
+        <div style={{display:"flex",flexDirection:"column",gap:11}}>
+          <Inp label="Name" value={name} onChange={e=>setName(e.target.value)} placeholder="RX 580"/>
+          <CategoryPicker label="Category" value={cat} onChange={setCat} customCategories={state.customCategories} dispatch={dispatch}/>
+          <Inp label="Cost (₱)" type="number" value={cost} onChange={e=>setCost(e.target.value)} placeholder="3000"/>
+          <div style={{display:"flex",gap:8,marginTop:4}}>
+            <Btn onClick={submit} style={{flex:1}}>Add to Inventory</Btn>
+            <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuickSellPickerModal({state,dispatch,toast,onClose}) {
+  const [search,setSearch]=useState("");
+  const [selId,setSelId]=useState("");
+  const [salePrice,setSalePrice]=useState("");
+  const [buyer,setBuyer]=useState("");
+
+  const avail=state.parts.filter(p=>p.status==="available");
+  const builds=state.builds.filter(b=>!b.dissolved&&!b.sold);
+  const items=[
+    ...avail.map(p=>({id:p.id,name:p.name,cost:p.allocatedCost,mode:"part"})),
+    ...builds.map(b=>({id:b.id,name:b.name,cost:state.parts.filter(p=>b.partIds.includes(p.id)).reduce((s,p)=>s+p.allocatedCost,0),mode:"build"})),
+  ].filter(it=>!search||it.name.toLowerCase().includes(search.toLowerCase()));
+
+  const selected=items.find(it=>it.id===selId);
+  const sp=parseFloat(salePrice)||0;
+  const profit=selected?sp-selected.cost:0;
+
+  const submit=()=>{
+    if(!selected||!salePrice){toast("Pick an item and enter a price","error");return;}
+    dispatch({type:"SELL",mode:selected.mode,id:selected.id,sale:{id:uid(),
+      partId:selected.mode==="part"?selected.id:null,buildId:selected.mode==="build"?selected.id:null,
+      name:selected.name,cost:selected.cost,salePrice:sp,profit,buyerName:buyer,date:today()}});
+    toast(`${selected.name} sold for ${fmt(sp)} — profit ${fmt(profit)} ✓`,profit>=0?"success":"warn");
+    onClose();
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,maxHeight:"85vh",overflowY:"auto",animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:4}}>💵 Quick Sell</div>
+        <div style={{fontSize:12,color:"#71717a",marginBottom:16}}>Find it, price it, done.</div>
+        <div style={{display:"flex",flexDirection:"column",gap:11}}>
+          {!selected?(
+            <>
+              <Inp label="" value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍  Search parts and builds..."/>
+              <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:240,overflowY:"auto"}}>
+                {items.length===0?(
+                  <div style={{color:"#52525b",fontSize:13,padding:"10px 0"}}>Nothing available to sell.</div>
+                ):items.map(it=>(
+                  <button key={it.id} onClick={()=>setSelId(it.id)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                    width:"100%",background:"#09090b",border:"1px solid #27272a",borderRadius:8,padding:"9px 12px",cursor:"pointer",textAlign:"left"}}>
+                    <span style={{color:"#fff",fontSize:13}}>{it.mode==="build"?"🖥️ ":"🔧 "}{it.name}</span>
+                    <span style={{fontFamily:"monospace",fontSize:12,color:"#71717a"}}>{fmt(it.cost)}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          ):(
+            <>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#09090b",border:"1px solid #27272a",borderRadius:8,padding:"9px 12px"}}>
+                <span style={{color:"#fff",fontSize:13}}>{selected.mode==="build"?"🖥️ ":"🔧 "}{selected.name}</span>
+                <button onClick={()=>setSelId("")} style={{background:"none",border:"none",color:"#7dd3fc",fontSize:12,cursor:"pointer"}}>Change</button>
+              </div>
+              <Inp label="Sale price (₱)" type="number" value={salePrice} onChange={e=>setSalePrice(e.target.value)} placeholder="5000"/>
+              <Inp label="Buyer name (optional)" value={buyer} onChange={e=>setBuyer(e.target.value)} placeholder="Juan dela Cruz"/>
+              {sp>0&&(
+                <div style={{fontSize:12,color:profit>=0?"#34d399":"#f87171",fontWeight:600}}>
+                  {profit>=0?"+":""}{fmt(profit)} profit
+                </div>
+              )}
+            </>
+          )}
+          <div style={{display:"flex",gap:8,marginTop:4}}>
+            <Btn variant="success" onClick={submit} disabled={!selected||!salePrice} style={{flex:1}}>Record Sale</Btn>
+            <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuickNoteModal({dispatch,toast,onClose}) {
+  const [text,setText]=useState("");
+  const submit=()=>{
+    if(!text.trim()){toast("Write something first","error");return;}
+    dispatch({type:"ADD_QUICK_NOTE",text});
+    toast("Note saved ✓");
+    onClose();
+  };
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:4}}>📝 Quick Note</div>
+        <div style={{fontSize:12,color:"#71717a",marginBottom:14}}>Jot it down — sort it out later. Shows on your Dashboard.</div>
+        <textarea autoFocus value={text} onChange={e=>setText(e.target.value)} placeholder="Seller has 3 more GPUs, follow up Friday..."
+          style={{width:"100%",minHeight:100,background:"#27272a",border:"1px solid #3f3f46",borderRadius:9,padding:"9px 11px",
+            color:"#fff",fontSize:13,outline:"none",resize:"vertical",boxSizing:"border-box",fontFamily:"inherit"}}/>
+        <div style={{display:"flex",gap:8,marginTop:12}}>
+          <Btn onClick={submit} style={{flex:1}}>Save Note</Btn>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [state,setState]=useState(null);
   const [loadStatus,setLoadStatus]=useState("loading"); // loading | ready | error
@@ -1724,7 +2522,10 @@ export default function App() {
     fetch("/data")
       .then(r=>{if(!r.ok)throw new Error(`Server returned ${r.status}`);return r.json();})
       .then(json=>{
-        setState(json&&Object.keys(json).length?json:initialState);
+        // Merge with initialState defaults rather than a straight replace, so any field added
+        // after a user's data was first saved (customCategories, quickNotes, etc.) safely
+        // defaults to its empty value instead of being undefined for existing saved data.
+        setState(json&&Object.keys(json).length?{...initialState,...json}:initialState);
         setLoadStatus("ready");
         hasLoaded.current=true;
       })
@@ -1812,7 +2613,7 @@ export default function App() {
             <div><div className="stat-label" style={{fontSize:10,color:sub}}>Parts</div>
               <div style={{fontFamily:"monospace",fontWeight:700,color:txt,fontSize:13}}><AnimNum value={state.parts.length}/></div></div>
             <div><div className="stat-label" style={{fontSize:10,color:sub}}>Profit</div>
-              <div style={{fontFamily:"monospace",fontWeight:700,color:"#22c55e",fontSize:13}}>{fmt(state.sales.reduce((s,x)=>s+x.profit,0))}</div></div>
+              <div style={{fontFamily:"monospace",fontWeight:700,color:"#22c55e",fontSize:13}}>{fmt(state.sales.filter(s=>!s.deleted&&!s.returned).reduce((s,x)=>s+x.profit,0))}</div></div>
             <div><div className="stat-label" style={{fontSize:10,color:sub}}>Status</div>
               <div style={{fontSize:10.5,fontWeight:600,color:saveStatus==="saving"?"#eab308":saveStatus==="error"?"#ef4444":"#22c55e",whiteSpace:"nowrap"}}>
                 {saveStatus==="saving"?"Saving…":saveStatus==="error"?"Save failed":"Synced ✓"}
@@ -1839,17 +2640,22 @@ export default function App() {
         </div>
       </div>
 
-      {/* Content */}
-      <div key={tab} style={{maxWidth:740,margin:"0 auto",padding:"22px 16px calc(40px + env(safe-area-inset-bottom))",animation:"fadeUp 0.22s ease"}}>
-        {tab==="Dashboard" && <Dashboard state={state} setTab={setTab} openLightbox={openLightbox}/>}
-        {tab==="Buy"       && <Buy state={state} dispatch={dispatch} toast={toast}/>}
-        {tab==="Inventory" && <Inventory state={state} dispatch={dispatch} toast={toast} setTab={setTab} openLightbox={openLightbox}/>}
-        {tab==="Builds"    && <Builds state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/>}
-        {tab==="Sell"      && <Sell state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/>}
-        {tab==="History"   && <History state={state} openLightbox={openLightbox}/>}
-        {tab==="Settings"  && <Settings state={state} dispatch={dispatch} toast={toast} theme={theme} setTheme={setTheme}/>}
+      {/* Content — all tabs stay mounted (toggled with display:none) instead of being
+          conditionally rendered, so an in-progress form (e.g. a half-typed Sell note) survives
+          switching tabs and coming back. The previous `key={tab}` also forced a full remount of
+          this entire wrapper on every switch, which alone was enough to wipe any local form state
+          even before considering the per-tab && conditionals — removed for the same reason. */}
+      <div style={{maxWidth:740,margin:"0 auto",padding:"22px 16px calc(40px + env(safe-area-inset-bottom))"}}>
+        <div style={{display:tab==="Dashboard"?"block":"none"}}><Dashboard state={state} dispatch={dispatch} toast={toast} setTab={setTab} openLightbox={openLightbox}/></div>
+        <div style={{display:tab==="Buy"?"block":"none"}}><Buy state={state} dispatch={dispatch} toast={toast}/></div>
+        <div style={{display:tab==="Inventory"?"block":"none"}}><Inventory state={state} dispatch={dispatch} toast={toast} setTab={setTab} openLightbox={openLightbox}/></div>
+        <div style={{display:tab==="Builds"?"block":"none"}}><Builds state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/></div>
+        <div style={{display:tab==="Sell"?"block":"none"}}><Sell state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/></div>
+        <div style={{display:tab==="History"?"block":"none"}}><History state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/></div>
+        <div style={{display:tab==="Settings"?"block":"none"}}><Settings state={state} dispatch={dispatch} toast={toast} theme={theme} setTheme={setTheme}/></div>
       </div>
 
+      <QuickActionsFab state={state} dispatch={dispatch} toast={toast}/>
       <Lightbox url={lightboxUrl} onClose={()=>setLightboxUrl(null)}/>
     </div>
   );
