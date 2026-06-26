@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { AIAgentChatbox } from "./components/AIAgentChatbox";
 
 /* ═══════════════════════════════════════════
    GLOBALS & UTILS
@@ -20,7 +21,7 @@ function domainOf(category, customCategories){
   return custom?custom.domain:"pc_part"; // safe default — never silently misfile into General Assets
 }
 const TABS = ["Dashboard","Buy","Inventory","Builds","Sell","History"];
-const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ targetMargin:30 }, customCategories:[], quickNotes:[] };
+const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ targetMargin:30 }, customCategories:[], quickNotes:[], liquidCash:14500, expenses:[] };
 
 /* ═══════════════════════════════════════════
    REDUCER
@@ -28,9 +29,12 @@ const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ tar
 function reducer(state, action) {
   switch(action.type) {
     case "ADD_BUNDLE":
-      return {...state, bundles:[...state.bundles,action.bundle], parts:[...state.parts,...action.parts]};
-    case "ADD_PARTS":
-      return {...state, parts:[...state.parts,...action.parts]};
+      return {...state, bundles:[...state.bundles,action.bundle], parts:[...state.parts,...action.parts], 
+        liquidCash:(state.liquidCash||0)-(action.bundle.purchasePrice||0)}; // cash out for bundle purchase
+    case "ADD_PARTS": {
+      const totalCost=action.parts.reduce((s,p)=>s+(p.allocatedCost||0),0);
+      return {...state, parts:[...state.parts,...action.parts], liquidCash:(state.liquidCash||0)-totalCost}; // cash out for purchases
+    }
     case "UPDATE_PART": {
       return {...state, parts: state.parts.map(p => p.id === action.id
         ? {...p, ...action.changes, history:[...p.history,{date:today(),event:`Edited: ${action.desc}`}]}
@@ -58,6 +62,7 @@ function reducer(state, action) {
       const {mode,id,sale} = action;
       if(mode==="part") {
         return {...state, sales:[...state.sales,sale],
+          liquidCash:(state.liquidCash||0)+sale.salePrice, // cash in from the sale
           parts: state.parts.map(p=>p.id===id
             ? {...p,status:"sold",soldTo:sale.buyerName,history:[...p.history,{date:today(),event:`Sold to ${sale.buyerName||"buyer"} for ${fmt(sale.salePrice)} — profit ${fmt(sale.profit)}`}]}
             : p
@@ -65,6 +70,7 @@ function reducer(state, action) {
       } else {
         const build = state.builds.find(b=>b.id===id);
         return {...state, sales:[...state.sales,sale],
+          liquidCash:(state.liquidCash||0)+sale.salePrice, // cash in from the sale
           builds: state.builds.map(b=>b.id===id?{...b,sold:true}:b),
           parts: state.parts.map(p=>build?.partIds.includes(p.id)
             ? {...p,status:"sold",soldTo:sale.buyerName,history:[...p.history,{date:today(),event:`Sold in build "${build.name}" to ${sale.buyerName||"buyer"} for ${fmt(sale.salePrice)}`}]}
@@ -91,6 +97,19 @@ function reducer(state, action) {
     }
     case "DELETE_QUICK_NOTE":
       return {...state, quickNotes:(state.quickNotes||[]).filter(n=>n.id!==action.id)};
+
+    // Mixed-Finance Tracker: record business expenses and personal draws, with separate tracking
+    // for funds to recover (owner's draw) vs business costs (operation).
+    case "ADD_EXPENSE": {
+      const {expenseType,amount,description}=action; // expenseType: "business" | "personal_draw"
+      const newExpense={id:uid(),type:expenseType,amount,description,date:today()};
+      let updatedCash=state.liquidCash-amount; // both reduce cash available
+      return {...state, expenses:[...(state.expenses||[]),newExpense], liquidCash:updatedCash};
+    }
+
+    // Direct cash balance update (used by SELL to add revenue, or other revenue sources)
+    case "UPDATE_LIQUID_CASH":
+      return {...state, liquidCash:(state.liquidCash||0)+action.amount};
 
     // Reverses a completed sale: removes it from active totals (soft-deleted, not erased — kept
     // for the "Returned sales" filter), and returns the part(s)/build back to available inventory.
@@ -683,11 +702,45 @@ function EditPartModal({part,onClose,onSave,dispatch,customCategories}) {
    DASHBOARD  (#6 capital at risk, #7 bundle P&L)
 ═══════════════════════════════════════════ */
 function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
+  const [addingExpense,setAddingExpense]=useState(false);
   const {parts,bundles}=state;
   // Deleted sale records are kept (soft-delete, for the "Deleted records" filter in History) but
   // must never count toward live profit/revenue. Returned sales ARE deleted from active totals too —
   // a returned sale means the money didn't actually stay made.
   const sales=state.sales.filter(s=>!s.deleted&&!s.returned);
+  
+  // ══════════════════════════════════════════════════════════════════════════════
+  // CORE INVENTORY VALUATION METRICS
+  // ══════════════════════════════════════════════════════════════════════════════
+  
+  // 1. Inventory Market Value: current selling price of unsold items. Fallback to cost if market value is missing.
+  const activeInventory=parts.filter(p=>p.status==="available"||p.status==="in_build");
+  const inventoryMarketValue=activeInventory.reduce((s,p)=>{
+    const mkt=p.marketValue||0;
+    return s+(mkt>0?mkt:p.allocatedCost); // fallback to cost if market value is blank/zero
+  },0);
+  
+  // 2. Inventory Cost: total money we've spent acquiring everything still in stock.
+  const inventoryCost=activeInventory.reduce((s,p)=>s+p.allocatedCost,0);
+  
+  // 3. Recovered Capital: money we've successfully pulled back from completed sales.
+  const recoveredCapital=sales.reduce((s,x)=>s+x.salePrice,0);
+  
+  // 4. Cash on Hand: liquid balance (starts at 14500, increases on sales, decreases on purchases/draws).
+  const cashOnHand=state.liquidCash||0;
+  
+  // Funds to Recover: sum of personal draws (owner's money taken out, not business expense).
+  const fundsToRecover=(state.expenses||[])
+    .filter(e=>e.type==="personal_draw")
+    .reduce((s,e)=>s+e.amount,0);
+  
+  // Alert trigger: if we've dropped below the target baseline due to draws/spending.
+  const isUnderCapital=cashOnHand<14500;
+  
+  // ══════════════════════════════════════════════════════════════════════════════
+  // Traditional profit/loss metrics (unchanged)
+  // ══════════════════════════════════════════════════════════════════════════════
+  
   const totalCapital=parts.reduce((s,p)=>s+p.allocatedCost,0);
   const totalRevenue=sales.reduce((s,x)=>s+x.salePrice,0);
   const totalCOGS=sales.reduce((s,x)=>s+x.cost,0);
@@ -696,7 +749,7 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
   // Defective parts are a realized loss already counted in totalProfit (via their write-off sale),
   // so they're excluded from "at risk" — that stat is only for capital still tied up in active inventory.
   const atRisk=parts.filter(p=>p.status!=="sold"&&p.status!=="defective").reduce((s,p)=>s+p.allocatedCost,0);
-  const recovered=parts.filter(p=>p.status==="sold").reduce((s,p)=>s+p.allocatedCost,0);
+  const recoveredCost=parts.filter(p=>p.status==="sold").reduce((s,p)=>s+p.allocatedCost,0);
   const writeOffLoss=sales.filter(s=>s.writeOff).reduce((s,x)=>s+Math.abs(x.profit),0);
   const writeOffCount=parts.filter(p=>p.status==="defective").length;
   const available=parts.filter(p=>p.status==="available").length;
@@ -756,9 +809,14 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
-      <div>
-        <h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Overview</h2>
-        <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>Live figures from your inventory.</p>
+      {addingExpense&&<AddExpenseModal dispatch={dispatch} toast={toast} onClose={()=>setAddingExpense(false)}/>}
+      
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div>
+          <h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Overview</h2>
+          <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>Live figures from your inventory.</p>
+        </div>
+        <Btn small variant="ghost" onClick={()=>setAddingExpense(true)}>+ Add Expense</Btn>
       </div>
 
       {/* Liquidity Waterfall — paper profit can hide a cash crunch: you can show ₱50k profit
@@ -811,7 +869,7 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
         <StatBox label="Total Profit" value={fmt(totalProfit)} color={totalProfit>=0?"#34d399":"#f87171"} sub={`ROI ${pct(roi)}`}/>
         <StatBox label="Total Revenue" value={fmt(totalRevenue)} color="#34d399"/>
         <StatBox label="Capital at Risk" value={fmt(atRisk)} color="#f59e0b" sub="locked in unsold parts"/>
-        <StatBox label="Capital Recovered" value={fmt(recovered)} sub={`${parts.length>0?Math.round(recovered/totalCapital*100):0}% of total`}/>
+        <StatBox label="Capital Recovered" value={fmt(recoveredCost)} sub={`${parts.length>0?Math.round(recoveredCost/totalCapital*100):0}% of total`}/>
         {avgDaysToSell!==null&&<StatBox label="Avg. Days to Sell" value={`${avgDaysToSell}d`} color="#38bdf8" sub={`across ${holdDurations.length} sold part${holdDurations.length===1?"":"s"}`}/>}
         {writeOffCount>0&&<StatBox label="Write-offs" value={fmt(-writeOffLoss)} color="#f87171" sub={`${writeOffCount} defective part${writeOffCount===1?"":"s"}`}/>}
       </div>
@@ -821,13 +879,57 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
         <Card>
           <div style={{fontSize:11,color:"#71717a",marginBottom:8}}>CAPITAL RECOVERY</div>
           <div style={{height:8,background:"#27272a",borderRadius:99,overflow:"hidden"}}>
-            <div style={{height:"100%",width:`${Math.min(recovered/totalCapital*100,100)}%`,background:"linear-gradient(90deg,#7c3aed,#34d399)",borderRadius:99,transition:"width 0.8s cubic-bezier(0.34,1.2,0.64,1)"}}/>
+            <div style={{height:"100%",width:`${Math.min(recoveredCost/totalCapital*100,100)}%`,background:"linear-gradient(90deg,#7c3aed,#34d399)",borderRadius:99,transition:"width 0.8s cubic-bezier(0.34,1.2,0.64,1)"}}/>
           </div>
           <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:11,color:"#71717a"}}>
-            <span>Recovered {fmt(recovered)}</span><span>Total {fmt(totalCapital)}</span>
+            <span>Recovered {fmt(recoveredCost)}</span><span>Total {fmt(totalCapital)}</span>
           </div>
         </Card>
       )}
+
+      {/* CORE VALUATION METRICS — answers the real question: "What's my actual liquid position right now?" */}
+      <Card>
+        <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:14}}>Core Inventory & Cash Position</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12,marginBottom:14}}>
+          <div>
+            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Market Value (Inventory)</div>
+            <div style={{fontSize:16,fontWeight:700,color:"#d4d4d8",fontFamily:"monospace"}}>{fmt(inventoryMarketValue)}</div>
+            <div style={{fontSize:9,color:"#52525b",marginTop:2}}>unsold items @ current price</div>
+          </div>
+          <div>
+            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Cost Basis (Locked Capital)</div>
+            <div style={{fontSize:16,fontWeight:700,color:"#d4d4d8",fontFamily:"monospace"}}>{fmt(inventoryCost)}</div>
+            <div style={{fontSize:9,color:"#52525b",marginTop:2}}>what we spent</div>
+          </div>
+          <div>
+            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Recovered from Sales</div>
+            <div style={{fontSize:16,fontWeight:700,color:"#34d399",fontFamily:"monospace"}}>{fmt(recoveredCapital)}</div>
+            <div style={{fontSize:9,color:"#52525b",marginTop:2}}>cash actually collected</div>
+          </div>
+          <div style={{background:isUnderCapital?"rgba(239,68,68,0.08)":"#09090b",border:`1px solid ${isUnderCapital?"#7f1d1d":"#27272a"}`,borderRadius:9,padding:11}}>
+            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Cash on Hand</div>
+            <div style={{fontSize:16,fontWeight:700,color:isUnderCapital?"#f87171":"#34d399",fontFamily:"monospace"}}>{fmt(cashOnHand)}</div>
+            <div style={{fontSize:9,color:"#52525b",marginTop:2}}>wallet balance right now</div>
+          </div>
+        </div>
+
+        {/* Funds to Recover Alert */}
+        {isUnderCapital&&(
+          <div style={{background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:9,padding:12}}>
+            <div style={{display:"flex",alignItems:"flex-start",gap:9}}>
+              <span style={{fontSize:16}}>⚠️</span>
+              <div>
+                <div style={{color:"#fbbf24",fontWeight:600,fontSize:12,marginBottom:2}}>Below Target Baseline</div>
+                <div style={{color:"#d4d4d8",fontSize:11,lineHeight:1.4}}>
+                  Your liquid cash ({fmt(cashOnHand)}) has dropped below your ₱14,500 target.
+                  {fundsToRecover>0&&<div style={{marginTop:4}}>Personal draws to recover: <strong style={{color:"#fbbf24"}}>{fmt(fundsToRecover)}</strong></div>}
+                  Consider pausing new purchases or raising prices to rebuild your war chest.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
         {[["Available","#34d399",available],["In Builds","#38bdf8",inBuild],["Sold","#71717a",sold]].map(([l,c,v])=>(
@@ -2510,6 +2612,60 @@ function QuickNoteModal({dispatch,toast,onClose}) {
   );
 }
 
+/* ═══════════════════════════════════════════
+   ADD EXPENSE MODAL — log business costs (operation) or personal draws (owner's withdrawal),
+   tracking each separately so personal draws feed into "Funds to Recover" and don't affect business P&L.
+═══════════════════════════════════════════ */
+function AddExpenseModal({dispatch,toast,onClose}) {
+  const [type,setType]=useState("business"); // "business" | "personal_draw"
+  const [amount,setAmount]=useState("");
+  const [description,setDescription]=useState("");
+
+  const submit=()=>{
+    const amt=parseFloat(amount);
+    if(!amt||amt<=0){toast("Enter a valid amount","error");return;}
+    if(!description.trim()){toast("Add a description","error");return;}
+    dispatch({type:"ADD_EXPENSE",expenseType:type,amount:amt,description:description.trim()});
+    toast(`${type==="personal_draw"?"Personal draw":"Business cost"} recorded — cash updated ✓`);
+    onClose();
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:420,maxHeight:"85vh",overflowY:"auto",animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:4}}>Expense / Withdrawal</div>
+        <div style={{fontSize:12,color:"#71717a",marginBottom:14}}>Is this for the business, or are you taking personal cash?</div>
+
+        <div style={{display:"flex",gap:8,marginBottom:14}}>
+          <button onClick={()=>setType("business")} style={{flex:1,padding:"10px 12px",borderRadius:9,fontSize:12,cursor:"pointer",
+            border:`1.5px solid ${type==="business"?"#7c3aed":"#3f3f46"}`,background:type==="business"?"rgba(124,58,237,0.12)":"transparent",
+            color:type==="business"?"#a78bfa":"#a1a1aa",fontWeight:600}}>💼 Business Cost<div style={{fontSize:10,opacity:0.7,marginTop:3}}>Operation expense</div></button>
+          <button onClick={()=>setType("personal_draw")} style={{flex:1,padding:"10px 12px",borderRadius:9,fontSize:12,cursor:"pointer",
+            border:`1.5px solid ${type==="personal_draw"?"#7c3aed":"#3f3f46"}`,background:type==="personal_draw"?"rgba(124,58,237,0.12)":"transparent",
+            color:type==="personal_draw"?"#a78bfa":"#a1a1aa",fontWeight:600}}>💳 Personal Draw<div style={{fontSize:10,opacity:0.7,marginTop:3}}>Owner withdrawal</div></button>
+        </div>
+
+        <div style={{display:"flex",flexDirection:"column",gap:11}}>
+          <Inp label="Amount (₱)" type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="5000"/>
+          <Inp label="Description" value={description} onChange={e=>setDescription(e.target.value)} 
+            placeholder={type==="business"?"e.g. Fuel for shopping trip":"e.g. Personal spending"}/>
+          <div style={{fontSize:11,color:"#52525b",background:"#09090b",border:"1px solid #27272a",borderRadius:8,padding:10}}>
+            {type==="business"?(
+              <>Reduces cash on hand. Does NOT reduce business profit.</>
+            ):(
+              <>Reduces cash on hand AND adds to "Funds to Recover" — owner's draw that should be paid back to the business.</>
+            )}
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <Btn onClick={submit} style={{flex:1}}>Record {type==="business"?"Cost":"Draw"}</Btn>
+            <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [state,setState]=useState(null);
   const [loadStatus,setLoadStatus]=useState("loading"); // loading | ready | error
@@ -2555,6 +2711,19 @@ export default function App() {
   const [theme,setTheme]=useState("dark");  // #9
   const [lightboxUrl,setLightboxUrl]=useState(null);
   const openLightbox=useCallback(url=>setLightboxUrl(url),[]);
+
+  // Helper for chatbox to pre-fill form fields on AI commands
+  const setFormData=useCallback((formType,data)=>{
+    if(formType==="buy"){
+      // These state variables are in the Buy component, so we dispatch to global state
+      // For now, we just navigate and the user will need to fill manually OR we save to a temp location
+      // A more elegant solution would be to store form defaults in global state
+      // For this MVP, we just navigate to Buy tab and show a toast with the data
+      toast(`${data.singleName} - Cost: ${data.singleCost}, Market: ${data.singleMarket}`, "info");
+    }
+  },[toast]);
+
+  const pbUrl = import.meta.env.VITE_PB_URL || "http://localhost:8090";
 
   if(loadStatus==="loading"){
     return <div style={{minHeight:"100vh",background:"#09090b",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui,sans-serif"}}>Loading your data…</div>;
@@ -2656,6 +2825,7 @@ export default function App() {
       </div>
 
       <QuickActionsFab state={state} dispatch={dispatch} toast={toast}/>
+      <AIAgentChatbox pbUrl={pbUrl} state={state} dispatch={dispatch} setTab={setTab} setFormData={setFormData} toast={toast}/>
       <Lightbox url={lightboxUrl} onClose={()=>setLightboxUrl(null)}/>
     </div>
   );
