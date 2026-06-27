@@ -218,49 +218,6 @@ export function AIAgentChatbox({
             required: ['itemName'],
           },
         },
-        {
-          name: 'add_income',
-          description: 'Record money coming in that is NOT from selling inventory — e.g. "I earned 100 fixing a PC", "got paid 500 for a repair", "client paid me 2000 for service". This adds directly to a wallet balance and logs it in the Cash Ledger. Defaults to the business wallet unless the user says the money is personal.',
-          parameters: {
-            type: 'object',
-            properties: {
-              amount: { type: 'number' },
-              description: { type: 'string', description: 'What the money was for, e.g. "Fixed a PC for a client"' },
-              wallet: { type: 'string', enum: ['business', 'personal'] },
-            },
-            required: ['amount', 'description'],
-          },
-        },
-        {
-          name: 'log_expense',
-          description: 'Record money spent on something that is NOT inventory/resale stock — e.g. gas, food, tools, bills, or a personal withdrawal. Do not use this for buying parts to resell; use add_item_to_inventory for that instead.',
-          parameters: {
-            type: 'object',
-            properties: {
-              amount: { type: 'number' },
-              description: { type: 'string' },
-              wallet: { type: 'string', enum: ['business', 'personal'], description: 'Which wallet the money came out of' },
-            },
-            required: ['amount', 'description'],
-          },
-        },
-        {
-          name: 'transfer_funds',
-          description: 'Move money between the business wallet and the personal wallet — e.g. "move 500 to my personal wallet", "pay myself back 1000", "transfer 200 to business".',
-          parameters: {
-            type: 'object',
-            properties: {
-              amount: { type: 'number' },
-              direction: { type: 'string', enum: ['to_personal', 'to_business'], description: '"to_personal" moves money business → personal. "to_business" moves money personal → business.' },
-            },
-            required: ['amount', 'direction'],
-          },
-        },
-        {
-          name: 'query_wallet_balances',
-          description: 'Get the current business and personal wallet balances — use this to answer questions like "how much is in my business wallet".',
-          parameters: { type: 'object', properties: {} },
-        },
       ],
     },
   ];
@@ -271,9 +228,6 @@ Always reply in clean, natural, conversational sentences. Do not use markdown fo
 
 CRITICAL RULE FOR INVENTORY VS. EXPENSES:
 If the user says they "spent", "paid", bought consumables (like gas, food, or tools), or paid a bill, you must treat this as an EXPENSE and use your tool/action to log an expense. DO NOT add these items to inventory. ONLY use add_item_to_inventory for physical hardware, parts, or stock explicitly intended to be resold as part of the business.
-
-WALLET RULES:
-There are two wallets: business and personal. If the user describes money coming in that is NOT from selling inventory — fixing a PC, a repair job, a service fee, getting paid for anything that isn't a resale — that's income, use add_income. If they describe spending on something that isn't resale stock, use log_expense. If they explicitly want to move money between the two wallets ("pay myself back", "move X to personal"), use transfer_funds. Default to the business wallet unless the user says "personal" or it's clearly personal money. If you're not sure which wallet they mean, ask.
 
 When looking up, selling, or modifying an item, you must use the exact name, shorthand, or spelling the user provides in your tool arguments (for example, if the user says "iphone 13pm 256", use "iphone 13pm 256" exactly in the tool call; do not automatically expand it to "iPhone 13 Pro Max 256GB").
 
@@ -492,41 +446,6 @@ Keep responses short and to the point.`;
             dispatch({ type: 'MARK_DEFECTIVE', id: part.id, reason: reason || '' });
             toast?.(`${part.name} marked defective ✓`, 'warn');
             return `Marked "${part.name}" as defective — recorded a loss of ${cbFmt(part.allocatedCost)}.`;
-          }
-
-          case 'add_income': {
-            const { amount, description, wallet } = toolInput;
-            if (!amount || amount <= 0) return 'Missing or invalid amount — ask the user how much.';
-            const safeWallet = wallet === 'personal' ? 'personal' : 'business';
-            dispatch({ type: 'ADD_INCOME', amount, description: description || 'Income', wallet: safeWallet });
-            toast?.(`+${cbFmt(amount)} added to ${safeWallet} wallet ✓`, 'success');
-            return `Logged ${cbFmt(amount)} income to the ${safeWallet} wallet for "${description || 'income'}". Wallet updated.`;
-          }
-
-          case 'log_expense': {
-            const { amount, description, wallet } = toolInput;
-            if (!amount || amount <= 0) return 'Missing or invalid amount — ask the user how much.';
-            const safeWallet = wallet === 'personal' ? 'personal' : 'business';
-            const expenseType = safeWallet === 'personal' ? 'personal_draw' : 'business';
-            dispatch({ type: 'ADD_EXPENSE', expenseType, amount, description: description || 'Expense', wallet: safeWallet });
-            toast?.(`-${cbFmt(amount)} logged from ${safeWallet} wallet ✓`, 'warn');
-            return `Logged a ${cbFmt(amount)} expense from the ${safeWallet} wallet for "${description || 'expense'}". Wallet updated.`;
-          }
-
-          case 'transfer_funds': {
-            const { amount, direction } = toolInput;
-            if (!amount || amount <= 0) return 'Missing or invalid amount — ask the user how much.';
-            const safeDirection = direction === 'to_business' ? 'to_business' : 'to_personal';
-            dispatch({ type: 'TRANSFER_FUNDS', amount, direction: safeDirection });
-            toast?.(`Transferred ${cbFmt(amount)} ✓`, 'success');
-            return `Transferred ${cbFmt(amount)} ${safeDirection === 'to_personal' ? 'from the business wallet to the personal wallet' : 'from the personal wallet to the business wallet'}.`;
-          }
-
-          case 'query_wallet_balances': {
-            return JSON.stringify({
-              businessWallet: liveState.businessCash || 0,
-              personalWallet: liveState.personalCash || 0,
-            });
           }
 
           default:
