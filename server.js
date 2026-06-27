@@ -3,15 +3,10 @@ const express = require("express");
 const multer = require("multer");
 const path = require("path");
 
-const PB_URL = process.env.PB_URL;
-const PB_EMAIL = process.env.PB_ADMIN_EMAIL;
-const PB_PASS = process.env.PB_ADMIN_PASS;
+const PB_URL = process.env.PB_URL || process.env.VITE_PB_URL || "http://127.0.0.1:8090";
+const PB_EMAIL = process.env.PB_ADMIN_EMAIL || "admin@example.com";
+const PB_PASS = process.env.PB_ADMIN_PASS || "admin123456";
 const PORT = process.env.PORT || 3001;
-
-if (!PB_URL || !PB_EMAIL || !PB_PASS) {
-  console.error("Missing required env vars: PB_URL, PB_ADMIN_EMAIL, PB_ADMIN_PASS");
-  process.exit(1);
-}
 
 const app = express();
 app.use(express.json({ limit: "5mb" }));

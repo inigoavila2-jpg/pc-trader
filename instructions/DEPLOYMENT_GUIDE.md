@@ -56,8 +56,8 @@ Replace `AIzaSy_your_actual_key_here` with your actual Gemini API key from [ai.g
 cd C:\Users\ADMIN\Documents\files\pc-trader
 
 # Clean install
-del package-lock.json
-rmdir /s /q node_modules
+   del package-lock.json
+   rmdir /s /q node_modules
 
 # Install fresh
 npm install
@@ -106,7 +106,7 @@ If you see errors:
 ### Step 6: Commit to Git
 
 ```bash
-cd C:\Users\ADMIN\Documents\files\pc-trader
+cd C:\Users\ADMIN\Desktop\pc-trader
 
 git status
 git add .
