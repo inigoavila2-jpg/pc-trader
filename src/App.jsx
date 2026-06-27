@@ -103,18 +103,47 @@ function reducer(state, action) {
     case "ADD_EXPENSE": {
       const {expenseType,amount,description,wallet}=action; // expenseType: "business" | "personal_draw"
       const newExpense={id:uid(),type:expenseType,amount,description,date:today(),wallet};
+      const newTransaction={id:uid(),type:"EXPENSE",amount,description,wallet,date:today()};
       if (wallet === "personal") {
-        return {...state, expenses:[...(state.expenses||[]),newExpense], personalCash:(state.personalCash||0)-amount};
+        return {...state,
+          expenses:[...(state.expenses||[]),newExpense],
+          transactions:[newTransaction, ...(state.transactions||[])],
+          personalCash:(state.personalCash||0)-amount};
       } else {
-        return {...state, expenses:[...(state.expenses||[]),newExpense], businessCash:(state.businessCash||0)-amount};
+        return {...state,
+          expenses:[...(state.expenses||[]),newExpense],
+          transactions:[newTransaction, ...(state.transactions||[])],
+          businessCash:(state.businessCash||0)-amount};
       }
+    }
+    case "ADD_INCOME": {
+      const {amount,description,wallet} = action;
+      const newTransaction={id:uid(),type:"INCOME",amount,description,wallet,date:today()};
+      return {...state,
+        transactions:[newTransaction, ...(state.transactions||[])],
+        [`${wallet}Cash`]: (state[`${wallet}Cash`]||0) + amount};
     }
     case "TRANSFER_FUNDS": {
       const { amount, direction } = action;
+      const transferRecord={
+        id:uid(),
+        type:"TRANSFER",
+        amount,
+        description: direction==="to_personal"?"Transfer to Personal Wallet":"Transfer to Business Wallet",
+        from: direction==="to_personal"?"business":"personal",
+        to: direction==="to_personal"?"personal":"business",
+        date:today(),
+      };
       if (direction === "to_personal") {
-        return { ...state, businessCash: (state.businessCash||0) - amount, personalCash: (state.personalCash||0) + amount };
+        return { ...state,
+          businessCash: (state.businessCash||0) - amount,
+          personalCash: (state.personalCash||0) + amount,
+          transactions:[transferRecord, ...(state.transactions||[])] };
       } else {
-        return { ...state, personalCash: (state.personalCash||0) - amount, businessCash: (state.businessCash||0) + amount };
+        return { ...state,
+          personalCash: (state.personalCash||0) - amount,
+          businessCash: (state.businessCash||0) + amount,
+          transactions:[transferRecord, ...(state.transactions||[])] };
       }
     }
 
