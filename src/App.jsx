@@ -21,7 +21,7 @@ function domainOf(category, customCategories){
   return custom?custom.domain:"pc_part"; // safe default — never silently misfile into General Assets
 }
 const TABS = ["Dashboard","Buy","Inventory","Builds","Sell","History"];
-const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ targetMargin:30 }, customCategories:[], quickNotes:[], liquidCash:14500, expenses:[] };
+const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ targetMargin:30 }, customCategories:[], quickNotes:[], businessCash:14500, personalCash:0, expenses:[] };
 
 /* ═══════════════════════════════════════════
    REDUCER
@@ -30,10 +30,10 @@ function reducer(state, action) {
   switch(action.type) {
     case "ADD_BUNDLE":
       return {...state, bundles:[...state.bundles,action.bundle], parts:[...state.parts,...action.parts], 
-        liquidCash:(state.liquidCash||0)-(action.bundle.purchasePrice||0)}; // cash out for bundle purchase
+        businessCash:(state.businessCash||0)-(action.bundle.purchasePrice||0)}; // cash out for bundle purchase
     case "ADD_PARTS": {
       const totalCost=action.parts.reduce((s,p)=>s+(p.allocatedCost||0),0);
-      return {...state, parts:[...state.parts,...action.parts], liquidCash:(state.liquidCash||0)-totalCost}; // cash out for purchases
+      return {...state, parts:[...state.parts,...action.parts], businessCash:(state.businessCash||0)-totalCost}; // cash out for purchases
     }
     case "UPDATE_PART": {
       return {...state, parts: state.parts.map(p => p.id === action.id
@@ -62,7 +62,7 @@ function reducer(state, action) {
       const {mode,id,sale} = action;
       if(mode==="part") {
         return {...state, sales:[...state.sales,sale],
-          liquidCash:(state.liquidCash||0)+sale.salePrice, // cash in from the sale
+          businessCash:(state.businessCash||0)+sale.salePrice, // cash in from the sale
           parts: state.parts.map(p=>p.id===id
             ? {...p,status:"sold",soldTo:sale.buyerName,history:[...p.history,{date:today(),event:`Sold to ${sale.buyerName||"buyer"} for ${fmt(sale.salePrice)} — profit ${fmt(sale.profit)}`}]}
             : p
@@ -70,7 +70,7 @@ function reducer(state, action) {
       } else {
         const build = state.builds.find(b=>b.id===id);
         return {...state, sales:[...state.sales,sale],
-          liquidCash:(state.liquidCash||0)+sale.salePrice, // cash in from the sale
+          businessCash:(state.businessCash||0)+sale.salePrice, // cash in from the sale
           builds: state.builds.map(b=>b.id===id?{...b,sold:true}:b),
           parts: state.parts.map(p=>build?.partIds.includes(p.id)
             ? {...p,status:"sold",soldTo:sale.buyerName,history:[...p.history,{date:today(),event:`Sold in build "${build.name}" to ${sale.buyerName||"buyer"} for ${fmt(sale.salePrice)}`}]}
@@ -101,15 +101,26 @@ function reducer(state, action) {
     // Mixed-Finance Tracker: record business expenses and personal draws, with separate tracking
     // for funds to recover (owner's draw) vs business costs (operation).
     case "ADD_EXPENSE": {
-      const {expenseType,amount,description}=action; // expenseType: "business" | "personal_draw"
-      const newExpense={id:uid(),type:expenseType,amount,description,date:today()};
-      let updatedCash=state.liquidCash-amount; // both reduce cash available
-      return {...state, expenses:[...(state.expenses||[]),newExpense], liquidCash:updatedCash};
+      const {expenseType,amount,description,wallet}=action; // expenseType: "business" | "personal_draw"
+      const newExpense={id:uid(),type:expenseType,amount,description,date:today(),wallet};
+      if (wallet === "personal") {
+        return {...state, expenses:[...(state.expenses||[]),newExpense], personalCash:(state.personalCash||0)-amount};
+      } else {
+        return {...state, expenses:[...(state.expenses||[]),newExpense], businessCash:(state.businessCash||0)-amount};
+      }
+    }
+    case "TRANSFER_FUNDS": {
+      const { amount, direction } = action;
+      if (direction === "to_personal") {
+        return { ...state, businessCash: (state.businessCash||0) - amount, personalCash: (state.personalCash||0) + amount };
+      } else {
+        return { ...state, personalCash: (state.personalCash||0) - amount, businessCash: (state.businessCash||0) + amount };
+      }
     }
 
     // Direct cash balance update (used by SELL to add revenue, or other revenue sources)
     case "UPDATE_LIQUID_CASH":
-      return {...state, liquidCash:(state.liquidCash||0)+action.amount};
+      return {...state, businessCash:(state.businessCash||0)+action.amount};
 
     // Reverses a completed sale: removes it from active totals (soft-deleted, not erased — kept
     // for the "Returned sales" filter), and returns the part(s)/build back to available inventory.
@@ -699,10 +710,47 @@ function EditPartModal({part,onClose,onSave,dispatch,customCategories}) {
 }
 
 /* ═══════════════════════════════════════════
+   WALLET MODALS (Transfer & Expense)
+═══════════════════════════════════════════ */
+function TransferModal({onClose, dispatch, toast, businessCash, personalCash}) {
+  const [amount, setAmount] = useState("");
+  const [direction, setDirection] = useState("to_personal");
+
+  const handleTransfer = () => {
+    const amt = parseFloat(amount);
+    if(!amt || amt <= 0) return toast("Enter a valid amount", "error");
+    if(direction === "to_personal" && amt > businessCash) return toast("Insufficient business funds", "error");
+    if(direction === "to_business" && amt > personalCash) return toast("Insufficient personal funds", "error");
+
+    dispatch({type: "TRANSFER_FUNDS", amount: amt, direction});
+    toast(`Transferred ${fmt(amt)} to ${direction === "to_personal" ? "Personal Wallet" : "Business Wallet"} ✓`);
+    onClose();
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:16}}>Transfer Funds</div>
+        <div style={{display:"flex",gap:8,marginBottom:12}}>
+          <Btn variant={direction==="to_personal"?"primary":"ghost"} onClick={()=>setDirection("to_personal")} style={{flex:1}}>To Personal</Btn>
+          <Btn variant={direction==="to_business"?"primary":"ghost"} onClick={()=>setDirection("to_business")} style={{flex:1}}>To Business</Btn>
+        </div>
+        <Inp label="Amount (₱)" type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0" />
+        <div style={{marginTop:16, display:"flex", gap:8}}>
+          <Btn variant="success" onClick={handleTransfer} style={{flex:1}}>Confirm Transfer</Btn>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
    DASHBOARD  (#6 capital at risk, #7 bundle P&L)
 ═══════════════════════════════════════════ */
 function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
   const [addingExpense,setAddingExpense]=useState(false);
+  const [transferring,setTransferring]=useState(false);
   const {parts,bundles}=state;
   // Deleted sale records are kept (soft-delete, for the "Deleted records" filter in History) but
   // must never count toward live profit/revenue. Returned sales ARE deleted from active totals too —
@@ -726,8 +774,9 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
   // 3. Recovered Capital: money we've successfully pulled back from completed sales.
   const recoveredCapital=sales.reduce((s,x)=>s+x.salePrice,0);
   
-  // 4. Cash on Hand: liquid balance (starts at 14500, increases on sales, decreases on purchases/draws).
-  const cashOnHand=state.liquidCash||0;
+  // 4. Cash on Hand: business wallet balance for buying/selling parts.
+  const cashOnHand=state.businessCash||0;
+  const personalCash=state.personalCash||0;
   
   // Funds to Recover: sum of personal draws (owner's money taken out, not business expense).
   const fundsToRecover=(state.expenses||[])
@@ -810,13 +859,17 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
       {addingExpense&&<AddExpenseModal dispatch={dispatch} toast={toast} onClose={()=>setAddingExpense(false)}/>}
+      {transferring&&<TransferModal dispatch={dispatch} toast={toast} onClose={()=>setTransferring(false)} businessCash={cashOnHand} personalCash={personalCash}/>}
       
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
         <div>
           <h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Overview</h2>
           <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>Live figures from your inventory.</p>
         </div>
-        <Btn small variant="ghost" onClick={()=>setAddingExpense(true)}>+ Add Expense</Btn>
+        <div style={{display:"flex", gap:8}}>
+          <Btn small variant="ghost" onClick={()=>setTransferring(true)}>⇆ Transfer</Btn>
+          <Btn small variant="ghost" onClick={()=>setAddingExpense(true)}>+ Expense</Btn>
+        </div>
       </div>
 
       {/* Liquidity Waterfall — paper profit can hide a cash crunch: you can show ₱50k profit
@@ -906,10 +959,18 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
             <div style={{fontSize:16,fontWeight:700,color:"#34d399",fontFamily:"monospace"}}>{fmt(recoveredCapital)}</div>
             <div style={{fontSize:9,color:"#52525b",marginTop:2}}>cash actually collected</div>
           </div>
-          <div style={{background:isUnderCapital?"rgba(239,68,68,0.08)":"#09090b",border:`1px solid ${isUnderCapital?"#7f1d1d":"#27272a"}`,borderRadius:9,padding:11}}>
-            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Cash on Hand</div>
-            <div style={{fontSize:16,fontWeight:700,color:isUnderCapital?"#f87171":"#34d399",fontFamily:"monospace"}}>{fmt(cashOnHand)}</div>
-            <div style={{fontSize:9,color:"#52525b",marginTop:2}}>wallet balance right now</div>
+          <div style={{gridColumn:"1 / -1", display:"grid", gridTemplateColumns:"1fr 1fr", gap:12}}>
+            <div style={{background:isUnderCapital?"rgba(239,68,68,0.08)":"#09090b",border:`1px solid ${isUnderCapital?"#7f1d1d":"#27272a"}`,borderRadius:9,padding:11}}>
+              <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Business Wallet</div>
+              <div style={{fontSize:16,fontWeight:700,color:isUnderCapital?"#f87171":"#34d399",fontFamily:"monospace"}}>{fmt(cashOnHand)}</div>
+              <div style={{fontSize:9,color:"#52525b",marginTop:2}}>for parts & builds</div>
+            </div>
+            
+            <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:9,padding:11}}>
+              <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Personal Wallet</div>
+              <div style={{fontSize:16,fontWeight:700,color:"#38bdf8",fontFamily:"monospace"}}>{fmt(personalCash)}</div>
+              <div style={{fontSize:9,color:"#52525b",marginTop:2}}>your actual pocket money</div>
+            </div>
           </div>
         </div>
 
@@ -2133,6 +2194,19 @@ function History({state,dispatch,toast,openLightbox}) {
         <Btn variant="ghost" onClick={exportCSV} disabled={state.parts.length===0}>⬇ CSV</Btn>
       </div>
 
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14}}>
+          <div style={{fontSize:10,color:"#a1a1aa",marginBottom:4}}>Business Wallet</div>
+          <div style={{fontSize:18,fontWeight:700,color:"#34d399",fontFamily:"monospace"}}>{fmt(state.businessCash||0)}</div>
+          <div style={{fontSize:11,color:"#52525b",marginTop:4}}>for parts & builds</div>
+        </div>
+        <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14}}>
+          <div style={{fontSize:10,color:"#a1a1aa",marginBottom:4}}>Personal Wallet</div>
+          <div style={{fontSize:18,fontWeight:700,color:"#38bdf8",fontFamily:"monospace"}}>{fmt(state.personalCash||0)}</div>
+          <div style={{fontSize:11,color:"#52525b",marginTop:4}}>your separate personal funds</div>
+        </div>
+      </div>
+
       <div style={{display:"flex",gap:7}}>
         <Btn small variant={view==="transactions"?"primary":"ghost"} onClick={()=>setView("transactions")}>Transactions</Btn>
         <Btn small variant={view==="partTimeline"?"primary":"ghost"} onClick={()=>setView("partTimeline")}>Part Timeline</Btn>
@@ -2402,6 +2476,21 @@ function Settings({state,dispatch,toast,theme,setTheme}) {
       <div><h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Settings</h2>
         <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>App preferences.</p></div>
       <Card>
+        <div style={{fontWeight:600,fontSize:13,color:"#d4d4d8",marginBottom:14}}>Wallet Balances</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14}}>
+            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:4}}>Business Wallet</div>
+            <div style={{fontSize:18,fontWeight:700,color:"#34d399",fontFamily:"monospace"}}>{fmt(state.businessCash||0)}</div>
+            <div style={{fontSize:11,color:"#52525b",marginTop:4}}>Used for buying & selling parts</div>
+          </div>
+          <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14}}>
+            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:4}}>Personal Wallet</div>
+            <div style={{fontSize:18,fontWeight:700,color:"#38bdf8",fontFamily:"monospace"}}>{fmt(state.personalCash||0)}</div>
+            <div style={{fontSize:11,color:"#52525b",marginTop:4}}>Your separate personal funds</div>
+          </div>
+        </div>
+      </Card>
+      <Card>
         <div style={{fontWeight:600,fontSize:13,color:"#d4d4d8",marginBottom:14}}>Selling Defaults</div>
         <div style={{maxWidth:260}}>
           <Inp label="Target profit margin (%)" type="number" value={margin} onChange={e=>setMargin(e.target.value)}/>
@@ -2616,50 +2705,35 @@ function QuickNoteModal({dispatch,toast,onClose}) {
    ADD EXPENSE MODAL — log business costs (operation) or personal draws (owner's withdrawal),
    tracking each separately so personal draws feed into "Funds to Recover" and don't affect business P&L.
 ═══════════════════════════════════════════ */
-function AddExpenseModal({dispatch,toast,onClose}) {
-  const [type,setType]=useState("business"); // "business" | "personal_draw"
-  const [amount,setAmount]=useState("");
-  const [description,setDescription]=useState("");
+function AddExpenseModal({onClose, dispatch, toast}) {
+  const [wallet, setWallet] = useState("business");
+  const [desc, setDesc] = useState("");
+  const [amount, setAmount] = useState("");
 
-  const submit=()=>{
-    const amt=parseFloat(amount);
-    if(!amt||amt<=0){toast("Enter a valid amount","error");return;}
-    if(!description.trim()){toast("Add a description","error");return;}
-    dispatch({type:"ADD_EXPENSE",expenseType:type,amount:amt,description:description.trim()});
-    toast(`${type==="personal_draw"?"Personal draw":"Business cost"} recorded — cash updated ✓`);
+  const handleAdd = () => {
+    const amt = parseFloat(amount);
+    if(!amt || !desc) return toast("Fill all fields", "error");
+    const expenseType = wallet === "personal" ? "personal_draw" : "business";
+    dispatch({type: "ADD_EXPENSE", wallet, expenseType, amount: amt, description: desc});
+    toast(`Added ${wallet} expense for ${fmt(amt)} ✓`);
     onClose();
   };
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
-      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:420,maxHeight:"85vh",overflowY:"auto",animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
-        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:4}}>Expense / Withdrawal</div>
-        <div style={{fontSize:12,color:"#71717a",marginBottom:14}}>Is this for the business, or are you taking personal cash?</div>
-
-        <div style={{display:"flex",gap:8,marginBottom:14}}>
-          <button onClick={()=>setType("business")} style={{flex:1,padding:"10px 12px",borderRadius:9,fontSize:12,cursor:"pointer",
-            border:`1.5px solid ${type==="business"?"#7c3aed":"#3f3f46"}`,background:type==="business"?"rgba(124,58,237,0.12)":"transparent",
-            color:type==="business"?"#a78bfa":"#a1a1aa",fontWeight:600}}>💼 Business Cost<div style={{fontSize:10,opacity:0.7,marginTop:3}}>Operation expense</div></button>
-          <button onClick={()=>setType("personal_draw")} style={{flex:1,padding:"10px 12px",borderRadius:9,fontSize:12,cursor:"pointer",
-            border:`1.5px solid ${type==="personal_draw"?"#7c3aed":"#3f3f46"}`,background:type==="personal_draw"?"rgba(124,58,237,0.12)":"transparent",
-            color:type==="personal_draw"?"#a78bfa":"#a1a1aa",fontWeight:600}}>💳 Personal Draw<div style={{fontSize:10,opacity:0.7,marginTop:3}}>Owner withdrawal</div></button>
+      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:16}}>Add Expense</div>
+        <div style={{display:"flex",gap:8,marginBottom:12}}>
+          <Btn variant={wallet==="business"?"primary":"ghost"} onClick={()=>setWallet("business")} style={{flex:1}}>Business</Btn>
+          <Btn variant={wallet==="personal"?"primary":"ghost"} onClick={()=>setWallet("personal")} style={{flex:1}}>Personal</Btn>
         </div>
-
-        <div style={{display:"flex",flexDirection:"column",gap:11}}>
-          <Inp label="Amount (₱)" type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="5000"/>
-          <Inp label="Description" value={description} onChange={e=>setDescription(e.target.value)} 
-            placeholder={type==="business"?"e.g. Fuel for shopping trip":"e.g. Personal spending"}/>
-          <div style={{fontSize:11,color:"#52525b",background:"#09090b",border:"1px solid #27272a",borderRadius:8,padding:10}}>
-            {type==="business"?(
-              <>Reduces cash on hand. Does NOT reduce business profit.</>
-            ):(
-              <>Reduces cash on hand AND adds to "Funds to Recover" — owner's draw that should be paid back to the business.</>
-            )}
-          </div>
-          <div style={{display:"flex",gap:8}}>
-            <Btn onClick={submit} style={{flex:1}}>Record {type==="business"?"Cost":"Draw"}</Btn>
-            <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-          </div>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <Inp label="Description" value={desc} onChange={e=>setDesc(e.target.value)} placeholder="e.g. Tools, Lunch, Gas" />
+          <Inp label="Amount (₱)" type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0" />
+        </div>
+        <div style={{marginTop:16, display:"flex", gap:8}}>
+          <Btn variant="danger" onClick={handleAdd} style={{flex:1}}>Log Expense</Btn>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         </div>
       </div>
     </div>
@@ -2681,7 +2755,11 @@ export default function App() {
         // Merge with initialState defaults rather than a straight replace, so any field added
         // after a user's data was first saved (customCategories, quickNotes, etc.) safely
         // defaults to its empty value instead of being undefined for existing saved data.
-        setState(json&&Object.keys(json).length?{...initialState,...json}:initialState);
+        const loadedState = json&&Object.keys(json).length?{...initialState,...json}:initialState;
+        if(loadedState.businessCash===undefined && loadedState.liquidCash!==undefined) {
+          loadedState.businessCash = loadedState.liquidCash;
+        }
+        setState(loadedState);
         setLoadStatus("ready");
         hasLoaded.current=true;
       })
