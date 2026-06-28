@@ -109,6 +109,7 @@ export function AIAgentChatbox({
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const chatSessionRef = useRef(null); // Native SDK Chat Session
+  const geminiInitializedRef = useRef(false); // ensures the session above is created exactly once per page load
   const stateRef = useRef(state); // always-fresh state for tool execution (avoids stale closures)
   // The image attached to the CURRENT turn, so add_item_to_inventory can pick it up
   // even though tool execution happens inside an async loop, decoupled from render timing.
@@ -293,6 +294,13 @@ Keep responses short and to the point.`;
      INITIALIZE GEMINI
   ─────────────────────────────────────────── */
   useEffect(() => {
+    // Guards this from running more than once — formattedHistory changes every time a
+    // message is saved, but the chat session itself must stay the SAME object for the
+    // life of the tab. Recreating it mid-conversation was the bug: it would swap out
+    // chatSessionRef.current while a function-call response was still in flight, leaving
+    // that response talking to a brand-new session that never asked for it.
+    if (geminiInitializedRef.current || historyLoading) return;
+
     const initGemini = async () => {
       try {
         const apiKey = import.meta.env?.VITE_GEMINI_KEY || process?.env?.VITE_GEMINI_KEY;
@@ -324,11 +332,11 @@ Keep responses short and to the point.`;
       }
     };
 
-    if (!historyLoading && formattedHistory.length >= 0) {
-      initGemini();
-    }
+    geminiInitializedRef.current = true;
+    initGemini();
+    // Intentionally only depends on historyLoading, not formattedHistory — see comment above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [historyLoading, formattedHistory]);
+  }, [historyLoading]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
