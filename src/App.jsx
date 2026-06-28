@@ -21,19 +21,28 @@ function domainOf(category, customCategories){
   return custom?custom.domain:"pc_part"; // safe default — never silently misfile into General Assets
 }
 const TABS = ["Dashboard","Buy","Inventory","Builds","Sell","History"];
-const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ targetMargin:30 }, customCategories:[], quickNotes:[], businessCash:14500, personalCash:0, expenses:[] };
+const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ targetMargin:30 }, customCategories:[], quickNotes:[], businessCash:14500, personalCash:0, expenses:[], transactions:[] };
 
 /* ═══════════════════════════════════════════
    REDUCER
 ═══════════════════════════════════════════ */
 function reducer(state, action) {
   switch(action.type) {
-    case "ADD_BUNDLE":
-      return {...state, bundles:[...state.bundles,action.bundle], parts:[...state.parts,...action.parts], 
-        businessCash:(state.businessCash||0)-(action.bundle.purchasePrice||0)}; // cash out for bundle purchase
+    case "ADD_BUNDLE": {
+      const bundleCost = action.bundle.purchasePrice || 0;
+      const bundleTxn = {id:uid(), type:"PURCHASE", amount:bundleCost,
+        description:`Bought bundle: ${action.bundle.name||"Untitled bundle"}`, wallet:"business", date:today()};
+      return {...state, bundles:[...state.bundles,action.bundle], parts:[...state.parts,...action.parts],
+        businessCash:(state.businessCash||0)-bundleCost, // cash out for bundle purchase
+        transactions:[bundleTxn, ...(state.transactions||[])]};
+    }
     case "ADD_PARTS": {
       const totalCost=action.parts.reduce((s,p)=>s+(p.allocatedCost||0),0);
-      return {...state, parts:[...state.parts,...action.parts], businessCash:(state.businessCash||0)-totalCost}; // cash out for purchases
+      const partDesc=action.parts.length===1?`Bought ${action.parts[0].name}`:`Bought ${action.parts.length} items`;
+      const purchaseTxn={id:uid(),type:"PURCHASE",amount:totalCost,description:partDesc,wallet:"business",date:today()};
+      return {...state, parts:[...state.parts,...action.parts],
+        businessCash:(state.businessCash||0)-totalCost, // cash out for purchases
+        transactions:[purchaseTxn, ...(state.transactions||[])]};
     }
     case "UPDATE_PART": {
       return {...state, parts: state.parts.map(p => p.id === action.id
@@ -60,9 +69,12 @@ function reducer(state, action) {
     }
     case "SELL": {
       const {mode,id,sale} = action;
+      const saleTxn={id:uid(),type:"SALE",amount:sale.salePrice,
+        description:`Sold ${sale.name}${sale.buyerName?` to ${sale.buyerName}`:""}`,wallet:"business",date:today()};
       if(mode==="part") {
         return {...state, sales:[...state.sales,sale],
           businessCash:(state.businessCash||0)+sale.salePrice, // cash in from the sale
+          transactions:[saleTxn, ...(state.transactions||[])],
           parts: state.parts.map(p=>p.id===id
             ? {...p,status:"sold",soldTo:sale.buyerName,history:[...p.history,{date:today(),event:`Sold to ${sale.buyerName||"buyer"} for ${fmt(sale.salePrice)} — profit ${fmt(sale.profit)}`}]}
             : p
@@ -71,6 +83,7 @@ function reducer(state, action) {
         const build = state.builds.find(b=>b.id===id);
         return {...state, sales:[...state.sales,sale],
           businessCash:(state.businessCash||0)+sale.salePrice, // cash in from the sale
+          transactions:[saleTxn, ...(state.transactions||[])],
           builds: state.builds.map(b=>b.id===id?{...b,sold:true}:b),
           parts: state.parts.map(p=>build?.partIds.includes(p.id)
             ? {...p,status:"sold",soldTo:sale.buyerName,history:[...p.history,{date:today(),event:`Sold in build "${build.name}" to ${sale.buyerName||"buyer"} for ${fmt(sale.salePrice)}`}]}
@@ -170,7 +183,13 @@ function reducer(state, action) {
           ? {...p,status:"available",soldTo:"",history:[...p.history,{date:today(),event:`Sale undone (${reason}) — returned to inventory`}]}
           : p);
       }
+      // The cash from this sale isn't real anymore once the item goes back to inventory — reverse it.
+      // Guarded by sale.returned so the same sale can't have its cash pulled back twice.
+      const alreadyReversed=sale.returned;
+      const reversalTxn={id:uid(),type:"REVERSAL",amount:sale.salePrice,description:`Sale undone: ${sale.name}`,wallet:"business",date:today()};
       return {...state, parts, builds,
+        businessCash: alreadyReversed?(state.businessCash||0):(state.businessCash||0)-sale.salePrice,
+        transactions: alreadyReversed?(state.transactions||[]):[reversalTxn, ...(state.transactions||[])],
         sales: state.sales.map(s=>s.id===saleId?{...s,returned:true,returnReason:reason,returnedAt:today()}:s)
       };
     }
@@ -190,6 +209,8 @@ function reducer(state, action) {
       if(!sale)return state;
       let parts=state.parts;
       let builds=state.builds;
+      let cashReversal=0;
+      let extraTxns=[];
       if(mode==="undo-and-return"){
         if(sale.buildId){
           const build=state.builds.find(b=>b.id===sale.buildId);
@@ -202,8 +223,15 @@ function reducer(state, action) {
             ? {...p,status:"available",soldTo:"",history:[...p.history,{date:today(),event:"Sale record deleted — returned to inventory"}]}
             : p);
         }
+        // Only pull the cash back if it hasn't already been reversed by an earlier undo on this sale.
+        if(!sale.returned){
+          cashReversal=sale.salePrice;
+          extraTxns=[{id:uid(),type:"REVERSAL",amount:sale.salePrice,description:`Sale deleted & returned: ${sale.name}`,wallet:"business",date:today()}];
+        }
       }
       return {...state, parts, builds,
+        businessCash:(state.businessCash||0)-cashReversal,
+        transactions:[...extraTxns, ...(state.transactions||[])],
         sales: state.sales.map(s=>s.id===saleId?{...s,deleted:true,deletedAt:today(),returned:mode==="undo-and-return"||s.returned}:s)
       };
     }
@@ -779,6 +807,7 @@ function TransferModal({onClose, dispatch, toast, businessCash, personalCash}) {
 ═══════════════════════════════════════════ */
 function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
   const [addingExpense,setAddingExpense]=useState(false);
+  const [addingIncome,setAddingIncome]=useState(false);
   const [transferring,setTransferring]=useState(false);
   const {parts,bundles}=state;
   // Deleted sale records are kept (soft-delete, for the "Deleted records" filter in History) but
@@ -888,6 +917,7 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
       {addingExpense&&<AddExpenseModal dispatch={dispatch} toast={toast} onClose={()=>setAddingExpense(false)}/>}
+      {addingIncome&&<AddIncomeModal dispatch={dispatch} toast={toast} onClose={()=>setAddingIncome(false)}/>}
       {transferring&&<TransferModal dispatch={dispatch} toast={toast} onClose={()=>setTransferring(false)} businessCash={cashOnHand} personalCash={personalCash}/>}
       
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
@@ -897,6 +927,7 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
         </div>
         <div style={{display:"flex", gap:8}}>
           <Btn small variant="ghost" onClick={()=>setTransferring(true)}>⇆ Transfer</Btn>
+          <Btn small variant="ghost" onClick={()=>setAddingIncome(true)}>+ Income</Btn>
           <Btn small variant="ghost" onClick={()=>setAddingExpense(true)}>+ Expense</Btn>
         </div>
       </div>
@@ -2107,7 +2138,8 @@ function Sell({state,dispatch,toast,openLightbox}) {
    HISTORY  (+ #4 CSV export)
 ═══════════════════════════════════════════ */
 function History({state,dispatch,toast,openLightbox}) {
-  const [view,setView]=useState("transactions"); // "transactions" | "partTimeline"
+  const [view,setView]=useState("transactions"); // "transactions" | "partTimeline" | "ledger"
+  const [walletFilter,setWalletFilter]=useState("business"); // "business" | "personal" — used only by the Cash Ledger tab
   const [sel,setSel]=useState("");
   const [search,setSearch]=useState("");
   const [typeFilter,setTypeFilter]=useState("all"); // all | part | build | returned | deleted
@@ -2122,6 +2154,13 @@ function History({state,dispatch,toast,openLightbox}) {
 
   const allSales=state.sales;
   const activeSales=allSales.filter(s=>!s.deleted&&!s.returned&&!s.writeOff);
+
+  // Cash Ledger: every entry that moved money in or out of either wallet. TRANSFER entries have a
+  // from/to pair instead of a single wallet field, since one transfer touches both wallets at once —
+  // _positive flips depending on which wallet you're currently looking at.
+  const ledgerEntries=(state.transactions||[])
+    .filter(t=>t.type==="TRANSFER"?(t.from===walletFilter||t.to===walletFilter):t.wallet===walletFilter)
+    .map(t=>({...t,_positive: t.type==="TRANSFER"?t.to===walletFilter:(t.type==="INCOME"||t.type==="SALE")}));
 
   const filtered=allSales.filter(s=>{
     if(s.writeOff)return false; // write-offs are losses, not sales transactions — shown on Dashboard instead
@@ -2237,8 +2276,9 @@ function History({state,dispatch,toast,openLightbox}) {
       </div>
 
       <div style={{display:"flex",gap:7}}>
-        <Btn small variant={view==="transactions"?"primary":"ghost"} onClick={()=>setView("transactions")}>Transactions</Btn>
+        <Btn small variant={view==="transactions"?"primary":"ghost"} onClick={()=>setView("transactions")}>Sales History</Btn>
         <Btn small variant={view==="partTimeline"?"primary":"ghost"} onClick={()=>setView("partTimeline")}>Part Timeline</Btn>
+        <Btn small variant={view==="ledger"?"primary":"ghost"} onClick={()=>setView("ledger")}>Cash Ledger</Btn>
       </div>
 
       {view==="partTimeline"?(
@@ -2277,6 +2317,35 @@ function History({state,dispatch,toast,openLightbox}) {
           )}
           {state.parts.length===0&&(
             <Card style={{textAlign:"center",padding:36}}><div style={{color:"#52525b"}}>No parts yet.</div></Card>
+          )}
+        </>
+      ):view==="ledger"?(
+        <>
+          {/* Wallet toggle — replaces the inventory filters for this tab, since the ledger
+              is about money movement, not parts/builds/profit */}
+          <div style={{display:"flex",gap:7}}>
+            <Btn small variant={walletFilter==="business"?"primary":"ghost"} onClick={()=>setWalletFilter("business")}>💼 Business Wallet</Btn>
+            <Btn small variant={walletFilter==="personal"?"primary":"ghost"} onClick={()=>setWalletFilter("personal")}>👤 Personal Wallet</Btn>
+          </div>
+
+          {ledgerEntries.length===0?(
+            <Card style={{textAlign:"center",padding:36}}><div style={{color:"#52525b"}}>No {walletFilter} wallet activity yet.</div></Card>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {ledgerEntries.map((t,i)=>(
+                <div key={t.id} style={{background:"#18181b",border:"1px solid #27272a",borderRadius:11,padding:"12px 14px",
+                  display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,
+                  animation:`fadeUp 0.18s ease ${Math.min(i*0.02,0.3)}s both`}}>
+                  <div style={{minWidth:0}}>
+                    <div style={{color:"#fff",fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.description}</div>
+                    <div style={{color:"#71717a",fontSize:11,marginTop:2}}>{t.date}</div>
+                  </div>
+                  <div style={{fontFamily:"monospace",fontWeight:700,fontSize:14,color:t._positive?"#34d399":"#f87171",whiteSpace:"nowrap"}}>
+                    {t._positive?"+":"-"}{fmt(t.amount)}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </>
       ):(
@@ -2734,6 +2803,41 @@ function QuickNoteModal({dispatch,toast,onClose}) {
    ADD EXPENSE MODAL — log business costs (operation) or personal draws (owner's withdrawal),
    tracking each separately so personal draws feed into "Funds to Recover" and don't affect business P&L.
 ═══════════════════════════════════════════ */
+function AddIncomeModal({onClose, dispatch, toast}) {
+  const [wallet, setWallet] = useState("business");
+  const [desc, setDesc] = useState("");
+  const [amount, setAmount] = useState("");
+
+  const handleAdd = () => {
+    const amt = parseFloat(amount);
+    if(!amt || !desc) return toast("Fill all fields", "error");
+    dispatch({type: "ADD_INCOME", wallet, amount: amt, description: desc});
+    toast(`+${fmt(amt)} added to ${wallet} wallet ✓`);
+    onClose();
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:4}}>Add Income</div>
+        <div style={{fontSize:12,color:"#71717a",marginBottom:14}}>Money coming in that isn't from selling inventory — a repair job, a service fee, anything like that.</div>
+        <div style={{display:"flex",gap:8,marginBottom:12}}>
+          <Btn variant={wallet==="business"?"primary":"ghost"} onClick={()=>setWallet("business")} style={{flex:1}}>Business</Btn>
+          <Btn variant={wallet==="personal"?"primary":"ghost"} onClick={()=>setWallet("personal")} style={{flex:1}}>Personal</Btn>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <Inp label="Description" value={desc} onChange={e=>setDesc(e.target.value)} placeholder="e.g. Fixed a PC for a client" />
+          <Inp label="Amount (₱)" type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0" />
+        </div>
+        <div style={{marginTop:16, display:"flex", gap:8}}>
+          <Btn variant="success" onClick={handleAdd} style={{flex:1}}>Log Income</Btn>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AddExpenseModal({onClose, dispatch, toast}) {
   const [wallet, setWallet] = useState("business");
   const [desc, setDesc] = useState("");
