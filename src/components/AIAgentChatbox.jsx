@@ -291,52 +291,60 @@ When the user wants to delete, undo, or return a sale, first call find_sales to 
 Keep responses short and to the point.`;
 
   /* ───────────────────────────────────────────
-     INITIALIZE GEMINI
+     INITIALIZE GEMINI — also reused as a repair function (see handleSend's catch block):
+     if a turn ever fails mid function-call, the session can be left in a stuck state with
+     a dangling, never-answered function call in its history. Rebuilding it from whatever's
+     already persisted is how we recover, instead of every message failing until refresh.
   ─────────────────────────────────────────── */
-  useEffect(() => {
-    // Guards this from running more than once — formattedHistory changes every time a
-    // message is saved, but the chat session itself must stay the SAME object for the
-    // life of the tab. Recreating it mid-conversation was the bug: it would swap out
-    // chatSessionRef.current while a function-call response was still in flight, leaving
-    // that response talking to a brand-new session that never asked for it.
-    if (geminiInitializedRef.current || historyLoading) return;
-
-    const initGemini = async () => {
-      try {
-        const apiKey = import.meta.env?.VITE_GEMINI_KEY || process?.env?.VITE_GEMINI_KEY;
-        if (!apiKey) {
-          console.error('VITE_GEMINI_KEY not set');
-          return;
-        }
-
-        const ai = new GoogleGenAI({ apiKey });
-
-        const sdkHistory = (formattedHistory || []).map((item) => ({
-          role: item.role === 'user' ? 'user' : 'model',
-          parts: item.parts || [{ text: item.text || '' }],
-        }));
-
-        chatSessionRef.current = ai.chats.create({
-          model: 'gemini-2.5-flash',
-          history: sdkHistory,
-          config: {
-            temperature: 0.7,
-            tools: toolsConfig,
-            systemInstruction: SYSTEM_INSTRUCTION,
-          },
-        });
-
-        setAiReady(true);
-      } catch (err) {
-        console.error('Failed to initialize Gemini:', err);
+  const initGemini = useCallback(async () => {
+    try {
+      const apiKey = import.meta.env?.VITE_GEMINI_KEY || process?.env?.VITE_GEMINI_KEY;
+      if (!apiKey) {
+        console.error('VITE_GEMINI_KEY not set');
+        setAiReady(false);
+        return false;
       }
-    };
 
+      const ai = new GoogleGenAI({ apiKey });
+
+      const sdkHistory = (formattedHistory || []).map((item) => ({
+        role: item.role === 'user' ? 'user' : 'model',
+        parts: item.parts || [{ text: item.text || '' }],
+      }));
+
+      chatSessionRef.current = ai.chats.create({
+        model: 'gemini-2.5-flash',
+        history: sdkHistory,
+        config: {
+          temperature: 0.7,
+          tools: toolsConfig,
+          systemInstruction: SYSTEM_INSTRUCTION,
+        },
+      });
+
+      setAiReady(true);
+      return true;
+    } catch (err) {
+      console.error('Failed to initialize Gemini:', err);
+      setAiReady(false);
+      return false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formattedHistory]);
+
+  useEffect(() => {
+    // Guards this from running more than once on its own — formattedHistory changes every
+    // time a message is saved, but the chat session itself must stay the SAME object for the
+    // life of the tab. Recreating it mid-conversation was the original bug: it would swap out
+    // chatSessionRef.current while a function-call response was still in flight, leaving
+    // that response talking to a brand-new session that never asked for it. The ref guard
+    // below is what makes this run exactly once at startup; initGemini changing reference
+    // afterward (because formattedHistory changed) does NOT cause a re-run.
+    if (geminiInitializedRef.current || historyLoading) return;
     geminiInitializedRef.current = true;
     initGemini();
-    // Intentionally only depends on historyLoading, not formattedHistory — see comment above.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [historyLoading]);
+  }, [historyLoading, initGemini]);
+
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -596,7 +604,13 @@ Keep responses short and to the point.`;
         userParts.push({ inlineData: { mimeType: 'image/jpeg', data: base64Data } });
       }
 
-      let response = await chatSessionRef.current.sendMessage({ message: userParts });
+      let response;
+      try {
+        response = await chatSessionRef.current.sendMessage({ message: userParts });
+      } catch (err) {
+        console.error('Gemini rejected the initial message:', err);
+        throw err;
+      }
 
       let iterations = 0;
       const maxIterations = 5;
@@ -608,9 +622,14 @@ Keep responses short and to the point.`;
         for (const call of functionCalls) {
           const { name, args } = call;
           const result = await executeTool(name, args);
-          response = await chatSessionRef.current.sendMessage({
-            message: [{ functionResponse: { name, response: { result } } }],
-          });
+          try {
+            response = await chatSessionRef.current.sendMessage({
+              message: [{ functionResponse: { name, response: { result } } }],
+            });
+          } catch (err) {
+            console.error(`Gemini rejected the function response for "${name}":`, err);
+            throw err;
+          }
         }
       }
 
@@ -620,13 +639,20 @@ Keep responses short and to the point.`;
       }
     } catch (err) {
       console.error('Error during agent interaction loop:', err);
-      toast?.('Something went wrong talking to the assistant. Try again.', 'error');
+      toast?.('Something went wrong talking to the assistant. Resetting — please try again.', 'error');
+      // A failed turn can leave the session with a dangling function call it never got an
+      // answer to recorded for — every message after that would fail the same way. Rebuild
+      // it fresh from whatever's already persisted so the NEXT message isn't stuck repeating
+      // this same failure until the page is refreshed.
+      chatSessionRef.current = null;
+      setAiReady(false);
+      await initGemini();
     } finally {
       setSending(false);
       setPendingMessages([]);
       pendingImageRef.current = null;
     }
-  }, [input, selectedImage, aiReady, addMessage, executeTool, toast]);
+  }, [input, selectedImage, aiReady, addMessage, executeTool, toast, initGemini]);
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !sending) {
