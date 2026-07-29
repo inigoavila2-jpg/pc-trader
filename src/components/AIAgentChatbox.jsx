@@ -88,7 +88,6 @@ function formatMessageText(text) {
  * - Mobile-first responsive design
  */
 export function AIAgentChatbox({
-  pbUrl,
   state,
   dispatch,
   setTab,
@@ -101,6 +100,7 @@ export function AIAgentChatbox({
   const [imagePreview, setImagePreview] = useState(null);
   const [sending, setSending] = useState(false);
   const [aiReady, setAiReady] = useState(false);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   // Optimistic local echo so the user's own message + a "thinking" indicator show up
   // instantly, instead of the chat looking frozen while the network round-trip happens.
   const [pendingMessages, setPendingMessages] = useState([]);
@@ -117,7 +117,7 @@ export function AIAgentChatbox({
 
   useEffect(() => { stateRef.current = state; }, [state]);
 
-  const { messages, formattedHistory, loading: historyLoading, error: historyError, addMessage } = useChatHistory(pbUrl);
+  const { messages, formattedHistory, loading: historyLoading, error: historyError, addMessage } = useChatHistory();
 
   /* ───────────────────────────────────────────
      TOOL DEFINITIONS
@@ -150,6 +150,30 @@ export function AIAgentChatbox({
               marketPrice: { type: 'number' },
             },
             required: ['name', 'cost'],
+          },
+        },
+        {
+          name: 'attach_photo_to_part',
+          description: 'Attach a photo to an existing inventory item after the initial entry. Use the current turn image and update the matching part by item name or itemId.',
+          parameters: {
+            type: 'object',
+            properties: {
+              itemId: { type: 'string', description: 'Exact part ID if known' },
+              itemName: { type: 'string', description: 'Part name or a partial match for the item to attach the photo to' },
+            },
+            required: ['itemName'],
+          },
+        },
+        {
+          name: 'attach_photo_to_sale',
+          description: 'Attach a proof photo to an existing sale transaction after the sale has already been recorded. Use the current turn image and the exact saleId from find_sales.',
+          parameters: {
+            type: 'object',
+            properties: {
+              saleId: { type: 'string', description: 'Exact saleId from a prior find_sales call' },
+              itemName: { type: 'string', description: 'Optional item name to help locate the sale if saleId is not known' },
+            },
+            required: ['saleId'],
           },
         },
         {
@@ -288,7 +312,12 @@ When the user wants to sell an item, ensure you know the exact item name, the sa
 
 When the user wants to delete, undo, or return a sale, first call find_sales to locate the exact transaction. If you get more than one plausible match, ask the user which one they mean instead of guessing. Only after you have verified the exact saleId from the tool output should you call delete_transaction.
 
-Keep responses short and to the point.`;
+Keep responses short and to the point.
+
+When web search is enabled, prefer using it for any request that needs up-to-date technical specifications, clock speeds, core counts, or detailed hardware comparisons beyond what is already stored in your inventory notes. Cite the exact model and spec details clearly, and only rely on internal memory for inventory status, not for fresh hardware specs.
+
+For business strategy questions, offer thoughtful advice that considers pricing, margins, inventory mix, cash flow, customer demand, and resale timing. You may recommend pricing strategies, when to hold inventory vs. sell, which component categories are most profitable, and how to use your current business wallet balance effectively.
+`;
 
   /* ───────────────────────────────────────────
      INITIALIZE GEMINI — also reused as a repair function (see handleSend's catch block):
@@ -298,9 +327,9 @@ Keep responses short and to the point.`;
   ─────────────────────────────────────────── */
   const initGemini = useCallback(async () => {
     try {
-      const apiKey = import.meta.env?.VITE_GEMINI_KEY || process?.env?.VITE_GEMINI_KEY;
+      const apiKey = import.meta.env?.VITE_GEMINI_KEY || import.meta.env?.VITE_GEMINI_API_KEY || import.meta.env?.GEMINI_API_KEY || process?.env?.VITE_GEMINI_KEY || process?.env?.GEMINI_API_KEY;
       if (!apiKey) {
-        console.error('VITE_GEMINI_KEY not set');
+        console.error('Gemini API key not set. Add VITE_GEMINI_KEY to your local environment.');
         setAiReady(false);
         return false;
       }
@@ -319,6 +348,7 @@ Keep responses short and to the point.`;
           temperature: 0.7,
           tools: toolsConfig,
           systemInstruction: SYSTEM_INSTRUCTION,
+          ...(webSearchEnabled ? { enterpriseWebSearch: true } : {}),
         },
       });
 
@@ -330,7 +360,14 @@ Keep responses short and to the point.`;
       return false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formattedHistory]);
+  }, [formattedHistory, webSearchEnabled]);
+
+  const handleToggleWebSearch = useCallback(() => {
+    setWebSearchEnabled((prev) => !prev);
+    setAiReady(false);
+    chatSessionRef.current = null;
+    geminiInitializedRef.current = false;
+  }, []);
 
   useEffect(() => {
     // Guards this from running more than once on its own — formattedHistory changes every
@@ -474,6 +511,49 @@ Keep responses short and to the point.`;
             dispatch({ type: 'DELETE_SALE', saleId, mode: returnToInventory ? 'undo-and-return' : 'record-only' });
             toast?.(`Transaction with ${sale.buyerName || 'buyer'} deleted${returnToInventory ? ' — item returned to inventory' : ''} ✓`, 'success');
             return `Deleted the sale of "${sale.name}" to ${sale.buyerName || 'the buyer'}${returnToInventory ? ', and returned the item to available inventory' : ''}.`;
+          }
+
+          case 'attach_photo_to_part': {
+            const { itemId, itemName } = toolInput;
+            if (!pendingImageRef.current) return 'No attached image found for this turn. Please attach a photo then try again.';
+            const uploaded = await uploadImageToPocketBase(pendingImageRef.current);
+            pendingImageRef.current = null;
+            if (!uploaded) return 'Image upload failed — the photo could not be attached.';
+
+            let part = null;
+            if (itemId) {
+              part = liveState.parts.find(p => p.id === itemId);
+            }
+            if (!part && itemName) {
+              const q = itemName.toLowerCase();
+              const matches = liveState.parts.filter(p => p.name.toLowerCase().includes(q));
+              if (matches.length === 1) {
+                part = matches[0];
+              } else if (matches.length > 1) {
+                return `Multiple parts match "${itemName}". Please provide the exact item ID or a more specific name.`;
+              }
+            }
+            if (!part) return `Could not find a part matching "${itemName || itemId || ''}".`;
+
+            dispatch({ type: 'UPDATE_PART', id: part.id, changes: { photoUrl: uploaded.photoUrl, photoRecordId: uploaded.photoRecordId }, desc: 'Attached photo to existing item' });
+            toast?.(`Photo attached to ${part.name} ✓`, 'success');
+            return `Attached the photo to "${part.name}".`;
+          }
+
+          case 'attach_photo_to_sale': {
+            const { saleId } = toolInput;
+            if (!saleId) return 'saleId is required to attach a photo to a sale.';
+            if (!pendingImageRef.current) return 'No attached image found for this turn. Please attach a photo then try again.';
+            const uploaded = await uploadImageToPocketBase(pendingImageRef.current);
+            pendingImageRef.current = null;
+            if (!uploaded) return 'Image upload failed — the photo could not be attached.';
+
+            const sale = liveState.sales.find(s => s.id === saleId && !s.deleted);
+            if (!sale) return `No active sale found with saleId "${saleId}".`;
+
+            dispatch({ type: 'EDIT_SALE', saleId, changes: { proofPhotoUrl: uploaded.photoUrl, proofPhotoRecordId: uploaded.photoRecordId } });
+            toast?.(`Photo attached to sale ${sale.name} ✓`, 'success');
+            return `Attached the photo to sale "${sale.name}".`;
           }
 
           case 'sell_item': {
@@ -706,7 +786,26 @@ Keep responses short and to the point.`;
         >
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderBottom: '1px solid #27272a', flexShrink: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>🤖 AI Assistant</div>
+            <button
+              type="button"
+              onClick={handleToggleWebSearch}
+              style={{
+                background: webSearchEnabled ? '#22c55e' : '#27272a',
+                border: '1px solid',
+                borderColor: webSearchEnabled ? '#16a34a' : '#3f3f46',
+                color: '#fff',
+                cursor: 'pointer',
+                fontSize: 11,
+                padding: '6px 10px',
+                borderRadius: 999,
+                width: 'max-content',
+              }}
+            >
+              {webSearchEnabled ? 'Web search ON' : 'Web search OFF'}
+            </button>
+          </div>
             <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', fontSize: 18 }}>✕</button>
           </div>
 

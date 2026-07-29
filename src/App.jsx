@@ -2934,8 +2934,6 @@ export default function App() {
     }
   },[toast]);
 
-  const pbUrl = import.meta.env.VITE_PB_URL || "http://localhost:8090";
-
   if(loadStatus==="loading"){
     return <div style={{minHeight:"100vh",background:"#09090b",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui,sans-serif"}}>Loading your data…</div>;
   }
@@ -3036,7 +3034,7 @@ export default function App() {
       </div>
 
       <QuickActionsFab state={state} dispatch={dispatch} toast={toast}/>
-      <AIAgentChatbox pbUrl={pbUrl} state={state} dispatch={dispatch} setTab={setTab} setFormData={setFormData} toast={toast}/>
+      <AIAgentChatbox state={state} dispatch={dispatch} setTab={setTab} setFormData={setFormData} toast={toast}/>
       <Lightbox url={lightboxUrl} onClose={()=>setLightboxUrl(null)}/>
     </div>
   );
