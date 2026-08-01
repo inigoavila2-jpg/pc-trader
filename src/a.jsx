@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, Fragment } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { AIAgentChatbox } from "./components/AIAgentChatbox";
 
 /* ═══════════════════════════════════════════
@@ -805,257 +805,80 @@ function TransferModal({onClose, dispatch, toast, businessCash, personalCash}) {
 /* ═══════════════════════════════════════════
    DASHBOARD  (#6 capital at risk, #7 bundle P&L)
 ═══════════════════════════════════════════ */
-/* ═══════════════════════════════════════════
-   DASHBOARD SUBCOMPONENTS — institutional-grade primitives used only here.
-   Kept local to this section (not hoisted into the shared UI block above)
-   since nothing else in the app needs a KPI hero card, a health-score ring,
-   or a sortable ledger table.
-═══════════════════════════════════════════ */
-
-// Hero number — the one figure on the page meant to register before anything else.
-// Metallic gradient text instead of a flat color: reads as "statement", not "stat box".
-function HeroNumber({children,color}) {
-  return (
-    <span style={{
-      background: color || "linear-gradient(135deg,#ffffff 0%,#a1a1aa 100%)",
-      WebkitBackgroundClip:"text", backgroundClip:"text", color:"transparent",
-      fontFamily:"monospace", fontWeight:800, letterSpacing:"-0.02em",
-    }}>{children}</span>
-  );
-}
-
-function PeriodSwitch({period,setPeriod}) {
-  const opts=[["month","This Month"],["quarter","This Quarter"],["all","All Time"]];
-  return (
-    <div style={{display:"inline-flex",background:"#111113",border:"1px solid #27272a",borderRadius:9,padding:3,gap:2}}>
-      {opts.map(([k,l])=>(
-        <button key={k} onClick={()=>setPeriod(k)} style={{
-          padding:"5px 11px",borderRadius:7,fontSize:11,fontWeight:600,cursor:"pointer",border:"none",
-          background:period===k?"#27272a":"transparent", color:period===k?"#fff":"#71717a",
-          transition:"all 0.15s"}}>{l}</button>
-      ))}
-    </div>
-  );
-}
-
-// KPI card — every card here is built to answer one specific business question, stated
-// in the `question` line beneath the number, per the "no decorative widgets" brief.
-function KPICard({label,value,question,color,accent}) {
-  return (
-    <div style={{background:"#111113",border:`1px solid ${accent||"#27272a"}`,borderRadius:14,padding:"16px 18px",minWidth:0}}>
-      <div style={{fontSize:10,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.09em",marginBottom:8,fontWeight:600}}>{label}</div>
-      <div style={{fontSize:22,fontWeight:800,fontFamily:"monospace",color:color||"#fff",letterSpacing:"-0.01em",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{value}</div>
-      {question&&<div style={{fontSize:10.5,color:"#52525b",marginTop:6,lineHeight:1.4}}>{question}</div>}
-    </div>
-  );
-}
-
-// Cash In → Inventory → Sales → Profit — the four-stage capital cycle of a flipping business,
-// rendered as a labelled flow rather than a chart, since the point is sequence, not magnitude.
-function CapitalFlowDiagram({invested,inventoryVal,recovered,profit}) {
-  const stages=[
-    {label:"Cash In",sub:"capital deployed",value:invested,color:"#38bdf8"},
-    {label:"Inventory",sub:"held at market value",value:inventoryVal,color:"#a78bfa"},
-    {label:"Sales",sub:"revenue collected",value:recovered,color:"#34d399"},
-    {label:"Profit",sub:profit>=0?"net gain":"net loss",value:profit,color:profit>=0?"#34d399":"#f87171"},
-  ];
-  return (
-    <div style={{display:"flex",alignItems:"center",gap:0,overflowX:"auto",paddingBottom:4}}>
-      {stages.map((s,i)=>(
-        <Fragment key={s.label}>
-          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,minWidth:92,flexShrink:0}}>
-            <div style={{width:10,height:10,borderRadius:"50%",background:s.color,boxShadow:`0 0 0 3px ${s.color}22`}}/>
-            <div style={{fontSize:14,fontWeight:800,fontFamily:"monospace",color:"#fff"}}>{fmt(s.value)}</div>
-            <div style={{fontSize:11,color:"#d4d4d8",fontWeight:600,textAlign:"center"}}>{s.label}</div>
-            <div style={{fontSize:9,color:"#52525b",textAlign:"center"}}>{s.sub}</div>
-          </div>
-          {i<stages.length-1&&(
-            <svg width="36" height="10" style={{flexShrink:0,margin:"0 2px 28px"}}>
-              <line x1="0" y1="5" x2="30" y2="5" stroke="#3f3f46" strokeWidth="1.5"/>
-              <polygon points="30,1 36,5 30,9" fill="#3f3f46"/>
-            </svg>
-          )}
-        </Fragment>
-      ))}
-    </div>
-  );
-}
-
-// Profit trend — area chart with gridlines and a gradient fill, replacing the bare sparkline.
-// Institutional convention: zero-line always visible, fill communicates magnitude not just direction.
-function ProfitAreaChart({points,positive}) {
-  if(points.length<2)return null;
-  const max=Math.max(1,...points.map(Math.abs));
-  const toXY=(v,i)=>{
-    const x=(i/(points.length-1))*100;
-    const y=32-(v/max)*28;
-    return [x,y];
-  };
-  const linePath=points.map((v,i)=>{const [x,y]=toXY(v,i);return `${i===0?"M":"L"}${x.toFixed(2)},${y.toFixed(2)}`;}).join(" ");
-  const [firstX]=toXY(points[0],0);
-  const [lastX]=toXY(points[points.length-1],points.length-1);
-  const areaPath=`M${firstX},32 ${linePath.replace(/^M/,"L")} L${lastX},32 Z`;
-  const color=positive?"#34d399":"#f87171";
-  const gradId=`pg-${positive?"pos":"neg"}`;
-  return (
-    <svg viewBox="0 0 100 40" style={{width:"100%",height:96,display:"block"}} preserveAspectRatio="none">
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.28"/>
-          <stop offset="100%" stopColor={color} stopOpacity="0"/>
-        </linearGradient>
-      </defs>
-      {[8,16,24,32].map(y=>(
-        <line key={y} x1="0" y1={y} x2="100" y2={y} stroke="#1f1f23" strokeWidth="0.4"/>
-      ))}
-      <path d={areaPath} fill={`url(#${gradId})`} stroke="none"/>
-      <path d={linePath} fill="none" stroke={color} strokeWidth="1.4" vectorEffect="non-scaling-stroke"/>
-    </svg>
-  );
-}
-
-// Financial Health Score — a weighted composite (ROI, turnover, cash ratio, profit momentum),
-// not a formal accounting standard. Presented as a ring so it reads as "one number to check
-// weekly", the same way an owner would glance at a fuel gauge before a chart.
-function HealthScoreRing({score,tier}) {
-  const r=42, c=2*Math.PI*r;
-  const filled=(score/100)*c;
-  return (
-    <div style={{display:"flex",alignItems:"center",gap:20,flexWrap:"wrap"}}>
-      <svg width="100" height="100" viewBox="0 0 100 100" style={{flexShrink:0}}>
-        <circle cx="50" cy="50" r={r} fill="none" stroke="#27272a" strokeWidth="8"/>
-        <circle cx="50" cy="50" r={r} fill="none" stroke={tier.color} strokeWidth="8" strokeLinecap="round"
-          strokeDasharray={`${filled} ${c}`} transform="rotate(-90 50 50)"
-          style={{transition:"stroke-dasharray 0.8s cubic-bezier(0.34,1.2,0.64,1)"}}/>
-        <text x="50" y="46" textAnchor="middle" fontSize="22" fontWeight="800" fill="#fff" fontFamily="monospace">{score}</text>
-        <text x="50" y="62" textAnchor="middle" fontSize="8" fill="#71717a">/ 100</text>
-      </svg>
-      <div style={{flex:1,minWidth:160}}>
-        <div style={{fontSize:15,fontWeight:700,color:tier.color,marginBottom:3}}>{tier.emoji} {tier.label}</div>
-        <div style={{fontSize:11.5,color:"#a1a1aa",lineHeight:1.5}}>
-          Composite of ROI, inventory turnover, cash position vs. baseline, and month-over-month profit momentum. A working diagnostic, not a credit score.
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SortHeader({label,active,dir,onClick,align}) {
-  return (
-    <th onClick={onClick} style={{cursor:"pointer",textAlign:align||"left",padding:"8px 10px",userSelect:"none",whiteSpace:"nowrap"}}>
-      <span style={{fontSize:10,color:active?"#d4d4d8":"#71717a",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:700}}>
-        {label}{active&&<span style={{marginLeft:3}}>{dir==="asc"?"↑":"↓"}</span>}
-      </span>
-    </th>
-  );
-}
-
-/* ═══════════════════════════════════════════
-   DASHBOARD — executive financial overview.
-   Snapshot metrics (Net Worth, Cash, Inventory, inventory counts, dead stock) always reflect
-   right now, independent of the period switch — a balance sheet doesn't have a "this month"
-   view. Flow metrics (Invested, Recovered, Net Profit, ROI, the transactions table) DO respect
-   the period switch, since those are income-statement-style figures. Monthly Profit and Best
-   Month Ever are intentionally always all-time — filtering "best month ever" by a period would
-   contradict the label.
-═══════════════════════════════════════════ */
 function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
   const [addingExpense,setAddingExpense]=useState(false);
   const [addingIncome,setAddingIncome]=useState(false);
   const [transferring,setTransferring]=useState(false);
-  const [period,setPeriod]=useState("all"); // "month" | "quarter" | "all" — governs flow metrics only
-  const [sortKey,setSortKey]=useState("date");
-  const [sortDir,setSortDir]=useState("desc");
-  const {parts,bundles,builds}=state;
-
-  // Deleted sale records are kept (soft-delete, for History's filter) but must never count
-  // toward live figures. Returned sales are excluded too — the money didn't stay made.
-  const allSales=state.sales.filter(s=>!s.deleted&&!s.returned);
-
-  const parseDate=(str)=>{ if(!str)return null; const d=new Date(str); return isNaN(d.getTime())?null:d; };
-  const now=new Date();
-  const inPeriod=(dateStr)=>{
-    if(period==="all")return true;
-    const d=parseDate(dateStr);
-    if(!d)return true; // never silently hide a record just because its date didn't parse
-    if(period==="month")return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth();
-    if(period==="quarter")return d.getFullYear()===now.getFullYear()&&Math.floor(d.getMonth()/3)===Math.floor(now.getMonth()/3);
-    return true;
-  };
-  const sales=allSales.filter(s=>inPeriod(s.date)); // period-scoped — used for all flow metrics below
-
-  // ── SNAPSHOT METRICS (always "as of now") ──────────────────────────────────────
+  const {parts,bundles}=state;
+  // Deleted sale records are kept (soft-delete, for the "Deleted records" filter in History) but
+  // must never count toward live profit/revenue. Returned sales ARE deleted from active totals too —
+  // a returned sale means the money didn't actually stay made.
+  const sales=state.sales.filter(s=>!s.deleted&&!s.returned);
+  
+  // ══════════════════════════════════════════════════════════════════════════════
+  // CORE INVENTORY VALUATION METRICS
+  // ══════════════════════════════════════════════════════════════════════════════
+  
+  // 1. Inventory Market Value: current selling price of unsold items. Fallback to cost if market value is missing.
   const activeInventory=parts.filter(p=>p.status==="available"||p.status==="in_build");
-  const inventoryMarketValue=activeInventory.reduce((s,p)=>{const mkt=p.marketValue||0;return s+(mkt>0?mkt:p.allocatedCost);},0);
+  const inventoryMarketValue=activeInventory.reduce((s,p)=>{
+    const mkt=p.marketValue||0;
+    return s+(mkt>0?mkt:p.allocatedCost); // fallback to cost if market value is blank/zero
+  },0);
+  
+  // 2. Inventory Cost: total money we've spent acquiring everything still in stock.
   const inventoryCost=activeInventory.reduce((s,p)=>s+p.allocatedCost,0);
+  
+  // 3. Recovered Capital: money we've successfully pulled back from completed sales.
+  const recoveredCapital=sales.reduce((s,x)=>s+x.salePrice,0);
+  
+  // 4. Cash on Hand: business wallet balance for buying/selling parts.
   const cashOnHand=state.businessCash||0;
   const personalCash=state.personalCash||0;
-  const netWorth=cashOnHand+inventoryMarketValue;
-  const fundsToRecover=(state.expenses||[]).filter(e=>e.type==="personal_draw").reduce((s,e)=>s+e.amount,0);
+  
+  // Funds to Recover: sum of personal draws (owner's money taken out, not business expense).
+  const fundsToRecover=(state.expenses||[])
+    .filter(e=>e.type==="personal_draw")
+    .reduce((s,e)=>s+e.amount,0);
+  
+  // Alert trigger: if we've dropped below the target baseline due to draws/spending.
   const isUnderCapital=cashOnHand<14500;
+  
+  // ══════════════════════════════════════════════════════════════════════════════
+  // Traditional profit/loss metrics (unchanged)
+  // ══════════════════════════════════════════════════════════════════════════════
+  
+  const totalCapital=parts.reduce((s,p)=>s+p.allocatedCost,0);
+  const totalRevenue=sales.reduce((s,x)=>s+x.salePrice,0);
+  const totalCOGS=sales.reduce((s,x)=>s+x.cost,0);
+  const totalProfit=totalRevenue-totalCOGS;
+  const roi=totalCOGS>0?totalProfit/totalCOGS:0;
+  // Defective parts are a realized loss already counted in totalProfit (via their write-off sale),
+  // so they're excluded from "at risk" — that stat is only for capital still tied up in active inventory.
+  const atRisk=parts.filter(p=>p.status!=="sold"&&p.status!=="defective").reduce((s,p)=>s+p.allocatedCost,0);
+  const recoveredCost=parts.filter(p=>p.status==="sold").reduce((s,p)=>s+p.allocatedCost,0);
+  const writeOffLoss=sales.filter(s=>s.writeOff).reduce((s,x)=>s+Math.abs(x.profit),0);
+  const writeOffCount=parts.filter(p=>p.status==="defective").length;
   const available=parts.filter(p=>p.status==="available").length;
   const inBuild=parts.filter(p=>p.status==="in_build").length;
-  const soldCount=parts.filter(p=>p.status==="sold").length;
-  const totalCapitalAllTime=parts.reduce((s,p)=>s+p.allocatedCost,0);
-  const atRisk=parts.filter(p=>p.status!=="sold"&&p.status!=="defective").reduce((s,p)=>s+p.allocatedCost,0);
-  const recoveredCostAllTime=parts.filter(p=>p.status==="sold").reduce((s,p)=>s+p.allocatedCost,0);
-  const writeOffLoss=allSales.filter(s=>s.writeOff).reduce((s,x)=>s+Math.abs(x.profit),0);
-  const writeOffCount=parts.filter(p=>p.status==="defective").length;
+  const sold=parts.filter(p=>p.status==="sold").length;
+  const recentSales=[...sales].reverse().slice(0,5);
 
-  const DEAD_DAYS=30;
-  const deadInventory=parts.filter(p=>{
-    if(p.status!=="available")return false;
-    const bought=parseDate(p.history?.[0]?.date);
-    if(!bought)return false;
-    return Math.round((now-bought)/86400000)>DEAD_DAYS;
+  // Bundle P&L  (#7)
+  const bundlePnl = bundles.map(b=>{
+    const bParts=parts.filter(p=>p.bundleId===b.id);
+    const soldParts=bParts.filter(p=>p.status==="sold");
+    const unsoldParts=bParts.filter(p=>p.status!=="sold");
+    const recovered=soldParts.reduce((s,p)=>{
+      const sale=sales.find(s=>s.partId===p.id)||sales.find(s=>s.name===p.name);
+      return s+(sale?sale.salePrice:0);
+    },0);
+    const unsoldMarket=unsoldParts.reduce((s,p)=>s+p.marketValue,0);
+    return {...b,bParts,soldParts,unsoldParts,recovered,unsoldMarket};
   });
-  const deadInventoryValue=deadInventory.reduce((s,p)=>s+(p.marketValue||p.allocatedCost),0);
 
-  // ── FLOW METRICS (respect the period switch) ───────────────────────────────────
-  const invested=parts.filter(p=>{const d=parseDate(p.history?.[0]?.date);return d?inPeriod(p.history[0].date):period==="all";}).reduce((s,p)=>s+p.allocatedCost,0);
-  const recovered=sales.reduce((s,x)=>s+x.salePrice,0);
-  const periodCOGS=sales.reduce((s,x)=>s+x.cost,0);
-  const totalProfit=recovered-periodCOGS;
-  const roi=periodCOGS>0?totalProfit/periodCOGS:0;
-  const inventoryTurnoverRate=inventoryCost>0?periodCOGS/inventoryCost:0;
-  const avgProfitPerSale=sales.length?totalProfit/sales.length:0;
-  const highestProfitSale=sales.length?[...sales].sort((a,b)=>b.profit-a.profit)[0]:null;
-
-  // ── OPERATIONAL: avg days to sell (all-time — needs the full sample to be stable) ──
-  const holdDurations=[];
-  parts.filter(p=>p.status==="sold").forEach(p=>{
-    const sale=allSales.find(s=>s.partId===p.id)||allSales.find(s=>s.name===p.name);
-    const bought=p.history?.[0]?.date;
-    if(sale&&bought){
-      const d1=parseDate(bought),d2=parseDate(sale.date);
-      if(d1&&d2)holdDurations.push(Math.max(0,Math.round((d2-d1)/86400000)));
-    }
-  });
-  const avgDaysToSell=holdDurations.length?Math.round(holdDurations.reduce((s,d)=>s+d,0)/holdDurations.length):null;
-
-  // ── MONTH-OVER-MONTH (always all-time source data — "Best Month Ever" can't be period-scoped) ──
-  const monthMap={};
-  allSales.forEach(s=>{
-    const d=parseDate(s.date); if(!d)return;
-    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-    if(!monthMap[key])monthMap[key]={label:d.toLocaleDateString("en-PH",{month:"short",year:"numeric"}),profit:0,sortKey:key};
-    monthMap[key].profit+=s.profit;
-  });
-  const monthRows=Object.values(monthMap).sort((a,b)=>a.sortKey.localeCompare(b.sortKey));
-  const thisMonthKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
-  const lastMonthDate=new Date(now.getFullYear(),now.getMonth()-1,1);
-  const lastMonthKey=`${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth()+1).padStart(2,"0")}`;
-  const thisMonthProfit=monthMap[thisMonthKey]?.profit||0;
-  const lastMonthProfit=monthMap[lastMonthKey]?.profit||0;
-  const momGrowthPct=lastMonthProfit!==0?(thisMonthProfit-lastMonthProfit)/Math.abs(lastMonthProfit):(thisMonthProfit>0?1:0);
-  const bestMonth=monthRows.length?monthRows.reduce((a,b)=>b.profit>a.profit?b:a):null;
-
-  // ── Profit trend chart data (period-scoped, running cumulative across the period's sales) ──
-  let running=0;
-  const cumPoints=sales.map(s=>{running+=s.profit;return running;});
-
-  // ── Profit by category (period-scoped) ──
-  const categoryProfit={};
+  // Insight: profit by category — which part types are actually worth buying
+  const categoryProfit = {};
   sales.forEach(s=>{
     const part=parts.find(p=>p.name===s.name);
     const cat=part?.category||"Other";
@@ -1066,123 +889,66 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
   const categoryRows=Object.entries(categoryProfit).sort((a,b)=>b[1].profit-a[1].profit);
   const maxCatProfit=Math.max(1,...categoryRows.map(([,v])=>Math.abs(v.profit)));
 
-  // ── CFO Insights — every line is derived from a real number above, never invented ──
-  const insights=[];
-  if(categoryRows.length>0){
-    const [topCat,topVal]=categoryRows[0];
-    const posTotal=categoryRows.reduce((s,[,v])=>s+Math.max(v.profit,0),0)||1;
-    const share=Math.round(Math.max(topVal.profit,0)/posTotal*100);
-    if(topVal.profit>0)insights.push(`${topCat} generates ${share}% of total profit — your strongest category.`);
-  }
-  if(avgDaysToSell!==null)insights.push(`Average sale completes in ${avgDaysToSell} day${avgDaysToSell===1?"":"s"} from purchase to sale.`);
-  if(parts.length>0){
-    const avgCost=totalCapitalAllTime/parts.length;
-    if(avgCost>0&&cashOnHand>0){
-      const buyingPower=Math.floor(cashOnHand/avgCost);
-      if(buyingPower>0)insights.push(`Current cash position supports ${buyingPower} more purchase${buyingPower===1?"":"s"} at your average part cost of ${fmt(Math.round(avgCost))}.`);
+  // Insight: cumulative profit sparkline over sale sequence
+  let running=0;
+  const cumPoints=sales.map(s=>{running+=s.profit;return running;});
+  const sparkMax=Math.max(1,...cumPoints.map(Math.abs));
+  const sparkPath=cumPoints.length>1?cumPoints.map((v,i)=>{
+    const x=(i/(cumPoints.length-1))*100;
+    const y=50-(v/sparkMax)*45;
+    return `${i===0?"M":"L"}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" "):"";
+
+  // Insight: average days held before sale — flags whether inventory is moving or going stale
+  const holdDurations=[];
+  parts.filter(p=>p.status==="sold").forEach(p=>{
+    const sale=sales.find(s=>s.partId===p.id)||sales.find(s=>s.name===p.name);
+    const bought=p.history?.[0]?.date;
+    if(sale&&bought){
+      const d1=new Date(bought).getTime(),d2=new Date(sale.date).getTime();
+      if(!isNaN(d1)&&!isNaN(d2)){
+        const days=Math.max(0,Math.round((d2-d1)/86400000));
+        holdDurations.push(days);
+      }
     }
-  }
-  if(lastMonthProfit!==0)insights.push(`Profit ${momGrowthPct>=0?"increased":"decreased"} ${pct(Math.abs(momGrowthPct))} vs. last month.`);
-  if(deadInventory.length>0)insights.push(`${deadInventory.length} item${deadInventory.length===1?"":"s"} worth ${fmt(deadInventoryValue)} has sat unsold for over ${DEAD_DAYS} days.`);
-  if(insights.length===0)insights.push("Record a few sales to unlock CFO-level insights on category performance, cash runway, and momentum.");
-
-  // ── Financial Health Score (0–100), weighted composite ──
-  const roiScore=Math.max(0,Math.min(roi/0.5,1));
-  const turnoverScore=Math.max(0,Math.min(inventoryTurnoverRate/2,1));
-  const cashScore=Math.max(0,Math.min(cashOnHand/14500,1));
-  const growthScore=Math.max(0,Math.min((momGrowthPct+0.5)/1,1));
-  const healthScore=Math.round(roiScore*25+turnoverScore*25+cashScore*25+growthScore*25);
-  const healthTier=healthScore>=90?{emoji:"🟢",label:"Excellent",color:"#34d399"}
-    :healthScore>=70?{emoji:"🟡",label:"Good",color:"#fbbf24"}
-    :{emoji:"🔴",label:"Needs Attention",color:"#f87171"};
-
-  // ── Recent transactions table (period-scoped, sortable) ──
-  const getDaysHeld=(sale)=>{
-    let boughtStr=null;
-    if(sale.partId){
-      boughtStr=parts.find(p=>p.id===sale.partId)?.history?.[0]?.date;
-    } else if(sale.buildId){
-      const build=builds.find(b=>b.id===sale.buildId);
-      const buildParts=build?parts.filter(p=>build.partIds.includes(p.id)):[];
-      const dates=buildParts.map(p=>parseDate(p.history?.[0]?.date)).filter(Boolean);
-      if(dates.length)boughtStr=new Date(Math.min(...dates)).toLocaleDateString("en-PH",{year:"numeric",month:"short",day:"numeric"});
-    }
-    if(!boughtStr)boughtStr=parts.find(p=>p.name===sale.name)?.history?.[0]?.date;
-    const d1=parseDate(boughtStr),d2=parseDate(sale.date);
-    return d1&&d2?Math.max(0,Math.round((d2-d1)/86400000)):null;
-  };
-  const txRows=sales.map(s=>({
-    id:s.id,name:s.name,cost:s.cost,salePrice:s.salePrice,profit:s.profit,
-    roi:s.cost>0?s.profit/s.cost:0,days:getDaysHeld(s),date:s.date,
-  }));
-  const sortedTx=[...txRows].sort((a,b)=>{
-    let av=a[sortKey],bv=b[sortKey];
-    if(sortKey==="name"){av=av||"";bv=bv||"";return sortDir==="asc"?av.localeCompare(bv):bv.localeCompare(av);}
-    if(sortKey==="date"){av=parseDate(av)?.getTime()||0;bv=parseDate(bv)?.getTime()||0;}
-    else{av=av??-Infinity;bv=bv??-Infinity;}
-    return sortDir==="asc"?av-bv:bv-av;
-  }).slice(0,12);
-  const toggleSort=(key)=>{
-    if(sortKey===key)setSortDir(d=>d==="asc"?"desc":"asc");
-    else{setSortKey(key);setSortDir("desc");}
-  };
-
-  const periodLabel=period==="month"?"this month":period==="quarter"?"this quarter":"all time";
+  });
+  const avgDaysToSell=holdDurations.length?Math.round(holdDurations.reduce((s,d)=>s+d,0)/holdDurations.length):null;
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
       {addingExpense&&<AddExpenseModal dispatch={dispatch} toast={toast} onClose={()=>setAddingExpense(false)}/>}
       {addingIncome&&<AddIncomeModal dispatch={dispatch} toast={toast} onClose={()=>setAddingIncome(false)}/>}
       {transferring&&<TransferModal dispatch={dispatch} toast={toast} onClose={()=>setTransferring(false)} businessCash={cashOnHand} personalCash={personalCash}/>}
-
-      {/* Header */}
-      <div style={{display:"flex",flexDirection:"column",gap:12}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10}}>
-          <div>
-            <h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Business Overview</h2>
-            <p style={{color:"#71717a",fontSize:12.5,margin:"4px 0 0"}}>Flow figures shown for {periodLabel} · balances as of today</p>
-          </div>
-          <div style={{display:"flex",gap:8}}>
-            <Btn small variant="ghost" onClick={()=>setTransferring(true)}>⇆ Transfer</Btn>
-            <Btn small variant="ghost" onClick={()=>setAddingIncome(true)}>+ Income</Btn>
-            <Btn small variant="ghost" onClick={()=>setAddingExpense(true)}>+ Expense</Btn>
-          </div>
+      
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div>
+          <h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Overview</h2>
+          <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>Live figures from your inventory.</p>
         </div>
-        <PeriodSwitch period={period} setPeriod={setPeriod}/>
+        <div style={{display:"flex", gap:8}}>
+          <Btn small variant="ghost" onClick={()=>setTransferring(true)}>⇆ Transfer</Btn>
+          <Btn small variant="ghost" onClick={()=>setAddingIncome(true)}>+ Income</Btn>
+          <Btn small variant="ghost" onClick={()=>setAddingExpense(true)}>+ Expense</Btn>
+        </div>
       </div>
 
-      {/* Net Worth Hero */}
-      <div style={{background:"linear-gradient(155deg,#111113 0%,#0a0a0c 100%)",border:"1px solid #27272a",borderRadius:16,padding:"22px 24px"}}>
-        <div style={{fontSize:10.5,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:600,marginBottom:8}}>Total Business Net Worth</div>
-        <div style={{fontSize:40,lineHeight:1}}><HeroNumber><AnimNum value={netWorth}/></HeroNumber></div>
-        <div style={{fontSize:11.5,color:"#52525b",marginTop:10}}>Business cash ({fmt(cashOnHand)}) + inventory at market value ({fmt(inventoryMarketValue)}) · excludes personal wallet</div>
-      </div>
-
-      {/* KPI Row */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10}}>
-        <KPICard label="Available Cash" value={fmt(cashOnHand)} color={isUnderCapital?"#f87171":"#38bdf8"} accent={isUnderCapital?"#7f1d1d":undefined}
-          question="Ready to deploy on new inventory"/>
-        <KPICard label="Inventory Value" value={fmt(inventoryMarketValue)} color="#a78bfa"
-          question="Current market value if sold today"/>
-        <KPICard label="Total Profit" value={`${totalProfit>=0?"+":""}${fmt(totalProfit)}`} color={totalProfit>=0?"#34d399":"#f87171"}
-          question={`Net earnings, ${periodLabel}`}/>
-        <KPICard label="ROI" value={pct(roi)} color={roi>=0?"#34d399":"#f87171"}
-          question={`Return on capital sold, ${periodLabel}`}/>
-      </div>
-
-      {/* Business Capital Overview (formerly "Liquidity") */}
+      {/* Liquidity Waterfall — paper profit can hide a cash crunch: you can show ₱50k profit
+          and still have ₱0 in your wallet if it's all sitting in unsold inventory. This makes
+          that visible at a glance. Kept alongside (not replacing) the profit/ROI stats below,
+          since those answer a different question — "am I profitable" vs "am I liquid" — and
+          both matter for a healthy flipping business. */}
       <Card>
-        <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:4}}>Business Capital Overview</div>
-        <div style={{fontSize:11,color:"#52525b",marginBottom:16}}>Where all-time capital actually sits right now</div>
+        <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:4}}>Liquidity</div>
+        <div style={{fontSize:11,color:"#52525b",marginBottom:16}}>Where your capital actually is right now</div>
         {(()=>{
-          const maxVal=Math.max(totalCapitalAllTime,atRisk,recoveredCostAllTime,1);
+          const maxVal=Math.max(totalCapital,atRisk,totalRevenue,1);
           const barH=v=>Math.max(4,Math.round((v/maxVal)*120));
           const bars=[
-            {label:"Deployed",sub:"ever spent buying",value:totalCapitalAllTime,color:"#38bdf8"},
+            {label:"Deployed",sub:"ever spent buying",value:totalCapital,color:"#ef4444"},
             {label:"Locked",sub:"sitting unsold",value:atRisk,color:"#f59e0b"},
-            {label:"Recovered",sub:"cost basis of sold items",value:recoveredCostAllTime,color:"#34d399"},
+            {label:"Recovered",sub:"cash back from sales",value:totalRevenue,color:"#22c55e"},
           ];
-          const lockedRatio=totalCapitalAllTime>0?atRisk/totalCapitalAllTime:0;
+          const lockedRatio=totalCapital>0?atRisk/totalCapital:0;
           return (
             <>
               <div style={{display:"flex",justifyContent:"space-around",alignItems:"flex-end",height:150,marginBottom:8}}>
@@ -1190,7 +956,7 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
                   <div key={b.label} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,width:"30%"}}>
                     <div style={{fontSize:12,fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(b.value)}</div>
                     <div style={{width:"100%",maxWidth:64,height:barH(b.value),background:b.color,borderRadius:"6px 6px 2px 2px",
-                      transition:"height 0.6s cubic-bezier(0.34,1.2,0.64,1)"}}/>
+                      transition:"height 0.6s cubic-bezier(0.34,1.2,0.64,1)",boxShadow:`0 0 14px ${b.color}55`}}/>
                   </div>
                 ))}
               </div>
@@ -1203,8 +969,8 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
                 ))}
               </div>
               {lockedRatio>0.5&&(
-                <div style={{background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.25)",borderRadius:9,padding:"9px 12px",fontSize:12,color:"#fbbf24"}}>
-                  {pct(lockedRatio)} of everything ever spent is still sitting unsold — consider moving inventory to free up cash.
+                <div style={{background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:9,padding:"9px 12px",fontSize:12,color:"#fbbf24"}}>
+                  ⚠️ {pct(lockedRatio)} of everything you've ever spent is still sitting unsold. Consider moving some inventory to free up cash.
                 </div>
               )}
             </>
@@ -1212,234 +978,92 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
         })()}
       </Card>
 
-      {/* Cash Flow */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12}}>
+        <StatBox label="Total Profit" value={fmt(totalProfit)} color={totalProfit>=0?"#34d399":"#f87171"} sub={`ROI ${pct(roi)}`}/>
+        <StatBox label="Total Revenue" value={fmt(totalRevenue)} color="#34d399"/>
+        <StatBox label="Capital at Risk" value={fmt(atRisk)} color="#f59e0b" sub="locked in unsold parts"/>
+        <StatBox label="Capital Recovered" value={fmt(recoveredCost)} sub={`${parts.length>0?Math.round(recoveredCost/totalCapital*100):0}% of total`}/>
+        {avgDaysToSell!==null&&<StatBox label="Avg. Days to Sell" value={`${avgDaysToSell}d`} color="#38bdf8" sub={`across ${holdDurations.length} sold part${holdDurations.length===1?"":"s"}`}/>}
+        {writeOffCount>0&&<StatBox label="Write-offs" value={fmt(-writeOffLoss)} color="#f87171" sub={`${writeOffCount} defective part${writeOffCount===1?"":"s"}`}/>}
+      </div>
+
+      {/* Capital at risk bar  (#6) */}
+      {totalCapital>0&&(
+        <Card>
+          <div style={{fontSize:11,color:"#71717a",marginBottom:8}}>CAPITAL RECOVERY</div>
+          <div style={{height:8,background:"#27272a",borderRadius:99,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${Math.min(recoveredCost/totalCapital*100,100)}%`,background:"linear-gradient(90deg,#7c3aed,#34d399)",borderRadius:99,transition:"width 0.8s cubic-bezier(0.34,1.2,0.64,1)"}}/>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:11,color:"#71717a"}}>
+            <span>Recovered {fmt(recoveredCost)}</span><span>Total {fmt(totalCapital)}</span>
+          </div>
+        </Card>
+      )}
+
+      {/* CORE VALUATION METRICS — answers the real question: "What's my actual liquid position right now?" */}
       <Card>
-        <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:2}}>Cash Flow</div>
-        <div style={{fontSize:11,color:"#52525b",marginBottom:16}}>Capital cycle, {periodLabel}</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:12,marginBottom:18}}>
-          <div><div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Money Invested</div><div style={{fontSize:15,fontWeight:700,color:"#38bdf8",fontFamily:"monospace"}}>{fmt(invested)}</div></div>
-          <div><div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Money Recovered</div><div style={{fontSize:15,fontWeight:700,color:"#34d399",fontFamily:"monospace"}}>{fmt(recovered)}</div></div>
-          <div><div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Net Profit</div><div style={{fontSize:15,fontWeight:700,color:totalProfit>=0?"#34d399":"#f87171",fontFamily:"monospace"}}>{totalProfit>=0?"+":""}{fmt(totalProfit)}</div></div>
-          <div><div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Cash Position</div><div style={{fontSize:15,fontWeight:700,color:"#fff",fontFamily:"monospace"}}>{fmt(cashOnHand)}</div></div>
-        </div>
-        <CapitalFlowDiagram invested={invested} inventoryVal={inventoryMarketValue} recovered={recovered} profit={totalProfit}/>
-
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:18,paddingTop:16,borderTop:"1px solid #1f1f23"}}>
-          <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:9,padding:11}}>
-            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Personal Wallet</div>
-            <div style={{fontSize:15,fontWeight:700,color:"#a78bfa",fontFamily:"monospace"}}>{fmt(personalCash)}</div>
-            <div style={{fontSize:9,color:"#52525b",marginTop:2}}>owner's pocket money — not business capital</div>
+        <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:14}}>Core Inventory & Cash Position</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12,marginBottom:14}}>
+          <div>
+            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Market Value (Inventory)</div>
+            <div style={{fontSize:16,fontWeight:700,color:"#d4d4d8",fontFamily:"monospace"}}>{fmt(inventoryMarketValue)}</div>
+            <div style={{fontSize:9,color:"#52525b",marginTop:2}}>unsold items @ current price</div>
           </div>
-          <div style={{background:fundsToRecover>0?"rgba(245,158,11,0.08)":"#09090b",border:`1px solid ${fundsToRecover>0?"rgba(245,158,11,0.25)":"#27272a"}`,borderRadius:9,padding:11}}>
-            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Funds to Recover</div>
-            <div style={{fontSize:15,fontWeight:700,color:fundsToRecover>0?"#fbbf24":"#71717a",fontFamily:"monospace"}}>{fmt(fundsToRecover)}</div>
-            <div style={{fontSize:9,color:"#52525b",marginTop:2}}>lifetime personal draws from the business</div>
+          <div>
+            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Cost Basis (Locked Capital)</div>
+            <div style={{fontSize:16,fontWeight:700,color:"#d4d4d8",fontFamily:"monospace"}}>{fmt(inventoryCost)}</div>
+            <div style={{fontSize:9,color:"#52525b",marginTop:2}}>what we spent</div>
+          </div>
+          <div>
+            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Recovered from Sales</div>
+            <div style={{fontSize:16,fontWeight:700,color:"#34d399",fontFamily:"monospace"}}>{fmt(recoveredCapital)}</div>
+            <div style={{fontSize:9,color:"#52525b",marginTop:2}}>cash actually collected</div>
+          </div>
+          <div style={{gridColumn:"1 / -1", display:"grid", gridTemplateColumns:"1fr 1fr", gap:12}}>
+            <div style={{background:isUnderCapital?"rgba(239,68,68,0.08)":"#09090b",border:`1px solid ${isUnderCapital?"#7f1d1d":"#27272a"}`,borderRadius:9,padding:11}}>
+              <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Business Wallet</div>
+              <div style={{fontSize:16,fontWeight:700,color:isUnderCapital?"#f87171":"#34d399",fontFamily:"monospace"}}>{fmt(cashOnHand)}</div>
+              <div style={{fontSize:9,color:"#52525b",marginTop:2}}>for parts & builds</div>
+            </div>
+            
+            <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:9,padding:11}}>
+              <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Personal Wallet</div>
+              <div style={{fontSize:16,fontWeight:700,color:"#38bdf8",fontFamily:"monospace"}}>{fmt(personalCash)}</div>
+              <div style={{fontSize:9,color:"#52525b",marginTop:2}}>your actual pocket money</div>
+            </div>
           </div>
         </div>
 
+        {/* Funds to Recover Alert */}
         {isUnderCapital&&(
-          <div style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:9,padding:12,marginTop:14}}>
+          <div style={{background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:9,padding:12}}>
             <div style={{display:"flex",alignItems:"flex-start",gap:9}}>
-              <span style={{fontSize:15}}>⚠️</span>
-              <div style={{color:"#d4d4d8",fontSize:12,lineHeight:1.5}}>
-                <strong style={{color:"#fca5a5"}}>Below target baseline.</strong> Cash on hand ({fmt(cashOnHand)}) is under the ₱14,500 war chest. Consider pausing purchases or raising prices until it recovers.
+              <span style={{fontSize:16}}>⚠️</span>
+              <div>
+                <div style={{color:"#fbbf24",fontWeight:600,fontSize:12,marginBottom:2}}>Below Target Baseline</div>
+                <div style={{color:"#d4d4d8",fontSize:11,lineHeight:1.4}}>
+                  Your liquid cash ({fmt(cashOnHand)}) has dropped below your ₱14,500 target.
+                  {fundsToRecover>0&&<div style={{marginTop:4}}>Personal draws to recover: <strong style={{color:"#fbbf24"}}>{fmt(fundsToRecover)}</strong></div>}
+                  Consider pausing new purchases or raising prices to rebuild your war chest.
+                </div>
               </div>
             </div>
           </div>
         )}
       </Card>
 
-      {/* Inventory Intelligence */}
-      <Card>
-        <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:2}}>Inventory Intelligence</div>
-        <div style={{fontSize:11,color:"#52525b",marginBottom:16}}>How efficiently stock is moving, as of today</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12}}>
-          {[
-            ["Available",available,"#34d399","ready to sell or build"],
-            ["In Builds",inBuild,"#38bdf8","allocated to active builds"],
-            ["Sold",soldCount,"#71717a","lifetime units moved"],
-            ["Avg. Days to Sell",avgDaysToSell!==null?`${avgDaysToSell}d`:"—","#a78bfa","purchase to sale, all-time"],
-            ["Turnover Rate",`${inventoryTurnoverRate.toFixed(2)}×`,"#38bdf8",`cost of goods sold ÷ current stock cost, ${periodLabel}`],
-            ["Cash Conversion",avgDaysToSell!==null?`~${avgDaysToSell}d`:"—","#a78bfa","≈ days to sell — cash purchases, cash sales"],
-          ].map(([l,v,c,sub])=>(
-            <div key={l}>
-              <div style={{fontSize:19,fontWeight:800,fontFamily:"monospace",color:c}}>{v}</div>
-              <div style={{fontSize:10,color:"#d4d4d8",fontWeight:600,marginTop:3}}>{l}</div>
-              <div style={{fontSize:9.5,color:"#52525b",marginTop:2,lineHeight:1.35}}>{sub}</div>
-            </div>
-          ))}
-        </div>
-        {deadInventory.length>0&&(
-          <div style={{background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.25)",borderRadius:9,padding:"10px 12px",marginTop:16}}>
-            <div style={{color:"#fbbf24",fontWeight:600,fontSize:12,marginBottom:2}}>⚠ Dead Inventory — {deadInventory.length} item{deadInventory.length===1?"":"s"} unsold {DEAD_DAYS}+ days</div>
-            <div style={{color:"#d4d4d8",fontSize:11.5}}>{fmt(deadInventoryValue)} in market value sitting idle. Consider a price cut or bundling to move it.</div>
-          </div>
-        )}
-        {writeOffCount>0&&(
-          <div style={{fontSize:11,color:"#71717a",marginTop:14,paddingTop:12,borderTop:"1px solid #1f1f23"}}>
-            {writeOffCount} write-off{writeOffCount===1?"":"s"} recorded · <span style={{color:"#f87171",fontFamily:"monospace"}}>{fmt(-writeOffLoss)}</span> lifetime loss
-          </div>
-        )}
-      </Card>
-
-      {/* Profit Analytics */}
-      <Card>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:2}}>
-          <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em"}}>Profit Analytics</div>
-          <div style={{fontSize:11,color:totalProfit>=0?"#34d399":"#f87171",fontFamily:"monospace"}}>{totalProfit>=0?"+":""}{fmt(totalProfit)} {periodLabel}</div>
-        </div>
-        <div style={{fontSize:11,color:"#52525b",marginBottom:12}}>Running profit across {sales.length} sale{sales.length===1?"":"s"} in the selected period</div>
-        {cumPoints.length>1
-          ? <ProfitAreaChart points={cumPoints} positive={totalProfit>=0}/>
-          : <div style={{fontSize:12,color:"#52525b",padding:"20px 0",textAlign:"center"}}>Need at least 2 sales in this period to plot a trend.</div>}
-
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginTop:20,paddingTop:16,borderTop:"1px solid #1f1f23"}}>
-          <div>
-            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Monthly Profit</div>
-            <div style={{fontSize:16,fontWeight:700,color:thisMonthProfit>=0?"#34d399":"#f87171",fontFamily:"monospace"}}>{thisMonthProfit>=0?"+":""}{fmt(thisMonthProfit)}</div>
-            <div style={{fontSize:9,color:"#52525b",marginTop:2}}>current calendar month, always</div>
-          </div>
-          <div>
-            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Best Month Ever</div>
-            <div style={{fontSize:16,fontWeight:700,color:"#34d399",fontFamily:"monospace"}}>{bestMonth?fmt(bestMonth.profit):"—"}</div>
-            <div style={{fontSize:9,color:"#52525b",marginTop:2}}>{bestMonth?bestMonth.label:"not enough data yet"}</div>
-          </div>
-          <div>
-            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Avg. Profit / Sale</div>
-            <div style={{fontSize:16,fontWeight:700,color:avgProfitPerSale>=0?"#34d399":"#f87171",fontFamily:"monospace"}}>{sales.length?`${avgProfitPerSale>=0?"+":""}${fmt(Math.round(avgProfitPerSale))}`:"—"}</div>
-            <div style={{fontSize:9,color:"#52525b",marginTop:2}}>{periodLabel}</div>
-          </div>
-          <div>
-            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Highest Profit Sale</div>
-            <div style={{fontSize:16,fontWeight:700,color:"#34d399",fontFamily:"monospace"}}>{highestProfitSale?`+${fmt(highestProfitSale.profit)}`:"—"}</div>
-            <div style={{fontSize:9,color:"#52525b",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{highestProfitSale?highestProfitSale.name:periodLabel}</div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Profit by Category */}
-      {categoryRows.length>0&&(
-        <Card>
-          <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:2}}>Profit by Category</div>
-          <div style={{fontSize:11,color:"#52525b",marginBottom:14}}>Which categories are actually worth buying, {periodLabel}</div>
-          <div style={{display:"flex",flexDirection:"column",gap:11}}>
-            {categoryRows.map(([cat,v])=>{
-              const w=Math.abs(v.profit)/maxCatProfit*100;
-              const positive=v.profit>=0;
-              return (
-                <div key={cat}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                    <span style={{fontSize:12,color:"#d4d4d8"}}>{cat} <span style={{color:"#52525b"}}>({v.count} sold)</span></span>
-                    <span style={{fontSize:12,fontFamily:"monospace",fontWeight:700,color:positive?"#34d399":"#f87171"}}>{positive?"+":""}{fmt(v.profit)}</span>
-                  </div>
-                  <div style={{height:5,background:"#1f1f23",borderRadius:99}}>
-                    <div style={{height:"100%",width:`${w}%`,background:positive?"#34d399":"#f87171",borderRadius:99,transition:"width 0.7s cubic-bezier(0.34,1.2,0.64,1)"}}/>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      )}
-
-      {/* CFO Insights */}
-      <Card style={{background:"linear-gradient(155deg,#151318 0%,#111113 100%)",border:"1px solid #2d2438"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
-          <span style={{fontSize:15}}>💼</span>
-          <div style={{fontSize:11,color:"#a78bfa",textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:700}}>CFO Insights</div>
-        </div>
-        <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {insights.slice(0,5).map((line,i)=>(
-            <div key={i} style={{display:"flex",gap:9,alignItems:"flex-start"}}>
-              <span style={{color:"#a78bfa",fontSize:13,lineHeight:1.5}}>·</span>
-              <span style={{fontSize:12.5,color:"#d4d4d8",lineHeight:1.55}}>{line}</span>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Financial Health Score */}
-      <Card>
-        <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:16}}>Financial Health Score</div>
-        <HealthScoreRing score={healthScore} tier={healthTier}/>
-      </Card>
-
-      {/* Recent Transactions — sortable */}
-      {sortedTx.length>0&&(
-        <Card style={{padding:0,overflow:"hidden"}}>
-          <div style={{padding:"16px 18px 4px"}}>
-            <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em"}}>Recent Transactions</div>
-            <div style={{fontSize:11,color:"#52525b",marginTop:2}}>{periodLabel} · tap a column to sort</div>
-          </div>
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5,minWidth:520}}>
-              <thead>
-                <tr style={{borderBottom:"1px solid #27272a"}}>
-                  <SortHeader label="Product" active={sortKey==="name"} dir={sortDir} onClick={()=>toggleSort("name")}/>
-                  <SortHeader label="Buy" active={sortKey==="cost"} dir={sortDir} onClick={()=>toggleSort("cost")} align="right"/>
-                  <SortHeader label="Sale" active={sortKey==="salePrice"} dir={sortDir} onClick={()=>toggleSort("salePrice")} align="right"/>
-                  <SortHeader label="Profit" active={sortKey==="profit"} dir={sortDir} onClick={()=>toggleSort("profit")} align="right"/>
-                  <SortHeader label="ROI" active={sortKey==="roi"} dir={sortDir} onClick={()=>toggleSort("roi")} align="right"/>
-                  <SortHeader label="Held" active={sortKey==="days"} dir={sortDir} onClick={()=>toggleSort("days")} align="right"/>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedTx.map(r=>(
-                  <tr key={r.id} style={{borderBottom:"1px solid #1a1a1d"}}>
-                    <td style={{padding:"9px 10px",color:"#d4d4d8",maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name}</td>
-                    <td style={{padding:"9px 10px",textAlign:"right",color:"#a1a1aa",fontFamily:"monospace"}}>{fmt(r.cost)}</td>
-                    <td style={{padding:"9px 10px",textAlign:"right",color:"#d4d4d8",fontFamily:"monospace"}}>{fmt(r.salePrice)}</td>
-                    <td style={{padding:"9px 10px",textAlign:"right",color:r.profit>=0?"#34d399":"#f87171",fontFamily:"monospace",fontWeight:700}}>{r.profit>=0?"+":""}{fmt(r.profit)}</td>
-                    <td style={{padding:"9px 10px",textAlign:"right",color:r.roi>=0?"#34d399":"#f87171",fontFamily:"monospace"}}>{pct(r.roi)}</td>
-                    <td style={{padding:"9px 10px",textAlign:"right",color:"#71717a",fontFamily:"monospace"}}>{r.days!==null?`${r.days}d`:"—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-
-      {/* Bundle Recovery */}
-      {bundles.length>0&&(()=>{
-        const bundlePnl=bundles.map(b=>{
-          const bParts=parts.filter(p=>p.bundleId===b.id);
-          const soldParts=bParts.filter(p=>p.status==="sold");
-          const unsoldParts=bParts.filter(p=>p.status!=="sold");
-          const recoveredAmt=soldParts.reduce((s,p)=>{
-            const sale=allSales.find(s=>s.partId===p.id)||allSales.find(s=>s.name===p.name);
-            return s+(sale?sale.salePrice:0);
-          },0);
-          const unsoldMarket=unsoldParts.reduce((s,p)=>s+p.marketValue,0);
-          return {...b,bParts,soldParts,unsoldParts,recoveredAmt,unsoldMarket};
-        });
-        return (
-          <Card>
-            <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:14}}>Bundle Recovery</div>
-            <div style={{display:"flex",flexDirection:"column",gap:12}}>
-              {bundlePnl.map(b=>{
-                const recPct=b.purchasePrice>0?Math.min(b.recoveredAmt/b.purchasePrice*100,100):0;
-                return (
-                  <div key={b.id}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-                      <span style={{fontSize:13,color:"#d4d4d8",fontWeight:500}}>{b.name}</span>
-                      <span style={{fontSize:12,color:"#71717a",fontFamily:"monospace"}}>{fmt(b.recoveredAmt)} / {fmt(b.purchasePrice)}</span>
-                    </div>
-                    <div style={{height:5,background:"#1f1f23",borderRadius:99}}>
-                      <div style={{height:"100%",width:`${recPct}%`,background:recPct>=100?"#34d399":"#7c3aed",borderRadius:99,transition:"width 0.8s ease"}}/>
-                    </div>
-                    <div style={{fontSize:10,color:"#52525b",marginTop:3}}>
-                      {b.soldParts.length}/{b.bParts.length} parts sold · {b.unsoldParts.length} remaining ~{fmt(b.unsoldMarket)} market
-                    </div>
-                  </div>
-                );
-              })}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+        {[["Available","#34d399",available],["In Builds","#38bdf8",inBuild],["Sold","#71717a",sold]].map(([l,c,v])=>(
+          <Card key={l}>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:30,fontWeight:800,color:c,fontFamily:"monospace"}}><AnimNum value={v}/></div>
+              <div style={{fontSize:10,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginTop:4}}>{l}</div>
             </div>
           </Card>
-        );
-      })()}
+        ))}
+      </div>
 
-      {/* Quick Notes */}
+      {/* Quick Notes — jotted from the floating [+] button's Note action */}
       {(state.quickNotes||[]).length>0&&(
         <Card>
           <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>Quick Notes</div>
@@ -1455,6 +1079,95 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
                   style={{background:"none",border:"none",color:"#52525b",cursor:"pointer",fontSize:14,padding:"2px 4px",flexShrink:0}}>✕</button>
               </div>
             ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Insight: cumulative profit sparkline */}
+      {cumPoints.length>1&&(
+        <Card>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
+            <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em"}}>Profit Trend</div>
+            <div style={{fontSize:11,color:totalProfit>=0?"#34d399":"#f87171",fontFamily:"monospace"}}>{totalProfit>=0?"+":""}{fmt(totalProfit)} all-time</div>
+          </div>
+          <svg viewBox="0 0 100 50" style={{width:"100%",height:60,display:"block"}} preserveAspectRatio="none">
+            <line x1="0" y1="25" x2="100" y2="25" stroke="#27272a" strokeWidth="0.5"/>
+            <path d={sparkPath} fill="none" stroke={totalProfit>=0?"#34d399":"#f87171"} strokeWidth="2" vectorEffect="non-scaling-stroke"
+              style={{filter:`drop-shadow(0 0 4px ${totalProfit>=0?"rgba(52,211,153,0.4)":"rgba(248,113,113,0.4)"})`}}/>
+          </svg>
+          <div style={{fontSize:10,color:"#52525b",marginTop:2}}>Running profit across {sales.length} sale{sales.length===1?"":"s"}, in order</div>
+        </Card>
+      )}
+
+      {/* Insight: profit by category */}
+      {categoryRows.length>0&&(
+        <Card>
+          <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:14}}>Most Profitable Categories</div>
+          <div style={{display:"flex",flexDirection:"column",gap:11}}>
+            {categoryRows.map(([cat,v])=>{
+              const w=Math.abs(v.profit)/maxCatProfit*100;
+              const positive=v.profit>=0;
+              return (
+                <div key={cat}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                    <span style={{fontSize:12,color:"#d4d4d8"}}>{cat} <span style={{color:"#52525b"}}>({v.count} sold)</span></span>
+                    <span style={{fontSize:12,fontFamily:"monospace",fontWeight:700,color:positive?"#34d399":"#f87171"}}>{positive?"+":""}{fmt(v.profit)}</span>
+                  </div>
+                  <div style={{height:5,background:"#27272a",borderRadius:99}}>
+                    <div style={{height:"100%",width:`${w}%`,background:positive?"#22c55e":"#ef4444",borderRadius:99,transition:"width 0.7s cubic-bezier(0.34,1.2,0.64,1)"}}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {/* Bundle P&L  (#7) */}
+      {bundlePnl.length>0&&(
+        <Card>
+          <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:14}}>Bundle Recovery</div>
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {bundlePnl.map(b=>{
+              const recPct=b.purchasePrice>0?Math.min(b.recovered/b.purchasePrice*100,100):0;
+              return (
+                <div key={b.id}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                    <span style={{fontSize:13,color:"#d4d4d8",fontWeight:500}}>{b.name}</span>
+                    <span style={{fontSize:12,color:"#71717a",fontFamily:"monospace"}}>{fmt(b.recovered)} / {fmt(b.purchasePrice)}</span>
+                  </div>
+                  <div style={{height:5,background:"#27272a",borderRadius:99}}>
+                    <div style={{height:"100%",width:`${recPct}%`,background:recPct>=100?"#22c55e":"#7c3aed",borderRadius:99,transition:"width 0.8s ease"}}/>
+                  </div>
+                  <div style={{fontSize:10,color:"#52525b",marginTop:3}}>
+                    {b.soldParts.length}/{b.bParts.length} parts sold · {b.unsoldParts.length} remaining ~{fmt(b.unsoldMarket)} market
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {recentSales.length>0&&(
+        <Card>
+          <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>Recent Sales</div>
+          <div style={{display:"flex",flexDirection:"column",gap:11}}>
+            {recentSales.map(s=>{
+              const profit=s.salePrice-s.cost;
+              return (
+                <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div>
+                    <div style={{color:"#fff",fontSize:13,fontWeight:500}}>{s.name}</div>
+                    <div style={{color:"#71717a",fontSize:10}}>{s.date}{s.buyerName?` · ${s.buyerName}`:""}</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontFamily:"monospace",fontSize:13,color:"#fff"}}>{fmt(s.salePrice)}</div>
+                    <div style={{fontFamily:"monospace",fontSize:11,color:profit>=0?"#34d399":"#f87171"}}>{profit>=0?"+":""}{fmt(profit)}</div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}
