@@ -20,6 +20,7 @@ function domainOf(category, customCategories){
   const custom=customCategories?.find(c=>c.name===category);
   return custom?custom.domain:"pc_part"; // safe default — never silently misfile into General Assets
 }
+const TABS = ["Dashboard","Buy","Inventory","Builds","Sell","History"];
 const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ targetMargin:30 }, customCategories:[], quickNotes:[], businessCash:14500, personalCash:0, expenses:[], transactions:[] };
 
 /* ═══════════════════════════════════════════
@@ -37,13 +38,7 @@ function reducer(state, action) {
     }
     case "ADD_PARTS": {
       const totalCost=action.parts.reduce((s,p)=>s+(p.allocatedCost||0),0);
-      // Quantity purchases (e.g. buying 3 identical RAM sticks) create N parts with the same
-      // name — say "Bought 3× RAM Stick" instead of the generic "Bought 3 items" when that's
-      // what actually happened, since it reads much clearer in the Cash Ledger.
-      const allSameName=action.parts.length>1&&action.parts.every(p=>p.name===action.parts[0].name);
-      const partDesc=action.parts.length===1?`Bought ${action.parts[0].name}`
-        :allSameName?`Bought ${action.parts.length}× ${action.parts[0].name}`
-        :`Bought ${action.parts.length} items`;
+      const partDesc=action.parts.length===1?`Bought ${action.parts[0].name}`:`Bought ${action.parts.length} items`;
       const purchaseTxn={id:uid(),type:"PURCHASE",amount:totalCost,description:partDesc,wallet:"business",date:today()};
       return {...state, parts:[...state.parts,...action.parts],
         businessCash:(state.businessCash||0)-totalCost, // cash out for purchases
@@ -57,18 +52,8 @@ function reducer(state, action) {
     }
     case "CREATE_BUILD": {
       const {build} = action;
-      // Defense in depth: only ever claim parts that are truly available right now. The UI
-      // picker already filters to status==="available", but the reducer shouldn't blindly
-      // trust whatever partIds it's handed — if a part is already sold or claimed by another
-      // build, silently exclude it here rather than letting two builds reference the same part.
-      const validPartIds = build.partIds.filter(id => {
-        const p = state.parts.find(pp => pp.id === id);
-        return p && p.status === "available";
-      });
-      if (validPartIds.length === 0) return state; // nothing valid to build with — no-op
-      const safeBuild = { ...build, partIds: validPartIds };
-      return {...state, builds:[...state.builds,safeBuild],
-        parts: state.parts.map(p => validPartIds.includes(p.id)
+      return {...state, builds:[...state.builds,build],
+        parts: state.parts.map(p => build.partIds.includes(p.id)
           ? {...p,status:"in_build",history:[...p.history,{date:today(),event:`Added to build: ${build.name}`}]}
           : p
         )};
@@ -182,32 +167,17 @@ function reducer(state, action) {
     // Reverses a completed sale: removes it from active totals (soft-deleted, not erased — kept
     // for the "Returned sales" filter), and returns the part(s)/build back to available inventory.
     case "UNDO_SALE": {
-      const {saleId,reason,buildDisposition}=action; // buildDisposition: "reactivate" | "disassemble" — only meaningful when sale.buildId is set
+      const {saleId,reason}=action;
       const sale=state.sales.find(s=>s.id===saleId);
       if(!sale)return state;
       let parts=state.parts;
       let builds=state.builds;
       if(sale.buildId){
         const build=state.builds.find(b=>b.id===sale.buildId);
-        const disposition=buildDisposition||"disassemble"; // safe default: fully free the parts rather than silently resurrect a sellable build
-        if(disposition==="reactivate"){
-          // The assembled PC itself came back (e.g. buyer returned it) — keep it as one sellable
-          // unit again. Parts go to "in_build", NOT "available" — this is what stops them from
-          // being cherry-picked into a different build while this one still claims them.
-          builds=state.builds.map(b=>b.id===sale.buildId?{...b,sold:false}:b);
-          parts=state.parts.map(p=>build?.partIds.includes(p.id)
-            ? {...p,status:"in_build",soldTo:"",history:[...p.history,{date:today(),event:`Sale undone (${reason}) — build "${build.name}" reactivated`}]}
-            : p);
-        } else {
-          // Disassemble — permanently break the build apart. Marking dissolved:true (not just
-          // sold:false) is the actual fix: a build that's merely "unsold" but still intact would
-          // keep claiming these same partIds while they're free to be picked into a new build —
-          // exactly the bug where one part ends up used on two different builds.
-          builds=state.builds.map(b=>b.id===sale.buildId?{...b,sold:false,dissolved:true}:b);
-          parts=state.parts.map(p=>build?.partIds.includes(p.id)
-            ? {...p,status:"available",soldTo:"",history:[...p.history,{date:today(),event:`Sale undone (${reason}) — build disassembled, returned to inventory`}]}
-            : p);
-        }
+        builds=state.builds.map(b=>b.id===sale.buildId?{...b,sold:false}:b);
+        parts=state.parts.map(p=>build?.partIds.includes(p.id)
+          ? {...p,status:"available",soldTo:"",history:[...p.history,{date:today(),event:`Sale undone (${reason}) — returned to inventory`}]}
+          : p);
       } else if(sale.partId){
         parts=state.parts.map(p=>p.id===sale.partId
           ? {...p,status:"available",soldTo:"",history:[...p.history,{date:today(),event:`Sale undone (${reason}) — returned to inventory`}]}
@@ -234,7 +204,7 @@ function reducer(state, action) {
     // Soft-deletes a sale record. mode "record-only" just hides it from active lists (kept for
     // the "Deleted records" filter). mode "undo-and-return" also reverses the sale like UNDO_SALE.
     case "DELETE_SALE": {
-      const {saleId,mode,buildDisposition}=action; // buildDisposition: "reactivate" | "disassemble" — only meaningful when sale.buildId is set
+      const {saleId,mode}=action;
       const sale=state.sales.find(s=>s.id===saleId);
       if(!sale)return state;
       let parts=state.parts;
@@ -244,18 +214,10 @@ function reducer(state, action) {
       if(mode==="undo-and-return"){
         if(sale.buildId){
           const build=state.builds.find(b=>b.id===sale.buildId);
-          const disposition=buildDisposition||"disassemble"; // safe default, matches UNDO_SALE
-          if(disposition==="reactivate"){
-            builds=state.builds.map(b=>b.id===sale.buildId?{...b,sold:false}:b);
-            parts=state.parts.map(p=>build?.partIds.includes(p.id)
-              ? {...p,status:"in_build",soldTo:"",history:[...p.history,{date:today(),event:`Sale record deleted — build "${build.name}" reactivated`}]}
-              : p);
-          } else {
-            builds=state.builds.map(b=>b.id===sale.buildId?{...b,sold:false,dissolved:true}:b);
-            parts=state.parts.map(p=>build?.partIds.includes(p.id)
-              ? {...p,status:"available",soldTo:"",history:[...p.history,{date:today(),event:"Sale record deleted — build disassembled, returned to inventory"}]}
-              : p);
-          }
+          builds=state.builds.map(b=>b.id===sale.buildId?{...b,sold:false}:b);
+          parts=state.parts.map(p=>build?.partIds.includes(p.id)
+            ? {...p,status:"available",soldTo:"",history:[...p.history,{date:today(),event:"Sale record deleted — returned to inventory"}]}
+            : p);
         } else if(sale.partId){
           parts=state.parts.map(p=>p.id===sale.partId
             ? {...p,status:"available",soldTo:"",history:[...p.history,{date:today(),event:"Sale record deleted — returned to inventory"}]}
@@ -1522,7 +1484,6 @@ function Buy({state,dispatch,toast}) {
   const [singleCat,setSingleCat]=useState("GPU");
   const [singleCost,setSingleCost]=useState("");
   const [singleMarket,setSingleMarket]=useState("");
-  const [singleQty,setSingleQty]=useState("1");
   const [singleNotes,setSingleNotes]=useState("");
   const [singlePhoto,setSinglePhoto]=useState({photoUrl:"",photoRecordId:""});
   const [loading,setLoading]=useState(false);
@@ -1577,19 +1538,12 @@ function Buy({state,dispatch,toast}) {
     setTimeout(()=>{
       const cost=parseFloat(singleCost);
       const market=parseFloat(singleMarket)||cost;
-      const qty=Math.max(1,parseInt(singleQty,10)||1);
-      // Quantity creates N independent part records (each with its own id/status/history) rather
-      // than a shared "count" field — every other part of the app (Inventory, Builds picker, Sell,
-      // History) already works in terms of one trackable item per status, so N separate records is
-      // what lets each unit be individually put in a build, sold, or marked defective on its own.
-      const newParts=Array.from({length:qty},()=>({
-        id:uid(),name:singleName,category:singleCat,marketValue:market,
+      dispatch({type:"ADD_PARTS",parts:[{id:uid(),name:singleName,category:singleCat,marketValue:market,
         allocatedCost:cost,source:"Direct purchase",bundleId:null,status:"available",notes:singleNotes,soldTo:"",
         photoUrl:singlePhoto.photoUrl,photoRecordId:singlePhoto.photoRecordId,
-        history:[{date:today(),event:`Bought for ${fmt(cost)}`}]}));
-      dispatch({type:"ADD_PARTS",parts:newParts});
-      toast(qty>1?`${qty}× ${singleName} added ✓`:`${singleName} added ✓`);
-      setSingleName("");setSingleCost("");setSingleMarket("");setSingleQty("1");setSingleNotes("");setSingleCat("GPU");
+        history:[{date:today(),event:`Bought for ${fmt(cost)}`}]}]});
+      toast(`${singleName} added ✓`);
+      setSingleName("");setSingleCost("");setSingleMarket("");setSingleNotes("");setSingleCat("GPU");
       setSinglePhoto({photoUrl:"",photoRecordId:""});
       setLoading(false);
     },300);
@@ -1673,22 +1627,14 @@ function Buy({state,dispatch,toast}) {
           <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             <Inp label="Part name" value={singleName} onChange={e=>setSingleName(e.target.value)} placeholder="GTX 1060 6GB"/>
             <CategoryPicker label="Category" value={singleCat} onChange={setSingleCat} customCategories={state.customCategories} dispatch={dispatch}/>
-            <Inp label="Cost (₱, per unit)" type="number" value={singleCost} onChange={e=>setSingleCost(e.target.value)} placeholder="3000"/>
-            <Inp label="Market value (₱, per unit, optional)" type="number" value={singleMarket} onChange={e=>setSingleMarket(e.target.value)} placeholder="3500"/>
-            <Inp label="Quantity" type="number" min="1" value={singleQty} onChange={e=>setSingleQty(e.target.value)} placeholder="1"/>
+            <Inp label="Cost (₱)" type="number" value={singleCost} onChange={e=>setSingleCost(e.target.value)} placeholder="3000"/>
+            <Inp label="Market value (₱, optional)" type="number" value={singleMarket} onChange={e=>setSingleMarket(e.target.value)} placeholder="3500"/>
           </div>
-          {parseInt(singleQty,10)>1&&singleCost&&(
-            <div style={{marginTop:10,background:"#09090b",border:"1px solid #27272a",borderRadius:9,padding:"9px 12px",
-              display:"flex",justifyContent:"space-between",fontSize:12}}>
-              <span style={{color:"#a1a1aa"}}>{Math.max(1,parseInt(singleQty,10)||1)} units × {fmt(parseFloat(singleCost)||0)}</span>
-              <span style={{fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt((Math.max(1,parseInt(singleQty,10)||1))*(parseFloat(singleCost)||0))} total</span>
-            </div>
-          )}
           {/* Notes field  (#3) */}
           <div style={{marginTop:12}}>
             <Inp label="Notes — condition, extras, observations" value={singleNotes} onChange={e=>setSingleNotes(e.target.value)} placeholder="Tested working. Includes original box."/>
           </div>
-          <div style={{marginTop:14}}><Btn loading={loading} onClick={submitSingle} disabled={!singleName||!singleCost} style={{width:"100%"}}>{parseInt(singleQty,10)>1?`Add ${Math.max(1,parseInt(singleQty,10)||1)} to Inventory`:"Add to Inventory"}</Btn></div>
+          <div style={{marginTop:14}}><Btn loading={loading} onClick={submitSingle} disabled={!singleName||!singleCost} style={{width:"100%"}}>Add to Inventory</Btn></div>
         </Card>
       )}
     </div>
@@ -2537,11 +2483,9 @@ function History({state,dispatch,toast,openLightbox}) {
   const bestCategory=Object.entries(catTotals).sort((a,b)=>b[1]-a[1])[0];
   const bestItem=[...activeSales].sort((a,b)=>b.profit-a.profit)[0];
 
-  const undoSale=(reason,buildDisposition)=>{
-    dispatch({type:"UNDO_SALE",saleId:undoingSale.id,reason,buildDisposition});
-    toast(buildDisposition==="reactivate"
-      ? `"${undoingSale.name}" sale undone — build reactivated`
-      : `"${undoingSale.name}" sale undone — returned to inventory`,"warn");
+  const undoSale=(reason)=>{
+    dispatch({type:"UNDO_SALE",saleId:undoingSale.id,reason});
+    toast(`"${undoingSale.name}" sale undone — returned to inventory`,"warn");
     setUndoingSale(null);setViewingSale(null);
   };
 
@@ -2557,17 +2501,9 @@ function History({state,dispatch,toast,openLightbox}) {
     setDeletingSale(null);setViewingSale(null);
   };
 
-  // For part sales there's no ambiguity — always disassemble-equivalent (the single item just
-  // goes back to available). For build sales, this is used by the "Disassemble" choice.
-  const deleteAndReturnDisassemble=()=>{
-    dispatch({type:"DELETE_SALE",saleId:deletingSale.id,mode:"undo-and-return",buildDisposition:"disassemble"});
+  const deleteAndReturn=()=>{
+    dispatch({type:"DELETE_SALE",saleId:deletingSale.id,mode:"undo-and-return"});
     toast("Transaction deleted — item returned to inventory","warn");
-    setDeletingSale(null);setViewingSale(null);
-  };
-
-  const deleteAndReactivateBuild=()=>{
-    dispatch({type:"DELETE_SALE",saleId:deletingSale.id,mode:"undo-and-return",buildDisposition:"reactivate"});
-    toast("Transaction deleted — build reactivated and sellable again","warn");
     setDeletingSale(null);setViewingSale(null);
   };
 
@@ -2599,17 +2535,11 @@ function History({state,dispatch,toast,openLightbox}) {
       {editingSale&&<EditSaleModal sale={editingSale} onClose={()=>setEditingSale(null)} onSave={saveEdit}/>}
       {undoingSale&&<ReturnReasonModal title="Undo this sale?" sale={undoingSale} onConfirm={undoSale} onCancel={()=>setUndoingSale(null)}/>}
       {deletingSale&&(
-        <ConfirmModal title="Delete this transaction?" message={deletingSale.buildId
-            ? `"${deletingSale.name}" was sold as a build. What should happen to it?`
-            : `What should happen to "${deletingSale.name}"?`}
+        <ConfirmModal title="Delete this transaction?" message={`What should happen to "${deletingSale.name}"?`}
           onCancel={()=>setDeletingSale(null)}
-          extraChoices={deletingSale.buildId?[
+          extraChoices={[
             {label:"Delete record only (item stays sold)",onClick:deleteRecordOnly,variant:"warn"},
-            {label:"Delete & put build back in Builds",onClick:deleteAndReactivateBuild,variant:"success"},
-            {label:"Delete & disassemble into inventory",onClick:deleteAndReturnDisassemble,variant:"success"},
-          ]:[
-            {label:"Delete record only (item stays sold)",onClick:deleteRecordOnly,variant:"warn"},
-            {label:"Delete & return item to inventory",onClick:deleteAndReturnDisassemble,variant:"success"},
+            {label:"Delete & return item to inventory",onClick:deleteAndReturn,variant:"success"},
           ]}/>
       )}
 
@@ -2882,18 +2812,12 @@ function EditSaleModal({sale,onClose,onSave}) {
 function ReturnReasonModal({title,sale,onConfirm,onCancel}) {
   const [reason,setReason]=useState("Buyer cancelled");
   const [other,setOther]=useState("");
-  const [buildDisposition,setBuildDisposition]=useState("reactivate"); // only asked when sale.buildId is set
   const reasons=["Buyer cancelled","Product returned","Incorrect sale entry","Other"];
-  const isBuildSale=!!sale.buildId;
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onCancel}>
       <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
         <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:6}}>{title}</div>
-        <div style={{fontSize:13,color:"#a1a1aa",marginBottom:16}}>
-          {isBuildSale
-            ? `"${sale.name}" was sold as a build. The sale and profit/loss will be reversed either way — choose what happens to the build below.`
-            : `"${sale.name}" will be returned to inventory and the profit/loss reversed.`}
-        </div>
+        <div style={{fontSize:13,color:"#a1a1aa",marginBottom:16}}>"{sale.name}" will be returned to inventory and the profit/loss reversed.</div>
         <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:14}}>
           {reasons.map(r=>(
             <label key={r} style={{display:"flex",alignItems:"center",gap:9,cursor:"pointer",padding:"7px 10px",borderRadius:8,
@@ -2904,33 +2828,8 @@ function ReturnReasonModal({title,sale,onConfirm,onCancel}) {
           ))}
         </div>
         {reason==="Other"&&<Inp label="Specify reason" value={other} onChange={e=>setOther(e.target.value)} placeholder="What happened?"/>}
-
-        {isBuildSale&&(
-          <div style={{marginTop:14}}>
-            <div style={{fontSize:12,color:"#a1a1aa",marginBottom:7}}>What should happen to the build?</div>
-            <div style={{display:"flex",flexDirection:"column",gap:7}}>
-              <label style={{display:"flex",alignItems:"flex-start",gap:9,cursor:"pointer",padding:"9px 10px",borderRadius:8,
-                border:`1px solid ${buildDisposition==="reactivate"?"#7c3aed":"#27272a"}`,background:buildDisposition==="reactivate"?"rgba(124,58,237,0.1)":"transparent"}}>
-                <input type="radio" checked={buildDisposition==="reactivate"} onChange={()=>setBuildDisposition("reactivate")} style={{accentColor:"#7c3aed",marginTop:2}}/>
-                <span>
-                  <span style={{color:"#fff",fontSize:13,display:"block"}}>Put it back in Builds</span>
-                  <span style={{color:"#71717a",fontSize:11}}>The PC is still assembled — make it sellable again as one unit.</span>
-                </span>
-              </label>
-              <label style={{display:"flex",alignItems:"flex-start",gap:9,cursor:"pointer",padding:"9px 10px",borderRadius:8,
-                border:`1px solid ${buildDisposition==="disassemble"?"#7c3aed":"#27272a"}`,background:buildDisposition==="disassemble"?"rgba(124,58,237,0.1)":"transparent"}}>
-                <input type="radio" checked={buildDisposition==="disassemble"} onChange={()=>setBuildDisposition("disassemble")} style={{accentColor:"#7c3aed",marginTop:2}}/>
-                <span>
-                  <span style={{color:"#fff",fontSize:13,display:"block"}}>Disassemble into Inventory</span>
-                  <span style={{color:"#71717a",fontSize:11}}>Break the build apart — each part becomes individually available.</span>
-                </span>
-              </label>
-            </div>
-          </div>
-        )}
-
         <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:14}}>
-          <Btn variant="warn" onClick={()=>onConfirm(reason==="Other"?(other||"Other"):reason,isBuildSale?buildDisposition:undefined)} style={{width:"100%"}}>Confirm Undo</Btn>
+          <Btn variant="warn" onClick={()=>onConfirm(reason==="Other"?(other||"Other"):reason)} style={{width:"100%"}}>Confirm Undo</Btn>
           <Btn variant="ghost" onClick={onCancel} style={{width:"100%"}}>Cancel</Btn>
         </div>
       </div>
@@ -3060,17 +2959,14 @@ function QuickBuyModal({state,dispatch,toast,onClose}) {
   const [name,setName]=useState("");
   const [cat,setCat]=useState("Other");
   const [cost,setCost]=useState("");
-  const [qty,setQty]=useState("1");
 
   const submit=()=>{
     if(!name||!cost){toast("Enter a name and cost","error");return;}
     const c=parseFloat(cost);
-    const n=Math.max(1,parseInt(qty,10)||1);
-    const newParts=Array.from({length:n},()=>({id:uid(),name,category:cat,marketValue:c,allocatedCost:c,
+    dispatch({type:"ADD_PARTS",parts:[{id:uid(),name,category:cat,marketValue:c,allocatedCost:c,
       source:"Quick Buy",bundleId:null,status:"available",notes:"",soldTo:"",photoUrl:"",photoRecordId:"",
-      history:[{date:today(),event:`Quick Buy — bought for ${fmt(c)}`}]}));
-    dispatch({type:"ADD_PARTS",parts:newParts});
-    toast(n>1?`${n}× ${name} added ✓ — add photos/details later via Edit`:`${name} added ✓ — add photos/details later via Edit`);
+      history:[{date:today(),event:`Quick Buy — bought for ${fmt(c)}`}]}]});
+    toast(`${name} added ✓ — add photos/details later via Edit`);
     onClose();
   };
 
@@ -3082,12 +2978,9 @@ function QuickBuyModal({state,dispatch,toast,onClose}) {
         <div style={{display:"flex",flexDirection:"column",gap:11}}>
           <Inp label="Name" value={name} onChange={e=>setName(e.target.value)} placeholder="RX 580"/>
           <CategoryPicker label="Category" value={cat} onChange={setCat} customCategories={state.customCategories} dispatch={dispatch}/>
-          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:10}}>
-            <Inp label="Cost (₱, per unit)" type="number" value={cost} onChange={e=>setCost(e.target.value)} placeholder="3000"/>
-            <Inp label="Qty" type="number" min="1" value={qty} onChange={e=>setQty(e.target.value)} placeholder="1"/>
-          </div>
+          <Inp label="Cost (₱)" type="number" value={cost} onChange={e=>setCost(e.target.value)} placeholder="3000"/>
           <div style={{display:"flex",gap:8,marginTop:4}}>
-            <Btn onClick={submit} style={{flex:1}}>{parseInt(qty,10)>1?`Add ${Math.max(1,parseInt(qty,10)||1)} to Inventory`:"Add to Inventory"}</Btn>
+            <Btn onClick={submit} style={{flex:1}}>Add to Inventory</Btn>
             <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
           </div>
         </div>
