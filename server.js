@@ -64,9 +64,20 @@ const defaultState = {
 
 function normalizeDate(value) {
   if (!value) return null;
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
-  if (typeof value === "string") return value.slice(0, 10);
-  return value;
+  // Previous version did `value.slice(0, 10)` on ANY string, assuming it was already an ISO
+  // timestamp like "2026-08-02T00:00:00.000Z". But the frontend's today() sends locale strings
+  // like "Aug 2, 2026" (11 chars when the day is a single digit) — slicing that to 10 chars
+  // truncates the last digit of the YEAR itself, turning "Aug 2, 2026" into "Aug 2, 202". That
+  // gets written into a Postgres DATE column, which reads "202" as a literal 3-digit year, and
+  // whatever later formats it back out zero-pads it to "0202" — this was the entire bug.
+  // Fix: always parse into a real Date first, then format from its actual fields. This works
+  // correctly regardless of what string format the value arrives in.
+  const d = value instanceof Date ? value : new Date(value);
+  if (isNaN(d.getTime())) return null; // don't silently write a garbage date — surface it as null instead
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function toCurrencyNumber(value) {
