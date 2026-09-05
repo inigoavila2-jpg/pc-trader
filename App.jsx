@@ -2978,6 +2978,7 @@ function History({state,dispatch,toast,openLightbox}) {
    TRANSACTION DETAIL SHEET — tap a History card for full transaction info + actions
 ═══════════════════════════════════════════ */
 function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,onDelete}) {
+  const [showBreakdown,setShowBreakdown]=useState(false);
   const status=sale.deleted?"deleted":sale.returned?"returned":"completed";
   const statusColor={completed:"#6ee7b7",returned:"#fbbf24",deleted:"#71717a"}[status];
   const linkedPart=state.parts.find(p=>p.id===sale.partId);
@@ -2985,6 +2986,21 @@ function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,o
   // For a build sale, "Cost price" above is just the lump sum — this pulls the individual
   // components back out so the actual per-part breakdown is visible, not just the total.
   const buildParts=linkedBuild?state.parts.filter(p=>linkedBuild.partIds.includes(p.id)):[];
+  const totalPartsCost=buildParts.reduce((s,p)=>s+p.allocatedCost,0);
+  // Each part's share of the total cost is used to proportionally attribute the sale price and
+  // profit to it too — e.g. a part that was 40% of what the build cost to assemble is treated
+  // as having earned 40% of the eventual sale price and 40% of the profit, even though the
+  // buyer paid one lump sum for the whole PC. This is an allocation convention, not a claim
+  // that the buyer priced each part individually.
+  const breakdownRows=buildParts.map(p=>{
+    const costShare=totalPartsCost>0?p.allocatedCost/totalPartsCost:(buildParts.length?1/buildParts.length:0);
+    return {
+      ...p,
+      costSharePct:costShare,
+      allocatedSale:costShare*sale.salePrice,
+      allocatedProfit:costShare*sale.profit,
+    };
+  });
   const img=sale.proofPhotoUrl||linkedPart?.photoUrl||linkedBuild?.photoUrl;
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
@@ -3015,29 +3031,67 @@ function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,o
             ))}
           </div>
 
-          {/* Parts Used — only relevant for a build sale, since a single-part sale's "Cost
+          {/* Parts breakdown — only relevant for a build sale, since a single-part sale's "Cost
               price" above already IS that one item's price, nothing to break down further. */}
           {linkedBuild&&buildParts.length>0&&(
-            <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14,marginBottom:14}}>
-              <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>
-                Parts Used ({buildParts.length})
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:9}}>
-                {buildParts.map(p=>(
-                  <div key={p.id} style={{display:"flex",alignItems:"center",gap:9}}>
-                    <PhotoThumb url={p.photoUrl} size={30} seed={p.id.length}/>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{color:"#fff",fontSize:12.5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
-                      <div style={{color:"#71717a",fontSize:10}}>{p.category}</div>
-                    </div>
-                    <span style={{fontFamily:"monospace",fontSize:12.5,color:"#d4d4d8",flexShrink:0}}>{fmt(p.allocatedCost)}</span>
+            <div style={{marginBottom:14}}>
+              <Btn variant="ghost" onClick={()=>setShowBreakdown(v=>!v)} style={{width:"100%"}}>
+                {showBreakdown?"▲ Hide Parts Breakdown":`📊 View Parts Breakdown (${buildParts.length})`}
+              </Btn>
+
+              {showBreakdown&&(
+                <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14,marginTop:8,animation:"fadeUp 0.18s ease"}}>
+                  <div style={{fontSize:10.5,color:"#52525b",marginBottom:12,lineHeight:1.4}}>
+                    Sale price and profit are attributed to each part in proportion to its share of what the build cost to assemble.
                   </div>
-                ))}
-              </div>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginTop:10,paddingTop:9,borderTop:"1px solid #27272a"}}>
-                <span style={{color:"#a1a1aa"}}>Total parts cost</span>
-                <span style={{fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(buildParts.reduce((s,p)=>s+p.allocatedCost,0))}</span>
-              </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                    {breakdownRows.map(p=>(
+                      <div key={p.id}>
+                        <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:6}}>
+                          <PhotoThumb url={p.photoUrl} size={30} seed={p.id.length}/>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{color:"#fff",fontSize:12.5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                            <div style={{color:"#71717a",fontSize:10}}>{p.category}</div>
+                          </div>
+                          <span style={{fontFamily:"monospace",fontSize:12.5,color:"#d4d4d8",flexShrink:0}}>{fmt(p.allocatedCost)}</span>
+                        </div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,paddingLeft:39}}>
+                          <div>
+                            <div style={{fontSize:9,color:"#52525b"}}>% of cost</div>
+                            <div style={{fontSize:12,fontFamily:"monospace",color:"#a78bfa",fontWeight:600}}>{pct(p.costSharePct)}</div>
+                          </div>
+                          <div>
+                            <div style={{fontSize:9,color:"#52525b"}}>Alloc. sale</div>
+                            <div style={{fontSize:12,fontFamily:"monospace",color:"#d4d4d8",fontWeight:600}}>{fmt(p.allocatedSale)}</div>
+                          </div>
+                          <div>
+                            <div style={{fontSize:9,color:"#52525b"}}>Alloc. profit</div>
+                            <div style={{fontSize:12,fontFamily:"monospace",color:p.allocatedProfit>=0?"#34d399":"#f87171",fontWeight:600}}>
+                              {p.allocatedProfit>=0?"+":""}{fmt(p.allocatedProfit)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginTop:12,paddingTop:10,borderTop:"1px solid #27272a"}}>
+                    <div>
+                      <div style={{fontSize:9,color:"#71717a"}}>Total cost</div>
+                      <div style={{fontSize:12.5,fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(totalPartsCost)}</div>
+                    </div>
+                    <div>
+                      <div style={{fontSize:9,color:"#71717a"}}>Total sale</div>
+                      <div style={{fontSize:12.5,fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(sale.salePrice)}</div>
+                    </div>
+                    <div>
+                      <div style={{fontSize:9,color:"#71717a"}}>Total profit</div>
+                      <div style={{fontSize:12.5,fontFamily:"monospace",fontWeight:700,color:sale.profit>=0?"#34d399":"#f87171"}}>
+                        {sale.profit>=0?"+":""}{fmt(sale.profit)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
