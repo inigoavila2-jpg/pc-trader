@@ -2562,8 +2562,16 @@ function Sell({state,dispatch,toast,openLightbox}) {
     if(!selId||!salePrice){toast("Select item and enter price","error");return;}
     setLoading(true);
     const name=mode==="part"?tp?.name:tb?.name;
+    // Snapshot the build's components NOW, at time of sale — not looked up later from the build
+    // record. If the build is ever deleted afterward, Postgres's ON DELETE SET NULL on
+    // sales.build_id wipes that link permanently; this snapshot is what still lets the
+    // Parts Breakdown work even after that happens.
+    const buildPartsSnapshot=mode==="build"&&tb
+      ?state.parts.filter(p=>tb.partIds.includes(p.id)).map(p=>({id:p.id,name:p.name,category:p.category,allocatedCost:p.allocatedCost,photoUrl:p.photoUrl}))
+      :undefined;
     setTimeout(()=>{
       dispatch({type:"SELL",mode,id:selId,sale:{id:uid(),partId:mode==="part"?selId:null,buildId:mode==="build"?selId:null,name,cost,salePrice:sp,profit,buyerName:buyer,date:today(),
+        buildPartsSnapshot,
         convoLink:convoLink.trim(),proofPhotoUrl:proofPhoto.photoUrl,proofPhotoRecordId:proofPhoto.photoRecordId}});
       toast(`${name} sold for ${fmt(sp)} — profit ${fmt(profit)} ✓`,profit>=0?"success":"warn");
       setSelId("");setSalePrice("");setBuyer("");setConvoLink("");setProofPhoto({photoUrl:"",photoRecordId:""});setLoading(false);
@@ -2983,9 +2991,13 @@ function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,o
   const statusColor={completed:"#6ee7b7",returned:"#fbbf24",deleted:"#71717a"}[status];
   const linkedPart=state.parts.find(p=>p.id===sale.partId);
   const linkedBuild=state.builds.find(b=>b.id===sale.buildId);
-  // For a build sale, "Cost price" above is just the lump sum — this pulls the individual
-  // components back out so the actual per-part breakdown is visible, not just the total.
-  const buildParts=linkedBuild?state.parts.filter(p=>linkedBuild.partIds.includes(p.id)):[];
+  // Prefer the snapshot taken at time of sale — it's self-contained and survives the build
+  // record being deleted later (Postgres's ON DELETE SET NULL on sales.build_id means that
+  // link can silently disappear at the database level, independent of anything in this app).
+  // Fall back to a live lookup only for older sales recorded before this snapshot existed.
+  const buildParts=sale.buildPartsSnapshot?.length
+    ?sale.buildPartsSnapshot
+    :(linkedBuild?state.parts.filter(p=>linkedBuild.partIds.includes(p.id)):[]);
   const totalPartsCost=buildParts.reduce((s,p)=>s+p.allocatedCost,0);
   // Each part's share of the total cost is used to proportionally attribute the sale price and
   // profit to it too — e.g. a part that was 40% of what the build cost to assemble is treated
@@ -3033,13 +3045,21 @@ function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,o
 
           {/* Parts breakdown — only relevant for a build sale, since a single-part sale's "Cost
               price" above already IS that one item's price, nothing to break down further. */}
-          {linkedBuild&&buildParts.length>0&&(
+          {/* Show this whenever we have ANY evidence this was a build sale — either the live
+              buildId (usual case) or a snapshot taken at time of sale (survives buildId later
+              being wiped to null by the database's own ON DELETE SET NULL cascade if the build
+              row gets hard-deleted afterward). */}
+          {(sale.buildId||sale.buildPartsSnapshot?.length>0)&&(
             <div style={{marginBottom:14}}>
               <Btn variant="ghost" onClick={()=>setShowBreakdown(v=>!v)} style={{width:"100%"}}>
-                {showBreakdown?"▲ Hide Parts Breakdown":`📊 View Parts Breakdown (${buildParts.length})`}
+                {showBreakdown?"▲ Hide Parts Breakdown":`📊 View Parts Breakdown${buildParts.length?` (${buildParts.length})`:""}`}
               </Btn>
 
-              {showBreakdown&&(
+              {showBreakdown&&(buildParts.length===0?(
+                <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14,marginTop:8,color:"#71717a",fontSize:12}}>
+                  This build's individual parts are no longer available to look up (the build record was deleted after this sale) — only the total cost, sale price, and profit above are still known.
+                </div>
+              ):(
                 <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14,marginTop:8,animation:"fadeUp 0.18s ease"}}>
                   <div style={{fontSize:10.5,color:"#52525b",marginBottom:12,lineHeight:1.4}}>
                     Sale price and profit are attributed to each part in proportion to its share of what the build cost to assemble.
@@ -3091,7 +3111,7 @@ function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,o
                     </div>
                   </div>
                 </div>
-              )}
+              ))}
             </div>
           )}
 
@@ -3392,9 +3412,12 @@ function QuickSellPickerModal({state,dispatch,toast,onClose}) {
 
   const submit=()=>{
     if(!selected||!salePrice){toast("Pick an item and enter a price","error");return;}
+    const buildPartsSnapshot=selected.mode==="build"
+      ?state.parts.filter(p=>builds.find(b=>b.id===selected.id)?.partIds.includes(p.id)).map(p=>({id:p.id,name:p.name,category:p.category,allocatedCost:p.allocatedCost,photoUrl:p.photoUrl}))
+      :undefined;
     dispatch({type:"SELL",mode:selected.mode,id:selected.id,sale:{id:uid(),
       partId:selected.mode==="part"?selected.id:null,buildId:selected.mode==="build"?selected.id:null,
-      name:selected.name,cost:selected.cost,salePrice:sp,profit,buyerName:buyer,date:today()}});
+      name:selected.name,cost:selected.cost,salePrice:sp,profit,buyerName:buyer,date:today(),buildPartsSnapshot}});
     toast(`${selected.name} sold for ${fmt(sp)} — profit ${fmt(profit)} ✓`,profit>=0?"success":"warn");
     onClose();
   };

@@ -642,7 +642,11 @@ For business strategy questions, offer thoughtful advice that considers pricing,
               const buildParts = liveState.parts.filter(p => build.partIds.includes(p.id));
               const cost = buildParts.reduce((s, p) => s + p.allocatedCost, 0);
               const profit = salePrice - cost;
-              const sale = { id: cbUid(), buildId: build.id, name: build.name, cost, salePrice, profit, buyerName: buyerName || '', date: cbToday() };
+              // Snapshot components now — this is what keeps the Parts Breakdown working even if
+              // the build record itself gets deleted later (Postgres nulls sales.build_id via
+              // ON DELETE SET NULL when that happens, independent of anything in this app).
+              const buildPartsSnapshot = buildParts.map(p => ({ id: p.id, name: p.name, category: p.category, allocatedCost: p.allocatedCost, photoUrl: p.photoUrl }));
+              const sale = { id: cbUid(), buildId: build.id, name: build.name, cost, salePrice, profit, buyerName: buyerName || '', date: cbToday(), buildPartsSnapshot };
               dispatch({ type: 'SELL', mode: 'build', id: build.id, sale });
               toast?.(`${build.name} sold for ${cbFmt(salePrice)} ✓`, 'success');
               return `Sold build "${build.name}" for ${cbFmt(salePrice)} — profit ${cbFmt(profit)}.`;

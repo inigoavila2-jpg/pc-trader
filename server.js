@@ -145,6 +145,10 @@ function mapSaleRow(row) {
     returned: Boolean(row.returned),
     returnReason: row.return_reason || "",
     date: row.sale_date || null,
+    // Snapshot of the build's components at time of sale — self-contained, so the Parts
+    // Breakdown still works even if the build row is later deleted (Postgres nulls build_id
+    // via ON DELETE SET NULL when that happens, independent of this snapshot).
+    buildPartsSnapshot: row.build_parts_snapshot || undefined,
   };
 }
 
@@ -293,6 +297,10 @@ async function saveStateToSupabase(state) {
     returned: Boolean(sale.returned),
     return_reason: sale.returnReason || null,
     sale_date: normalizeDate(sale.date || new Date()),
+    // JSONB column — the Supabase client serializes arrays/objects automatically, no need to
+    // JSON.stringify manually. null (not undefined) when there's nothing to store, since
+    // undefined fields can behave inconsistently across different Supabase client versions.
+    build_parts_snapshot: sale.buildPartsSnapshot && sale.buildPartsSnapshot.length ? sale.buildPartsSnapshot : null,
   }));
 
   const expensesRows = (rows.expenses || []).map((expense) => ({
