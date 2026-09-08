@@ -3082,7 +3082,6 @@ function History({state,dispatch,toast,openLightbox}) {
 ═══════════════════════════════════════════ */
 function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,onDelete}) {
   const [showBreakdown,setShowBreakdown]=useState(false);
-  console.log("DEBUG sale object:", sale); // TEMPORARY — remove after diagnosing
   const status=sale.deleted?"deleted":sale.returned?"returned":"completed";
   const statusColor={completed:"#6ee7b7",returned:"#fbbf24",deleted:"#71717a"}[status];
   const linkedPart=state.parts.find(p=>p.id===sale.partId);
@@ -3148,7 +3147,7 @@ function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,o
           {(sale.buildId||sale.buildPartsSnapshot?.length>0)&&(
             <div style={{marginBottom:14}}>
               <Btn variant="ghost" onClick={()=>setShowBreakdown(v=>!v)} style={{width:"100%"}}>
-                {showBreakdown?"▲ Hide Parts Breakdown":`📊 View Parts Breakdown${buildParts.length?` (${buildParts.length})`:""}`}
+                {showBreakdown?"▲ Hide Parts":`🔧 View Parts${buildParts.length?` (${buildParts.length})`:""}`}
               </Btn>
 
               {showBreakdown&&(buildParts.length===0?(
