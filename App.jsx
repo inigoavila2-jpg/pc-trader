@@ -10,7 +10,7 @@ const pct = (n) => `${(n*100).toFixed(1)}%`;
 const today = () => new Date().toLocaleDateString("en-PH",{year:"numeric",month:"short",day:"numeric"});
 let _id = Date.now();
 const uid = () => `id_${_id++}`;
-const CATEGORIES = ["GPU","CPU","Motherboard","CPU+MB","RAM","PSU","Storage","Cooler","Case","Monitor","Other"];
+const CATEGORIES = ["GPU","CPU","Motherboard","CPU+MB","RAM","PSU","Storage","Cooler","Case","Monitor","Mouse","Keyboard","Other"];
 
 // Every built-in category is a PC part by definition. Custom categories (added via the
 // "+ Add Category" picker) carry their own domain in state.customCategories, looked up at
@@ -1831,11 +1831,74 @@ function DetailRow({label,value,valueColor="#fff"}) {
   );
 }
 
+function PartGroupSheet({group,onClose,onViewUnit}) {
+  const p=group[0];
+  const count=group.length;
+  const totalCost=p.allocatedCost*count;
+  const totalMarket=p.marketValue*count;
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",borderRadius:"18px 18px 0 0",width:"100%",maxWidth:520,
+        maxHeight:"85vh",overflowY:"auto",animation:"slideUp 0.22s cubic-bezier(0.22,1,0.36,1)",
+        paddingBottom:"calc(20px + env(safe-area-inset-bottom))"}}>
+        <div style={{display:"flex",justifyContent:"center",padding:"10px 0 4px"}}>
+          <div style={{width:38,height:4,borderRadius:99,background:"#3f3f46"}}/>
+        </div>
+        <div style={{padding:"14px 20px"}}>
+          <div style={{display:"flex",gap:12,alignItems:"center",marginBottom:14}}>
+            <PhotoThumb url={p.photoUrl} size={52} seed={p.id.length}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{color:"#fff",fontWeight:700,fontSize:16}}>{p.name}</div>
+              <div style={{color:"#71717a",fontSize:12,marginTop:2}}>{p.category} · {count} identical units</div>
+            </div>
+            <Badge s={p.status}/>
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+            <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:9,padding:10}}>
+              <div style={{fontSize:10,color:"#a1a1aa"}}>Cost each</div>
+              <div style={{fontSize:14,fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(p.allocatedCost)}</div>
+              <div style={{fontSize:10,color:"#52525b",marginTop:2}}>Total {fmt(totalCost)}</div>
+            </div>
+            <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:9,padding:10}}>
+              <div style={{fontSize:10,color:"#a1a1aa"}}>Market each</div>
+              <div style={{fontSize:14,fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(p.marketValue)}</div>
+              <div style={{fontSize:10,color:"#52525b",marginTop:2}}>Total {fmt(totalMarket)}</div>
+            </div>
+          </div>
+
+          <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:9}}>
+            Individual units — tap any one to sell, edit, or mark it defective
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {group.map((unit,i)=>(
+              <div key={unit.id} onClick={()=>onViewUnit(unit)} style={{display:"flex",alignItems:"center",gap:9,padding:"9px 10px",
+                borderRadius:9,background:"#09090b",border:"1px solid #27272a",cursor:"pointer",transition:"border-color 0.15s"}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor="#52525b";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor="#27272a";}}>
+                <span style={{color:"#52525b",fontSize:11,fontFamily:"monospace",width:20,flexShrink:0}}>{i+1}</span>
+                <PhotoThumb url={unit.photoUrl} size={28} seed={unit.id.length}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{color:"#d4d4d8",fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {unit.notes?unit.notes:`Unit ${i+1}`}
+                  </div>
+                </div>
+                <span style={{color:"#52525b",fontSize:14}}>›</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Inventory({state,dispatch,toast,setTab,openLightbox}) {
   const [statusFilter,setStatusFilter]=useState("all");
   const [catFilter,setCatFilter]=useState("all");
   const [search,setSearch]=useState("");   // #8
   const [viewing,setViewing]=useState(null); // part shown in the detail sheet
+  const [viewingGroup,setViewingGroup]=useState(null); // group of identical parts shown in the group sheet
   const [bundleView,setBundleView]=useState(false);
   const [quickSell,setQuickSell]=useState(null);
   const [editing,setEditing]=useState(null);
@@ -1858,6 +1921,21 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
     if(search&&!p.name.toLowerCase().includes(search.toLowerCase())&&!p.category.toLowerCase().includes(search.toLowerCase()))return false;
     return true;
   });
+
+  // Restocking the same item (e.g. buying 20 identical power cables) still creates 20
+  // independently-trackable part records under the hood — each can still be sold, built, or
+  // marked defective on its own. This only changes how they're DISPLAYED: identical parts
+  // (same name, category, cost, market value, and status) collapse into a single card with a
+  // quantity badge, instead of cluttering the grid with 20 near-identical cards. Anything
+  // that's the only one of its kind renders exactly as a normal single card, unchanged.
+  const groupKey=p=>`${p.name}|${p.category}|${Math.round(p.allocatedCost)}|${Math.round(p.marketValue)}|${p.status}`;
+  const groupMap=new Map();
+  filtered.forEach(p=>{
+    const k=groupKey(p);
+    if(!groupMap.has(k))groupMap.set(k,[]);
+    groupMap.get(k).push(p);
+  });
+  const groupedCards=[...groupMap.values()]; // each entry is an array of 1+ identical parts
 
   const handleQuickSell=(sp,buyer)=>{
     if(!quickSell)return;
@@ -1939,6 +2017,10 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
       )}
       {defectiveTarget&&(
         <DefectiveModal part={defectiveTarget} onConfirm={confirmDefective} onCancel={()=>setDefectiveTarget(null)}/>
+      )}
+      {viewingGroup&&(
+        <PartGroupSheet group={viewingGroup} onClose={()=>setViewingGroup(null)}
+          onViewUnit={(unit)=>{setViewing(unit);setViewingGroup(null);}}/>
       )}
       {viewing&&(
         <PartDetailSheet part={viewing} buildName={buildNameFor(viewing)} onClose={()=>setViewing(null)}
@@ -2024,21 +2106,28 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
         /* Marketplace-style 2-column card grid — replaces the old always-expanded list so
            scanning 50-100+ parts is fast, with full detail only a tap away. */
         <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
-          {filtered.map((p,i)=>{
+          {groupedCards.map((group,i)=>{
+            const p=group[0]; // representative — identical across the whole group by definition
+            const count=group.length;
             const potential=p.marketValue-p.allocatedCost;
+            const onCardClick=count>1?()=>setViewingGroup(group):()=>setViewing(p);
             return (
-              <div key={p.id} onClick={()=>setViewing(p)} style={{background:"#18181b",border:"1px solid #27272a",borderRadius:13,
-                padding:10,cursor:"pointer",animation:`fadeUp 0.18s ease ${Math.min(i*0.025,0.3)}s both`,transition:"border-color 0.15s,transform 0.1s"}}
+              <div key={groupKey(p)} onClick={onCardClick} style={{background:"#18181b",border:"1px solid #27272a",borderRadius:13,
+                padding:10,cursor:"pointer",animation:`fadeUp 0.18s ease ${Math.min(i*0.025,0.3)}s both`,transition:"border-color 0.15s,transform 0.1s",position:"relative"}}
                 onMouseEnter={e=>{e.currentTarget.style.borderColor="#52525b";}}
                 onMouseLeave={e=>{e.currentTarget.style.borderColor="#27272a";}}
                 onMouseDown={e=>e.currentTarget.style.transform="scale(0.98)"}
                 onMouseUp={e=>e.currentTarget.style.transform="scale(1)"}>
                 <div style={{width:"100%",aspectRatio:"1",borderRadius:9,overflow:"hidden",background:"#09090b",marginBottom:8,
-                  display:"flex",alignItems:"center",justifyContent:"center",border:"1px solid #1f1f23"}}>
+                  display:"flex",alignItems:"center",justifyContent:"center",border:"1px solid #1f1f23",position:"relative"}}>
                   {p.photoUrl?(
                     <img src={p.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
                   ):(
                     <span style={{fontSize:26,opacity:0.3}}>🔧</span>
+                  )}
+                  {count>1&&(
+                    <div style={{position:"absolute",top:6,right:6,background:"#7c3aed",color:"#fff",fontSize:11,fontWeight:800,
+                      padding:"3px 8px",borderRadius:99,boxShadow:"0 2px 6px rgba(0,0,0,0.4)"}}>×{count}</div>
                   )}
                 </div>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:4,marginBottom:3}}>
@@ -2047,11 +2136,17 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
                 </div>
                 <div style={{color:"#fff",fontWeight:600,fontSize:12.5,lineHeight:1.3,marginBottom:4,
                   display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.name}</div>
-                <div style={{fontFamily:"monospace",fontWeight:700,color:"#fff",fontSize:13}}>{fmt(p.allocatedCost)}</div>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#71717a",marginTop:2}}>
-                  <span>Market {fmt(p.marketValue)}</span>
-                  <span style={{color:potential>=0?"#34d399":"#f87171",fontWeight:600}}>{potential>=0?"+":""}{fmt(potential)}</span>
+                <div style={{fontFamily:"monospace",fontWeight:700,color:"#fff",fontSize:13}}>
+                  {fmt(p.allocatedCost)}{count>1&&<span style={{color:"#71717a",fontWeight:500,fontSize:11}}> each</span>}
                 </div>
+                {count>1?(
+                  <div style={{fontSize:10,color:"#a78bfa",marginTop:2,fontWeight:600}}>Total {fmt(p.allocatedCost*count)} · tap to view all {count}</div>
+                ):(
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#71717a",marginTop:2}}>
+                    <span>Market {fmt(p.marketValue)}</span>
+                    <span style={{color:potential>=0?"#34d399":"#f87171",fontWeight:600}}>{potential>=0?"+":""}{fmt(potential)}</span>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -2987,6 +3082,7 @@ function History({state,dispatch,toast,openLightbox}) {
 ═══════════════════════════════════════════ */
 function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,onDelete}) {
   const [showBreakdown,setShowBreakdown]=useState(false);
+  console.log("DEBUG sale object:", sale); // TEMPORARY — remove after diagnosing
   const status=sale.deleted?"deleted":sale.returned?"returned":"completed";
   const statusColor={completed:"#6ee7b7",returned:"#fbbf24",deleted:"#71717a"}[status];
   const linkedPart=state.parts.find(p=>p.id===sale.partId);
