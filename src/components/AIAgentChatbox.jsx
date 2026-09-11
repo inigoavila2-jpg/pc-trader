@@ -11,6 +11,36 @@ const cbUid = () => `chat_${Date.now()}_${Math.random().toString(36).slice(2, 8)
 const cbToday = () => new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
 const cbFmt = (n) => `₱${Number(n || 0).toLocaleString('en-PH', { maximumFractionDigits: 0 })}`;
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Gemini's free tier is easy to hit during normal use — every tool-using message burns at
+// least 2 requests (the message itself, then the function response). A 429 here usually means
+// "wait a few seconds," not "something is broken," so retry with backoff before surfacing it
+// as an actual error.
+const isRateLimitError = (err) => {
+  const msg = String(err?.message || err || '').toLowerCase();
+  return err?.status === 429 || err?.code === 429 || msg.includes('429') || msg.includes('resource_exhausted') || msg.includes('too many requests');
+};
+
+const sendWithRetry = async (sendFn, maxRetries = 2) => {
+  let lastErr;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await sendFn();
+    } catch (err) {
+      lastErr = err;
+      if (isRateLimitError(err) && attempt < maxRetries) {
+        const waitMs = 3000 * (attempt + 1);
+        console.warn(`Rate limited by Gemini (429) — retrying in ${waitMs / 1000}s...`);
+        await sleep(waitMs);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
+};
+
 /**
  * Renders message text as clean conversational text instead of dumping raw markdown.
  * Handles **bold**, leading "* " / "- " bullets, and ``` code fences without needing
@@ -288,6 +318,28 @@ export function AIAgentChatbox({
           description: 'Get the current business and personal wallet balances — use this to answer questions like "how much is in my business wallet".',
           parameters: { type: 'object', properties: {} },
         },
+        {
+          name: 'find_builds',
+          description: 'Search active (not dissolved, not sold) builds by name, partial match OK. Returns each build\'s exact buildId and its current component list. Always call this before modify_build — never guess a buildId.',
+          parameters: {
+            type: 'object',
+            properties: { query: { type: 'string', description: 'Build name to search for' } },
+            required: ['query'],
+          },
+        },
+        {
+          name: 'modify_build',
+          description: 'Add and/or remove parts on an EXISTING build, without dissolving it — works even if the build is already listed for sale. Use this when the user says things like "swap the RAM in Gaming Rig 2" or "add a bigger PSU to that build" or "take the GPU out of Gaming Rig 2". Find the exact buildId via find_builds first. To add parts, give the exact part name(s) as they appear in current inventory (use query_pocketbase_inventory if unsure). To remove parts, give the exact part name(s) as they currently appear in that build\'s component list.',
+          parameters: {
+            type: 'object',
+            properties: {
+              buildId: { type: 'string', description: 'Exact buildId from a previous find_builds call' },
+              addPartNames: { type: 'array', items: { type: 'string' }, description: 'Names of currently-available inventory parts to add to the build' },
+              removePartNames: { type: 'array', items: { type: 'string' }, description: 'Names of parts currently in the build to take out (they return to available inventory)' },
+            },
+            required: ['buildId'],
+          },
+        },
       ],
     },
   ];
@@ -313,6 +365,8 @@ When the user uploads a photo of hardware, read any visible labels, model names,
 When the user wants to sell an item, ensure you know the exact item name, the sale price, and the buyer. If any of this information is missing, ask the user for it before calling the sales tool.
 
 When the user wants to delete, undo, or return a sale, first call find_sales to locate the exact transaction. If you get more than one plausible match, ask the user which one they mean instead of guessing. Only after you have verified the exact saleId from the tool output should you call delete_transaction. If the matched sale has isBuild: true and the user wants the item(s) back in inventory, you must also ask whether the build should go back to Builds as one sellable unit (reactivate) or be broken apart into individually available parts (disassemble) — never guess this, since guessing wrong can let the same parts end up claimed by two different builds at once.
+
+When the user wants to change what's in an already-assembled build ("swap the RAM in Gaming Rig 2", "add a PSU to that build", "take the GPU out"), first call find_builds to get the exact buildId and see its current parts. Then call modify_build with that buildId and the part names to add/remove. This works even on a build that's already listed for sale — it doesn't need to be dissolved first.
 
 Keep responses short and to the point.
 
@@ -588,7 +642,11 @@ For business strategy questions, offer thoughtful advice that considers pricing,
               const buildParts = liveState.parts.filter(p => build.partIds.includes(p.id));
               const cost = buildParts.reduce((s, p) => s + p.allocatedCost, 0);
               const profit = salePrice - cost;
-              const sale = { id: cbUid(), buildId: build.id, name: build.name, cost, salePrice, profit, buyerName: buyerName || '', date: cbToday() };
+              // Snapshot components now — this is what keeps the Parts Breakdown working even if
+              // the build record itself gets deleted later (Postgres nulls sales.build_id via
+              // ON DELETE SET NULL when that happens, independent of anything in this app).
+              const buildPartsSnapshot = buildParts.map(p => ({ id: p.id, name: p.name, category: p.category, allocatedCost: p.allocatedCost, marketValue: p.marketValue, photoUrl: p.photoUrl }));
+              const sale = { id: cbUid(), buildId: build.id, name: build.name, cost, salePrice, profit, buyerName: buyerName || '', date: cbToday(), buildPartsSnapshot };
               dispatch({ type: 'SELL', mode: 'build', id: build.id, sale });
               toast?.(`${build.name} sold for ${cbFmt(salePrice)} ✓`, 'success');
               return `Sold build "${build.name}" for ${cbFmt(salePrice)} — profit ${cbFmt(profit)}.`;
@@ -639,6 +697,60 @@ For business strategy questions, offer thoughtful advice that considers pricing,
               businessWallet: liveState.businessCash || 0,
               personalWallet: liveState.personalCash || 0,
             });
+          }
+
+          case 'find_builds': {
+            const q = (toolInput.query || '').toLowerCase();
+            const matches = (liveState.builds || [])
+              .filter(b => !b.dissolved && !b.sold)
+              .filter(b => b.name.toLowerCase().includes(q))
+              .slice(0, 10)
+              .map(b => ({
+                buildId: b.id,
+                name: b.name,
+                currentParts: liveState.parts.filter(p => b.partIds.includes(p.id)).map(p => p.name),
+              }));
+            if (!matches.length) return `No active builds found matching "${toolInput.query}".`;
+            return JSON.stringify(matches);
+          }
+
+          case 'modify_build': {
+            const { buildId, addPartNames = [], removePartNames = [] } = toolInput;
+            const build = (liveState.builds || []).find(b => b.id === buildId && !b.dissolved && !b.sold);
+            if (!build) return `No active build found with buildId "${buildId}". Call find_builds again to get the correct ID.`;
+
+            const notes = [];
+            const addPartIds = [];
+            for (const name of addPartNames) {
+              const q = name.toLowerCase();
+              const candidates = liveState.parts.filter(p => p.status === 'available' && p.name.toLowerCase().includes(q));
+              if (candidates.length === 0) { notes.push(`couldn't find an available part matching "${name}"`); continue; }
+              if (candidates.length > 1) { notes.push(`"${name}" matched ${candidates.length} available parts — be more specific`); continue; }
+              addPartIds.push(candidates[0].id);
+            }
+
+            const buildParts = liveState.parts.filter(p => build.partIds.includes(p.id));
+            const removePartIds = [];
+            for (const name of removePartNames) {
+              const q = name.toLowerCase();
+              const candidates = buildParts.filter(p => p.name.toLowerCase().includes(q));
+              if (candidates.length === 0) { notes.push(`couldn't find "${name}" currently in this build`); continue; }
+              if (candidates.length > 1) { notes.push(`"${name}" matched ${candidates.length} parts in this build — be more specific`); continue; }
+              removePartIds.push(candidates[0].id);
+            }
+
+            if (addPartIds.length === 0 && removePartIds.length === 0) {
+              return `Nothing to change — ${notes.join('; ') || 'no valid part names were given'}.`;
+            }
+
+            dispatch({ type: 'EDIT_BUILD_PARTS', buildId, addPartIds, removePartIds });
+            const bits = [];
+            if (addPartIds.length) bits.push(`added ${addPartIds.length}`);
+            if (removePartIds.length) bits.push(`removed ${removePartIds.length}`);
+            toast?.(`"${build.name}" updated — ${bits.join(', ')} ✓`, 'success');
+            let result = `Updated "${build.name}" — ${bits.join(', ')}.`;
+            if (notes.length) result += ` Note: ${notes.join('; ')}.`;
+            return result;
           }
 
           default:
@@ -702,7 +814,7 @@ For business strategy questions, offer thoughtful advice that considers pricing,
 
       let response;
       try {
-        response = await chatSessionRef.current.sendMessage({ message: userParts });
+        response = await sendWithRetry(() => chatSessionRef.current.sendMessage({ message: userParts }));
       } catch (err) {
         console.error('Gemini rejected the initial message:', err);
         throw err;
@@ -719,9 +831,9 @@ For business strategy questions, offer thoughtful advice that considers pricing,
           const { name, args } = call;
           const result = await executeTool(name, args);
           try {
-            response = await chatSessionRef.current.sendMessage({
+            response = await sendWithRetry(() => chatSessionRef.current.sendMessage({
               message: [{ functionResponse: { name, response: { result } } }],
-            });
+            }));
           } catch (err) {
             console.error(`Gemini rejected the function response for "${name}":`, err);
             throw err;
@@ -735,7 +847,11 @@ For business strategy questions, offer thoughtful advice that considers pricing,
       }
     } catch (err) {
       console.error('Error during agent interaction loop:', err);
-      toast?.('Something went wrong talking to the assistant. Resetting — please try again.', 'error');
+      if (isRateLimitError(err)) {
+        toast?.("You're sending messages faster than the free Gemini tier allows. Wait about 15 seconds and try again.", 'error');
+      } else {
+        toast?.('Something went wrong talking to the assistant. Resetting — please try again.', 'error');
+      }
       // A failed turn can leave the session with a dangling function call it never got an
       // answer to recorded for — every message after that would fail the same way. Rebuild
       // it fresh from whatever's already persisted so the NEXT message isn't stuck repeating
