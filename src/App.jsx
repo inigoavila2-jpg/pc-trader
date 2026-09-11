@@ -2662,7 +2662,7 @@ function Sell({state,dispatch,toast,openLightbox}) {
     // sales.build_id wipes that link permanently; this snapshot is what still lets the
     // Parts Breakdown work even after that happens.
     const buildPartsSnapshot=mode==="build"&&tb
-      ?state.parts.filter(p=>tb.partIds.includes(p.id)).map(p=>({id:p.id,name:p.name,category:p.category,allocatedCost:p.allocatedCost,photoUrl:p.photoUrl}))
+      ?state.parts.filter(p=>tb.partIds.includes(p.id)).map(p=>({id:p.id,name:p.name,category:p.category,allocatedCost:p.allocatedCost,marketValue:p.marketValue,photoUrl:p.photoUrl}))
       :undefined;
     setTimeout(()=>{
       dispatch({type:"SELL",mode,id:selId,sale:{id:uid(),partId:mode==="part"?selId:null,buildId:mode==="build"?selId:null,name,cost,salePrice:sp,profit,buyerName:buyer,date:today(),
@@ -3082,6 +3082,7 @@ function History({state,dispatch,toast,openLightbox}) {
 ═══════════════════════════════════════════ */
 function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,onDelete}) {
   const [showBreakdown,setShowBreakdown]=useState(false);
+  const [showReceipt,setShowReceipt]=useState(false);
   const status=sale.deleted?"deleted":sale.returned?"returned":"completed";
   const statusColor={completed:"#6ee7b7",returned:"#fbbf24",deleted:"#71717a"}[status];
   const linkedPart=state.parts.find(p=>p.id===sale.partId);
@@ -3107,6 +3108,17 @@ function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,o
       allocatedSale:costShare*sale.salePrice,
       allocatedProfit:costShare*sale.profit,
     };
+  });
+
+  // Customer-facing receipt — deliberately a SEPARATE calculation from breakdownRows above.
+  // That one allocates by COST share (for the owner, to see which parts drove profit). This one
+  // allocates by MARKET VALUE share (for the customer, to see plausible per-item pricing) —
+  // scaled so every line item sums exactly to what they actually paid, with no cost, market
+  // value, or profit numbers anywhere in the output.
+  const totalMarketValue=buildParts.reduce((s,p)=>s+(p.marketValue||0),0);
+  const receiptRows=buildParts.map(p=>{
+    const marketShare=totalMarketValue>0?(p.marketValue||0)/totalMarketValue:(buildParts.length?1/buildParts.length:0);
+    return {...p,scaledPrice:marketShare*sale.salePrice};
   });
   const img=sale.proofPhotoUrl||linkedPart?.photoUrl||linkedBuild?.photoUrl;
   return (
@@ -3205,6 +3217,10 @@ function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,o
                       </div>
                     </div>
                   </div>
+                  <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid #27272a"}}>
+                    <Btn variant="primary" onClick={()=>setShowReceipt(true)} style={{width:"100%"}}>🧾 Generate Receipt</Btn>
+                    <div style={{fontSize:9.5,color:"#52525b",marginTop:6,textAlign:"center"}}>Customer-facing invoice — no cost or profit info included</div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -3233,6 +3249,67 @@ function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,o
               </div>
             </div>
           )}
+        </div>
+      </div>
+      {showReceipt&&<ReceiptModal sale={sale} receiptRows={receiptRows} onClose={()=>setShowReceipt(false)}/>}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   RECEIPT MODAL — customer-facing invoice. Deliberately shows ONLY item names and
+   scaled prices that sum to what the customer actually paid — no cost, no market
+   value, no profit anywhere. Scaling is by market-value share (see receiptRows in
+   TransactionDetailSheet), not cost share, since a receipt should reflect plausible
+   retail-style pricing per component, not the owner's internal cost structure.
+═══════════════════════════════════════════ */
+function ReceiptModal({sale,receiptRows,onClose}) {
+  const [copied,setCopied]=useState(false);
+
+  const copyReceipt=()=>{
+    const lines=[
+      sale.name,
+      "",
+      ...receiptRows.map(p=>`${p.name}: ${fmt(p.scaledPrice)}`),
+      "",
+      `Total: ${fmt(sale.salePrice)}`,
+    ];
+    const text=lines.join("\n");
+    navigator.clipboard?.writeText(text).then(
+      ()=>{setCopied(true);setTimeout(()=>setCopied(false),2000);},
+      ()=>{}
+    );
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:1600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,
+        width:"100%",maxWidth:400,animation:"fadeUp 0.2s ease",overflow:"hidden"}}>
+        <div style={{padding:"20px 22px 16px",borderBottom:"1px solid #27272a"}}>
+          <div style={{color:"#71717a",fontSize:10,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:4}}>Sales Receipt</div>
+          <div style={{color:"#fff",fontWeight:700,fontSize:17}}>{sale.name}</div>
+          {sale.buyerName&&<div style={{color:"#a1a1aa",fontSize:12,marginTop:3}}>For {sale.buyerName}</div>}
+          <div style={{color:"#52525b",fontSize:11,marginTop:2}}>{sale.date}</div>
+        </div>
+
+        <div style={{padding:"16px 22px"}}>
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
+            {receiptRows.map(p=>(
+              <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:10}}>
+                <span style={{color:"#d4d4d8",fontSize:13.5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</span>
+                <span style={{fontFamily:"monospace",fontSize:14,color:"#fff",fontWeight:600,flexShrink:0}}>{fmt(p.scaledPrice)}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",paddingTop:14,borderTop:"1px solid #27272a"}}>
+            <span style={{color:"#fff",fontWeight:700,fontSize:15}}>Total</span>
+            <span style={{fontFamily:"monospace",fontWeight:800,fontSize:19,color:"#fff"}}>{fmt(sale.salePrice)}</span>
+          </div>
+        </div>
+
+        <div style={{padding:"0 22px 20px",display:"flex",flexDirection:"column",gap:8}}>
+          <Btn onClick={copyReceipt} style={{width:"100%"}}>{copied?"✓ Copied":"📋 Copy Receipt Text"}</Btn>
+          <Btn variant="ghost" onClick={onClose} style={{width:"100%"}}>Close</Btn>
         </div>
       </div>
     </div>
@@ -3508,7 +3585,7 @@ function QuickSellPickerModal({state,dispatch,toast,onClose}) {
   const submit=()=>{
     if(!selected||!salePrice){toast("Pick an item and enter a price","error");return;}
     const buildPartsSnapshot=selected.mode==="build"
-      ?state.parts.filter(p=>builds.find(b=>b.id===selected.id)?.partIds.includes(p.id)).map(p=>({id:p.id,name:p.name,category:p.category,allocatedCost:p.allocatedCost,photoUrl:p.photoUrl}))
+      ?state.parts.filter(p=>builds.find(b=>b.id===selected.id)?.partIds.includes(p.id)).map(p=>({id:p.id,name:p.name,category:p.category,allocatedCost:p.allocatedCost,marketValue:p.marketValue,photoUrl:p.photoUrl}))
       :undefined;
     dispatch({type:"SELL",mode:selected.mode,id:selected.id,sale:{id:uid(),
       partId:selected.mode==="part"?selected.id:null,buildId:selected.mode==="build"?selected.id:null,
