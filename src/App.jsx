@@ -10,7 +10,7 @@ const pct = (n) => `${(n*100).toFixed(1)}%`;
 const today = () => new Date().toLocaleDateString("en-PH",{year:"numeric",month:"short",day:"numeric"});
 let _id = Date.now();
 const uid = () => `id_${_id++}`;
-const CATEGORIES = ["GPU","CPU","Motherboard","CPU+MB","RAM","PSU","Storage","Cooler","Case","Monitor","Other"];
+const CATEGORIES = ["GPU","CPU","Motherboard","CPU+MB","RAM","PSU","Storage","Cooler","Case","Monitor","Mouse","Keyboard","Other"];
 
 // Every built-in category is a PC part by definition. Custom categories (added via the
 // "+ Add Category" picker) carry their own domain in state.customCategories, looked up at
@@ -81,6 +81,40 @@ function reducer(state, action) {
           ? {...p,status:"available",history:[...p.history,{date:today(),event:`Removed from build: ${build.name}`}]}
           : p
         )};
+    }
+    case "EDIT_BUILD_PARTS": {
+      // Adds and/or removes parts on a build that's already assembled (and possibly already
+      // listed) — without dissolving it first. Same defense-in-depth as CREATE_BUILD: only ever
+      // claim parts that are genuinely available right now, and only ever release parts that are
+      // genuinely still in_build and actually belong to this specific build. This is what stops
+      // an edit from accidentally grabbing a part another build already claims, or releasing a
+      // part that was already sold out from under this build some other way.
+      const {buildId, addPartIds=[], removePartIds=[]} = action;
+      const build = state.builds.find(b=>b.id===buildId);
+      if(!build) return state;
+
+      const validAdds = addPartIds.filter(id=>{
+        const p = state.parts.find(pp=>pp.id===id);
+        return p && p.status==="available";
+      });
+      const validRemoves = removePartIds.filter(id=>{
+        const p = state.parts.find(pp=>pp.id===id);
+        return p && p.status==="in_build" && build.partIds.includes(id);
+      });
+      if(validAdds.length===0 && validRemoves.length===0) return state; // nothing valid to change
+
+      const newPartIds = [...build.partIds.filter(id=>!validRemoves.includes(id)), ...validAdds];
+
+      return {...state,
+        builds: state.builds.map(b=>b.id===buildId?{...b,partIds:newPartIds}:b),
+        parts: state.parts.map(p=>{
+          if(validAdds.includes(p.id))
+            return {...p,status:"in_build",history:[...p.history,{date:today(),event:`Added to build: ${build.name}`}]};
+          if(validRemoves.includes(p.id))
+            return {...p,status:"available",history:[...p.history,{date:today(),event:`Removed from build: ${build.name}`}]};
+          return p;
+        })
+      };
     }
     case "SELL": {
       const {mode,id,sale} = action;
@@ -1797,11 +1831,74 @@ function DetailRow({label,value,valueColor="#fff"}) {
   );
 }
 
+function PartGroupSheet({group,onClose,onViewUnit}) {
+  const p=group[0];
+  const count=group.length;
+  const totalCost=p.allocatedCost*count;
+  const totalMarket=p.marketValue*count;
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",borderRadius:"18px 18px 0 0",width:"100%",maxWidth:520,
+        maxHeight:"85vh",overflowY:"auto",animation:"slideUp 0.22s cubic-bezier(0.22,1,0.36,1)",
+        paddingBottom:"calc(20px + env(safe-area-inset-bottom))"}}>
+        <div style={{display:"flex",justifyContent:"center",padding:"10px 0 4px"}}>
+          <div style={{width:38,height:4,borderRadius:99,background:"#3f3f46"}}/>
+        </div>
+        <div style={{padding:"14px 20px"}}>
+          <div style={{display:"flex",gap:12,alignItems:"center",marginBottom:14}}>
+            <PhotoThumb url={p.photoUrl} size={52} seed={p.id.length}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{color:"#fff",fontWeight:700,fontSize:16}}>{p.name}</div>
+              <div style={{color:"#71717a",fontSize:12,marginTop:2}}>{p.category} · {count} identical units</div>
+            </div>
+            <Badge s={p.status}/>
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+            <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:9,padding:10}}>
+              <div style={{fontSize:10,color:"#a1a1aa"}}>Cost each</div>
+              <div style={{fontSize:14,fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(p.allocatedCost)}</div>
+              <div style={{fontSize:10,color:"#52525b",marginTop:2}}>Total {fmt(totalCost)}</div>
+            </div>
+            <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:9,padding:10}}>
+              <div style={{fontSize:10,color:"#a1a1aa"}}>Market each</div>
+              <div style={{fontSize:14,fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(p.marketValue)}</div>
+              <div style={{fontSize:10,color:"#52525b",marginTop:2}}>Total {fmt(totalMarket)}</div>
+            </div>
+          </div>
+
+          <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:9}}>
+            Individual units — tap any one to sell, edit, or mark it defective
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {group.map((unit,i)=>(
+              <div key={unit.id} onClick={()=>onViewUnit(unit)} style={{display:"flex",alignItems:"center",gap:9,padding:"9px 10px",
+                borderRadius:9,background:"#09090b",border:"1px solid #27272a",cursor:"pointer",transition:"border-color 0.15s"}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor="#52525b";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor="#27272a";}}>
+                <span style={{color:"#52525b",fontSize:11,fontFamily:"monospace",width:20,flexShrink:0}}>{i+1}</span>
+                <PhotoThumb url={unit.photoUrl} size={28} seed={unit.id.length}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{color:"#d4d4d8",fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {unit.notes?unit.notes:`Unit ${i+1}`}
+                  </div>
+                </div>
+                <span style={{color:"#52525b",fontSize:14}}>›</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Inventory({state,dispatch,toast,setTab,openLightbox}) {
   const [statusFilter,setStatusFilter]=useState("all");
   const [catFilter,setCatFilter]=useState("all");
   const [search,setSearch]=useState("");   // #8
   const [viewing,setViewing]=useState(null); // part shown in the detail sheet
+  const [viewingGroup,setViewingGroup]=useState(null); // group of identical parts shown in the group sheet
   const [bundleView,setBundleView]=useState(false);
   const [quickSell,setQuickSell]=useState(null);
   const [editing,setEditing]=useState(null);
@@ -1824,6 +1921,21 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
     if(search&&!p.name.toLowerCase().includes(search.toLowerCase())&&!p.category.toLowerCase().includes(search.toLowerCase()))return false;
     return true;
   });
+
+  // Restocking the same item (e.g. buying 20 identical power cables) still creates 20
+  // independently-trackable part records under the hood — each can still be sold, built, or
+  // marked defective on its own. This only changes how they're DISPLAYED: identical parts
+  // (same name, category, cost, market value, and status) collapse into a single card with a
+  // quantity badge, instead of cluttering the grid with 20 near-identical cards. Anything
+  // that's the only one of its kind renders exactly as a normal single card, unchanged.
+  const groupKey=p=>`${p.name}|${p.category}|${Math.round(p.allocatedCost)}|${Math.round(p.marketValue)}|${p.status}`;
+  const groupMap=new Map();
+  filtered.forEach(p=>{
+    const k=groupKey(p);
+    if(!groupMap.has(k))groupMap.set(k,[]);
+    groupMap.get(k).push(p);
+  });
+  const groupedCards=[...groupMap.values()]; // each entry is an array of 1+ identical parts
 
   const handleQuickSell=(sp,buyer)=>{
     if(!quickSell)return;
@@ -1905,6 +2017,10 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
       )}
       {defectiveTarget&&(
         <DefectiveModal part={defectiveTarget} onConfirm={confirmDefective} onCancel={()=>setDefectiveTarget(null)}/>
+      )}
+      {viewingGroup&&(
+        <PartGroupSheet group={viewingGroup} onClose={()=>setViewingGroup(null)}
+          onViewUnit={(unit)=>{setViewing(unit);setViewingGroup(null);}}/>
       )}
       {viewing&&(
         <PartDetailSheet part={viewing} buildName={buildNameFor(viewing)} onClose={()=>setViewing(null)}
@@ -1990,21 +2106,28 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
         /* Marketplace-style 2-column card grid — replaces the old always-expanded list so
            scanning 50-100+ parts is fast, with full detail only a tap away. */
         <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
-          {filtered.map((p,i)=>{
+          {groupedCards.map((group,i)=>{
+            const p=group[0]; // representative — identical across the whole group by definition
+            const count=group.length;
             const potential=p.marketValue-p.allocatedCost;
+            const onCardClick=count>1?()=>setViewingGroup(group):()=>setViewing(p);
             return (
-              <div key={p.id} onClick={()=>setViewing(p)} style={{background:"#18181b",border:"1px solid #27272a",borderRadius:13,
-                padding:10,cursor:"pointer",animation:`fadeUp 0.18s ease ${Math.min(i*0.025,0.3)}s both`,transition:"border-color 0.15s,transform 0.1s"}}
+              <div key={groupKey(p)} onClick={onCardClick} style={{background:"#18181b",border:"1px solid #27272a",borderRadius:13,
+                padding:10,cursor:"pointer",animation:`fadeUp 0.18s ease ${Math.min(i*0.025,0.3)}s both`,transition:"border-color 0.15s,transform 0.1s",position:"relative"}}
                 onMouseEnter={e=>{e.currentTarget.style.borderColor="#52525b";}}
                 onMouseLeave={e=>{e.currentTarget.style.borderColor="#27272a";}}
                 onMouseDown={e=>e.currentTarget.style.transform="scale(0.98)"}
                 onMouseUp={e=>e.currentTarget.style.transform="scale(1)"}>
                 <div style={{width:"100%",aspectRatio:"1",borderRadius:9,overflow:"hidden",background:"#09090b",marginBottom:8,
-                  display:"flex",alignItems:"center",justifyContent:"center",border:"1px solid #1f1f23"}}>
+                  display:"flex",alignItems:"center",justifyContent:"center",border:"1px solid #1f1f23",position:"relative"}}>
                   {p.photoUrl?(
                     <img src={p.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
                   ):(
                     <span style={{fontSize:26,opacity:0.3}}>🔧</span>
+                  )}
+                  {count>1&&(
+                    <div style={{position:"absolute",top:6,right:6,background:"#7c3aed",color:"#fff",fontSize:11,fontWeight:800,
+                      padding:"3px 8px",borderRadius:99,boxShadow:"0 2px 6px rgba(0,0,0,0.4)"}}>×{count}</div>
                   )}
                 </div>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:4,marginBottom:3}}>
@@ -2013,11 +2136,17 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
                 </div>
                 <div style={{color:"#fff",fontWeight:600,fontSize:12.5,lineHeight:1.3,marginBottom:4,
                   display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.name}</div>
-                <div style={{fontFamily:"monospace",fontWeight:700,color:"#fff",fontSize:13}}>{fmt(p.allocatedCost)}</div>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#71717a",marginTop:2}}>
-                  <span>Market {fmt(p.marketValue)}</span>
-                  <span style={{color:potential>=0?"#34d399":"#f87171",fontWeight:600}}>{potential>=0?"+":""}{fmt(potential)}</span>
+                <div style={{fontFamily:"monospace",fontWeight:700,color:"#fff",fontSize:13}}>
+                  {fmt(p.allocatedCost)}{count>1&&<span style={{color:"#71717a",fontWeight:500,fontSize:11}}> each</span>}
                 </div>
+                {count>1?(
+                  <div style={{fontSize:10,color:"#a78bfa",marginTop:2,fontWeight:600}}>Total {fmt(p.allocatedCost*count)} · tap to view all {count}</div>
+                ):(
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#71717a",marginTop:2}}>
+                    <span>Market {fmt(p.marketValue)}</span>
+                    <span style={{color:potential>=0?"#34d399":"#f87171",fontWeight:600}}>{potential>=0?"+":""}{fmt(potential)}</span>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -2034,7 +2163,161 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
    BUILD DETAIL SHEET — tap a build card to see full cost breakdown, components, and actions,
    matching the exact same pattern as PartDetailSheet / TransactionDetailSheet for consistency.
 ═══════════════════════════════════════════ */
-function BuildDetailSheet({build,parts,onClose,openLightbox,onDissolve,onCopySpecs,onDelete}) {
+function EditBuildPartsModal({build,state,dispatch,toast,onClose}) {
+  const currentParts=state.parts.filter(p=>build.partIds.includes(p.id));
+  const [toRemove,setToRemove]=useState([]); // partIds staged for removal (not yet dispatched)
+  const [toAdd,setToAdd]=useState([]); // partIds staged for adding
+  const [activeCat,setActiveCat]=useState(null);
+  const [pickerSearch,setPickerSearch]=useState("");
+
+  // Same Domain Firewall as build creation — only PC Parts, never General Assets.
+  const avail=state.parts.filter(p=>p.status==="available"&&domainOf(p.category,state.customCategories)==="pc_part");
+  const customPcPartCats=(state.customCategories||[]).filter(c=>c.domain==="pc_part").map(c=>c.name);
+  const categoriesPresent=[...CATEGORIES,...customPcPartCats].filter(c=>avail.some(p=>p.category===c));
+  const partsInActiveCat=activeCat?avail.filter(p=>p.category===activeCat&&
+    (!pickerSearch||p.name.toLowerCase().includes(pickerSearch.toLowerCase()))):[];
+  const selectedCountByCat=cat=>avail.filter(p=>p.category===cat&&toAdd.includes(p.id)).length;
+  const toggleAdd=id=>setToAdd(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
+  const toggleRemove=id=>setToRemove(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
+
+  const keptParts=currentParts.filter(p=>!toRemove.includes(p.id));
+  const addedParts=avail.filter(p=>toAdd.includes(p.id));
+  const previewCost=keptParts.reduce((s,p)=>s+p.allocatedCost,0)+addedParts.reduce((s,p)=>s+p.allocatedCost,0);
+  const hasChanges=toRemove.length>0||toAdd.length>0;
+
+  const save=()=>{
+    if(keptParts.length+addedParts.length===0){
+      toast("A build needs at least one part left in it","error");
+      return;
+    }
+    dispatch({type:"EDIT_BUILD_PARTS",buildId:build.id,addPartIds:toAdd,removePartIds:toRemove});
+    const bits=[];
+    if(toAdd.length)bits.push(`${toAdd.length} added`);
+    if(toRemove.length)bits.push(`${toRemove.length} removed`);
+    toast(`"${build.name}" updated — ${bits.join(", ")} ✓`);
+    onClose();
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1400,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",borderRadius:"18px 18px 0 0",width:"100%",maxWidth:520,
+        maxHeight:"90vh",overflowY:"auto",animation:"slideUp 0.22s cubic-bezier(0.22,1,0.36,1)",
+        paddingBottom:"calc(20px + env(safe-area-inset-bottom))"}}>
+        <div style={{display:"flex",justifyContent:"center",padding:"10px 0 4px"}}>
+          <div style={{width:38,height:4,borderRadius:99,background:"#3f3f46"}}/>
+        </div>
+        <div style={{padding:"14px 20px"}}>
+          <div style={{color:"#fff",fontWeight:700,fontSize:17,marginBottom:2}}>Edit "{build.name}"</div>
+          <div style={{color:"#71717a",fontSize:12,marginBottom:16}}>Swap parts in or out — works even if this build is already listed for sale.</div>
+
+          {/* Currently in this build */}
+          <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:9}}>
+            Currently in this build ({keptParts.length})
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:16}}>
+            {currentParts.length===0&&<div style={{color:"#52525b",fontSize:12}}>No parts left — add some below before saving.</div>}
+            {currentParts.map(p=>{
+              const marked=toRemove.includes(p.id);
+              return (
+                <div key={p.id} style={{display:"flex",alignItems:"center",gap:9,padding:"7px 9px",borderRadius:8,
+                  background:marked?"rgba(239,68,68,0.08)":"#09090b",border:`1px solid ${marked?"rgba(239,68,68,0.3)":"#27272a"}`,
+                  opacity:marked?0.6:1,transition:"all 0.15s"}}>
+                  <PhotoThumb url={p.photoUrl} size={30} seed={p.id.length}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{color:"#fff",fontSize:12.5,textDecoration:marked?"line-through":"none",
+                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                    <div style={{color:"#71717a",fontSize:10}}>{p.category} · {fmt(p.allocatedCost)}</div>
+                  </div>
+                  <button onClick={()=>toggleRemove(p.id)} style={{background:"none",border:"none",cursor:"pointer",
+                    color:marked?"#f87171":"#52525b",fontSize:13,padding:"4px 6px",flexShrink:0,fontWeight:600}}>
+                    {marked?"Undo":"Remove"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Add more parts — identical picker pattern to build creation */}
+          <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:9}}>
+            Add more parts {toAdd.length>0?`(${toAdd.length} selected)`:""}
+          </div>
+          {avail.length===0?<div style={{color:"#52525b",fontSize:12,marginBottom:8}}>No other available parts in inventory.</div>:(
+            <>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+                {categoriesPresent.map(cat=>{
+                  const count=selectedCountByCat(cat);
+                  const isActive=activeCat===cat;
+                  return (
+                    <button key={cat} onClick={()=>{setActiveCat(isActive?null:cat);setPickerSearch("");}}
+                      style={{display:"flex",alignItems:"center",gap:5,padding:"7px 12px",borderRadius:99,fontSize:12.5,fontWeight:600,cursor:"pointer",
+                        border:`1px solid ${isActive?"#7c3aed":count>0?"#16a34a":"#3f3f46"}`,
+                        background:isActive?"rgba(124,58,237,0.15)":count>0?"rgba(6,78,59,0.35)":"#09090b",
+                        color:isActive?"#a78bfa":count>0?"#6ee7b7":"#d4d4d8",transition:"all 0.15s"}}>
+                      {count>0&&<span>✓</span>}
+                      <span>{cat}</span>
+                      <span style={{opacity:0.7}}>({avail.filter(p=>p.category===cat).length}{count>0?`, ${count} picked`:""})</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {activeCat&&(
+                <div style={{marginBottom:14,animation:"fadeUp 0.18s ease"}}>
+                  <Inp label="" value={pickerSearch} onChange={e=>setPickerSearch(e.target.value)} placeholder={`🔍  Search ${activeCat}...`}/>
+                  {partsInActiveCat.length===0?(
+                    <div style={{color:"#52525b",fontSize:13,padding:"14px 0"}}>No {activeCat} parts match.</div>
+                  ):(
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginTop:10}}>
+                      {partsInActiveCat.map(p=>{
+                        const checked=toAdd.includes(p.id);
+                        return (
+                          <div key={p.id} onClick={()=>toggleAdd(p.id)} style={{cursor:"pointer",borderRadius:11,padding:9,
+                            border:`1.5px solid ${checked?"#7c3aed":"#27272a"}`,background:checked?"rgba(124,58,237,0.1)":"#09090b",
+                            transition:"all 0.12s",position:"relative"}}>
+                            {checked&&<div style={{position:"absolute",top:6,right:6,width:18,height:18,borderRadius:"50%",
+                              background:"#7c3aed",color:"#fff",fontSize:11,display:"flex",alignItems:"center",justifyContent:"center"}}>✓</div>}
+                            <div style={{width:"100%",aspectRatio:"1",borderRadius:8,overflow:"hidden",background:"#18181b",marginBottom:6,
+                              display:"flex",alignItems:"center",justifyContent:"center"}}>
+                              {p.photoUrl?<img src={p.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:20,opacity:0.3}}>🔧</span>}
+                            </div>
+                            <div style={{color:"#fff",fontSize:12,fontWeight:600,lineHeight:1.3,marginBottom:3,
+                              display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.name}</div>
+                            <div style={{fontFamily:"monospace",fontSize:11.5,color:"#d4d4d8"}}>{fmt(p.allocatedCost)}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Live preview of the resulting build */}
+          {hasChanges&&(
+            <div style={{marginTop:4,paddingTop:12,borderTop:"1px solid #27272a",marginBottom:14}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
+                <span style={{color:"#a1a1aa"}}>Resulting part count</span>
+                <span style={{fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{keptParts.length+addedParts.length}</span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}>
+                <span style={{color:"#a1a1aa"}}>Resulting total cost</span>
+                <span style={{fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(previewCost)}</span>
+              </div>
+            </div>
+          )}
+
+          <div style={{display:"flex",gap:8}}>
+            <Btn onClick={save} disabled={!hasChanges} style={{flex:1}}>Save Changes</Btn>
+            <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BuildDetailSheet({build,parts,onClose,openLightbox,onDissolve,onCopySpecs,onDelete,onEdit}) {
   const cost=parts.reduce((s,p)=>s+p.allocatedCost,0);
   const market=parts.reduce((s,p)=>s+p.marketValue,0);
   const potential=market-cost;
@@ -2100,6 +2383,7 @@ function BuildDetailSheet({build,parts,onClose,openLightbox,onDissolve,onCopySpe
 
           {/* Actions */}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <Btn variant="primary" onClick={onEdit} style={{width:"100%"}}>✏️ Edit Parts — Add or Remove</Btn>
             <Btn variant="ghost" onClick={onDissolve} style={{width:"100%"}}>↩️ Dissolve Build — Return Parts to Inventory</Btn>
             <Btn variant="ghost" onClick={onCopySpecs} style={{width:"100%"}}>📋 Copy Specs for Listing</Btn>
             <div style={{paddingTop:6,borderTop:"1px solid #27272a",marginTop:6}}>
@@ -2121,6 +2405,7 @@ function Builds({state,dispatch,toast,openLightbox}) {
   const [buildPhoto,setBuildPhoto]=useState({photoUrl:"",photoRecordId:""});
   const [deletingBuild,setDeletingBuild]=useState(null);
   const [viewingBuild,setViewingBuild]=useState(null); // build shown in the detail sheet
+  const [editingBuild,setEditingBuild]=useState(null); // build shown in the edit-parts modal
   // Domain Firewall: Builds must never see General Assets (phones, vehicles, etc.), only PC Parts.
   // This is enforced at the data-access layer here, not just hidden in the UI, so there's no path
   // for a non-PC item to end up selected into a build's partIds.
@@ -2176,13 +2461,17 @@ function Builds({state,dispatch,toast,openLightbox}) {
             {label:"Delete build AND permanently destroy its parts",onClick:deleteBuildAndParts,variant:"danger"},
           ]}/>
       )}
+      {editingBuild&&(
+        <EditBuildPartsModal build={editingBuild} state={state} dispatch={dispatch} toast={toast} onClose={()=>setEditingBuild(null)}/>
+      )}
       {viewingBuild&&(()=>{
         const bp=state.parts.filter(p=>viewingBuild.partIds.includes(p.id));
         return (
           <BuildDetailSheet build={viewingBuild} parts={bp} onClose={()=>setViewingBuild(null)} openLightbox={openLightbox}
             onDissolve={()=>{dissolve(viewingBuild);setViewingBuild(null);}}
             onCopySpecs={()=>copySpecs(viewingBuild,bp)}
-            onDelete={()=>{setDeletingBuild(viewingBuild);setViewingBuild(null);}}/>
+            onDelete={()=>{setDeletingBuild(viewingBuild);setViewingBuild(null);}}
+            onEdit={()=>{setEditingBuild(viewingBuild);setViewingBuild(null);}}/>
         );
       })()}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
@@ -2368,8 +2657,16 @@ function Sell({state,dispatch,toast,openLightbox}) {
     if(!selId||!salePrice){toast("Select item and enter price","error");return;}
     setLoading(true);
     const name=mode==="part"?tp?.name:tb?.name;
+    // Snapshot the build's components NOW, at time of sale — not looked up later from the build
+    // record. If the build is ever deleted afterward, Postgres's ON DELETE SET NULL on
+    // sales.build_id wipes that link permanently; this snapshot is what still lets the
+    // Parts Breakdown work even after that happens.
+    const buildPartsSnapshot=mode==="build"&&tb
+      ?state.parts.filter(p=>tb.partIds.includes(p.id)).map(p=>({id:p.id,name:p.name,category:p.category,allocatedCost:p.allocatedCost,photoUrl:p.photoUrl}))
+      :undefined;
     setTimeout(()=>{
       dispatch({type:"SELL",mode,id:selId,sale:{id:uid(),partId:mode==="part"?selId:null,buildId:mode==="build"?selId:null,name,cost,salePrice:sp,profit,buyerName:buyer,date:today(),
+        buildPartsSnapshot,
         convoLink:convoLink.trim(),proofPhotoUrl:proofPhoto.photoUrl,proofPhotoRecordId:proofPhoto.photoRecordId}});
       toast(`${name} sold for ${fmt(sp)} — profit ${fmt(profit)} ✓`,profit>=0?"success":"warn");
       setSelId("");setSalePrice("");setBuyer("");setConvoLink("");setProofPhoto({photoUrl:"",photoRecordId:""});setLoading(false);
@@ -2784,10 +3081,33 @@ function History({state,dispatch,toast,openLightbox}) {
    TRANSACTION DETAIL SHEET — tap a History card for full transaction info + actions
 ═══════════════════════════════════════════ */
 function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,onDelete}) {
+  const [showBreakdown,setShowBreakdown]=useState(false);
   const status=sale.deleted?"deleted":sale.returned?"returned":"completed";
   const statusColor={completed:"#6ee7b7",returned:"#fbbf24",deleted:"#71717a"}[status];
   const linkedPart=state.parts.find(p=>p.id===sale.partId);
   const linkedBuild=state.builds.find(b=>b.id===sale.buildId);
+  // Prefer the snapshot taken at time of sale — it's self-contained and survives the build
+  // record being deleted later (Postgres's ON DELETE SET NULL on sales.build_id means that
+  // link can silently disappear at the database level, independent of anything in this app).
+  // Fall back to a live lookup only for older sales recorded before this snapshot existed.
+  const buildParts=sale.buildPartsSnapshot?.length
+    ?sale.buildPartsSnapshot
+    :(linkedBuild?state.parts.filter(p=>linkedBuild.partIds.includes(p.id)):[]);
+  const totalPartsCost=buildParts.reduce((s,p)=>s+p.allocatedCost,0);
+  // Each part's share of the total cost is used to proportionally attribute the sale price and
+  // profit to it too — e.g. a part that was 40% of what the build cost to assemble is treated
+  // as having earned 40% of the eventual sale price and 40% of the profit, even though the
+  // buyer paid one lump sum for the whole PC. This is an allocation convention, not a claim
+  // that the buyer priced each part individually.
+  const breakdownRows=buildParts.map(p=>{
+    const costShare=totalPartsCost>0?p.allocatedCost/totalPartsCost:(buildParts.length?1/buildParts.length:0);
+    return {
+      ...p,
+      costSharePct:costShare,
+      allocatedSale:costShare*sale.salePrice,
+      allocatedProfit:costShare*sale.profit,
+    };
+  });
   const img=sale.proofPhotoUrl||linkedPart?.photoUrl||linkedBuild?.photoUrl;
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
@@ -2817,6 +3137,78 @@ function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,o
               </div>
             ))}
           </div>
+
+          {/* Parts breakdown — only relevant for a build sale, since a single-part sale's "Cost
+              price" above already IS that one item's price, nothing to break down further. */}
+          {/* Show this whenever we have ANY evidence this was a build sale — either the live
+              buildId (usual case) or a snapshot taken at time of sale (survives buildId later
+              being wiped to null by the database's own ON DELETE SET NULL cascade if the build
+              row gets hard-deleted afterward). */}
+          {(sale.buildId||sale.buildPartsSnapshot?.length>0)&&(
+            <div style={{marginBottom:14}}>
+              <Btn variant="ghost" onClick={()=>setShowBreakdown(v=>!v)} style={{width:"100%"}}>
+                {showBreakdown?"▲ Hide Parts":`🔧 View Parts${buildParts.length?` (${buildParts.length})`:""}`}
+              </Btn>
+
+              {showBreakdown&&(buildParts.length===0?(
+                <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14,marginTop:8,color:"#71717a",fontSize:12}}>
+                  This build's individual parts are no longer available to look up (the build record was deleted after this sale) — only the total cost, sale price, and profit above are still known.
+                </div>
+              ):(
+                <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14,marginTop:8,animation:"fadeUp 0.18s ease"}}>
+                  <div style={{fontSize:10.5,color:"#52525b",marginBottom:12,lineHeight:1.4}}>
+                    Sale price and profit are attributed to each part in proportion to its share of what the build cost to assemble.
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                    {breakdownRows.map(p=>(
+                      <div key={p.id}>
+                        <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:6}}>
+                          <PhotoThumb url={p.photoUrl} size={30} seed={p.id.length}/>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{color:"#fff",fontSize:12.5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                            <div style={{color:"#71717a",fontSize:10}}>{p.category}</div>
+                          </div>
+                          <span style={{fontFamily:"monospace",fontSize:12.5,color:"#d4d4d8",flexShrink:0}}>{fmt(p.allocatedCost)}</span>
+                        </div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,paddingLeft:39}}>
+                          <div>
+                            <div style={{fontSize:9,color:"#52525b"}}>% of cost</div>
+                            <div style={{fontSize:12,fontFamily:"monospace",color:"#a78bfa",fontWeight:600}}>{pct(p.costSharePct)}</div>
+                          </div>
+                          <div>
+                            <div style={{fontSize:9,color:"#52525b"}}>Alloc. sale</div>
+                            <div style={{fontSize:12,fontFamily:"monospace",color:"#d4d4d8",fontWeight:600}}>{fmt(p.allocatedSale)}</div>
+                          </div>
+                          <div>
+                            <div style={{fontSize:9,color:"#52525b"}}>Alloc. profit</div>
+                            <div style={{fontSize:12,fontFamily:"monospace",color:p.allocatedProfit>=0?"#34d399":"#f87171",fontWeight:600}}>
+                              {p.allocatedProfit>=0?"+":""}{fmt(p.allocatedProfit)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginTop:12,paddingTop:10,borderTop:"1px solid #27272a"}}>
+                    <div>
+                      <div style={{fontSize:9,color:"#71717a"}}>Total cost</div>
+                      <div style={{fontSize:12.5,fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(totalPartsCost)}</div>
+                    </div>
+                    <div>
+                      <div style={{fontSize:9,color:"#71717a"}}>Total sale</div>
+                      <div style={{fontSize:12.5,fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(sale.salePrice)}</div>
+                    </div>
+                    <div>
+                      <div style={{fontSize:9,color:"#71717a"}}>Total profit</div>
+                      <div style={{fontSize:12.5,fontFamily:"monospace",fontWeight:700,color:sale.profit>=0?"#34d399":"#f87171"}}>
+                        {sale.profit>=0?"+":""}{fmt(sale.profit)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
             <DetailRow label="Buyer" value={sale.buyerName||"—"}/>
@@ -3115,9 +3507,12 @@ function QuickSellPickerModal({state,dispatch,toast,onClose}) {
 
   const submit=()=>{
     if(!selected||!salePrice){toast("Pick an item and enter a price","error");return;}
+    const buildPartsSnapshot=selected.mode==="build"
+      ?state.parts.filter(p=>builds.find(b=>b.id===selected.id)?.partIds.includes(p.id)).map(p=>({id:p.id,name:p.name,category:p.category,allocatedCost:p.allocatedCost,photoUrl:p.photoUrl}))
+      :undefined;
     dispatch({type:"SELL",mode:selected.mode,id:selected.id,sale:{id:uid(),
       partId:selected.mode==="part"?selected.id:null,buildId:selected.mode==="build"?selected.id:null,
-      name:selected.name,cost:selected.cost,salePrice:sp,profit,buyerName:buyer,date:today()}});
+      name:selected.name,cost:selected.cost,salePrice:sp,profit,buyerName:buyer,date:today(),buildPartsSnapshot}});
     toast(`${selected.name} sold for ${fmt(sp)} — profit ${fmt(profit)} ✓`,profit>=0?"success":"warn");
     onClose();
   };
