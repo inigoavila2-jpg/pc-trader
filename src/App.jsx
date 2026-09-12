@@ -2454,6 +2454,8 @@ function Builds({state,dispatch,toast,openLightbox}) {
   const [deletingBuild,setDeletingBuild]=useState(null);
   const [viewingBuild,setViewingBuild]=useState(null); // build shown in the detail sheet
   const [editingBuild,setEditingBuild]=useState(null); // build shown in the edit-parts modal
+  const [receiptPromptBuild,setReceiptPromptBuild]=useState(null); // build currently being asked "what price?"
+  const [buildReceipt,setBuildReceipt]=useState(null); // {rows,total,name} once a price has been entered
   // Domain Firewall: Builds must never see General Assets (phones, vehicles, etc.), only PC Parts.
   // This is enforced at the data-access layer here, not just hidden in the UI, so there's no path
   // for a non-PC item to end up selected into a build's partIds.
@@ -2499,6 +2501,19 @@ function Builds({state,dispatch,toast,openLightbox}) {
     );
   };
 
+  // Same weighted market-value distribution used everywhere else a receipt is generated — each
+  // part's share of the build's total market value is applied to the quoted price, so the lines
+  // always sum exactly to what was entered, with no cost or profit numbers anywhere in it.
+  const generateBuildReceipt=(build,bp,inputPrice)=>{
+    const totalMarket=bp.reduce((s,p)=>s+(p.marketValue||0),0);
+    const rows=bp.map(p=>{
+      const share=totalMarket>0?(p.marketValue||0)/totalMarket:(bp.length?1/bp.length:0);
+      return {...p,scaledPrice:share*inputPrice};
+    });
+    setBuildReceipt({rows,total:inputPrice,name:build.name});
+    setReceiptPromptBuild(null);
+  };
+
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
       {deletingBuild&&(
@@ -2522,6 +2537,14 @@ function Builds({state,dispatch,toast,openLightbox}) {
             onEdit={()=>{setEditingBuild(viewingBuild);setViewingBuild(null);}}/>
         );
       })()}
+      {receiptPromptBuild&&(
+        <ReceiptPricePromptModal buildName={receiptPromptBuild.name} onCancel={()=>setReceiptPromptBuild(null)}
+          onConfirm={(price)=>generateBuildReceipt(receiptPromptBuild,state.parts.filter(p=>receiptPromptBuild.partIds.includes(p.id)),price)}/>
+      )}
+      {buildReceipt&&(
+        <ReceiptModal title={buildReceipt.name} subtitle="Quote — not yet sold" date={today()} total={buildReceipt.total}
+          receiptRows={buildReceipt.rows} onClose={()=>setBuildReceipt(null)}/>
+      )}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
         <div><h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Builds</h2>
           <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>Group parts into a sellable PC.</p></div>
@@ -2652,6 +2675,15 @@ function Builds({state,dispatch,toast,openLightbox}) {
                       <div style={{fontSize:10,color:"#71717a"}}>market {fmt(market)}</div>
                     </div>
                   </div>
+
+                  {/* Stops propagation so tapping this doesn't also open the detail sheet
+                      underneath it — this button needs to work as a standalone quick action
+                      right from the list, without requiring a trip into the build first. */}
+                  <button onClick={e=>{e.stopPropagation();setReceiptPromptBuild(build);}} style={{width:"100%",marginBottom:11,
+                    background:"#27272a",border:"1px solid #3f3f46",borderRadius:9,padding:"8px 0",cursor:"pointer",
+                    color:"#d4d4d8",fontSize:12.5,fontWeight:600}}>
+                    🧾 Make a Receipt
+                  </button>
 
                   {/* Component badge tags — core parts at a glance */}
                   <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
