@@ -2317,10 +2317,50 @@ function EditBuildPartsModal({build,state,dispatch,toast,onClose}) {
   );
 }
 
+function ReceiptPricePromptModal({buildName,onConfirm,onCancel}) {
+  const [price,setPrice]=useState("");
+  const submit=()=>{
+    const n=parseFloat(price);
+    if(!n||n<=0)return;
+    onConfirm(n);
+  };
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onCancel}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:360,animation:"fadeUp 0.2s ease"}}>
+        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:4}}>Make a Receipt</div>
+        <div style={{fontSize:12,color:"#71717a",marginBottom:16}}>
+          "{buildName}" hasn't sold yet — enter the price you're quoting, and each part will be scaled proportionally to add up to it.
+        </div>
+        <Inp label="Input Price (₱)" type="number" value={price} onChange={e=>setPrice(e.target.value)} placeholder="e.g. 32000" autoFocus/>
+        <div style={{display:"flex",gap:8,marginTop:14}}>
+          <Btn onClick={submit} disabled={!price||parseFloat(price)<=0} style={{flex:1}}>Generate</Btn>
+          <Btn variant="ghost" onClick={onCancel}>Cancel</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BuildDetailSheet({build,parts,onClose,openLightbox,onDissolve,onCopySpecs,onDelete,onEdit}) {
+  const [showReceiptPrompt,setShowReceiptPrompt]=useState(false);
+  const [buildReceipt,setBuildReceipt]=useState(null); // {rows,total} once a price has been entered
   const cost=parts.reduce((s,p)=>s+p.allocatedCost,0);
   const market=parts.reduce((s,p)=>s+p.marketValue,0);
   const potential=market-cost;
+
+  const generateBuildReceipt=(inputPrice)=>{
+    // Same weighted market-value distribution as the post-sale receipt — each part's share of
+    // the build's total market value is applied to the quoted price, so the lines always sum
+    // exactly to what was entered, without touching cost or profit anywhere in the output.
+    const totalMarket=parts.reduce((s,p)=>s+(p.marketValue||0),0);
+    const rows=parts.map(p=>{
+      const share=totalMarket>0?(p.marketValue||0)/totalMarket:(parts.length?1/parts.length:0);
+      return {...p,scaledPrice:share*inputPrice};
+    });
+    setBuildReceipt({rows,total:inputPrice});
+    setShowReceiptPrompt(false);
+  };
+
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
       <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",borderRadius:"18px 18px 0 0",width:"100%",maxWidth:520,
@@ -2384,6 +2424,7 @@ function BuildDetailSheet({build,parts,onClose,openLightbox,onDissolve,onCopySpe
           {/* Actions */}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <Btn variant="primary" onClick={onEdit} style={{width:"100%"}}>✏️ Edit Parts — Add or Remove</Btn>
+            <Btn variant="ghost" onClick={()=>setShowReceiptPrompt(true)} style={{width:"100%"}}>🧾 Make a Receipt</Btn>
             <Btn variant="ghost" onClick={onDissolve} style={{width:"100%"}}>↩️ Dissolve Build — Return Parts to Inventory</Btn>
             <Btn variant="ghost" onClick={onCopySpecs} style={{width:"100%"}}>📋 Copy Specs for Listing</Btn>
             <div style={{paddingTop:6,borderTop:"1px solid #27272a",marginTop:6}}>
@@ -2392,6 +2433,13 @@ function BuildDetailSheet({build,parts,onClose,openLightbox,onDissolve,onCopySpe
           </div>
         </div>
       </div>
+      {showReceiptPrompt&&(
+        <ReceiptPricePromptModal buildName={build.name} onCancel={()=>setShowReceiptPrompt(false)} onConfirm={generateBuildReceipt}/>
+      )}
+      {buildReceipt&&(
+        <ReceiptModal title={build.name} subtitle="Quote — not yet sold" date={today()} total={buildReceipt.total}
+          receiptRows={buildReceipt.rows} onClose={()=>setBuildReceipt(null)}/>
+      )}
     </div>
   );
 }
@@ -3251,7 +3299,7 @@ function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,o
           )}
         </div>
       </div>
-      {showReceipt&&<ReceiptModal sale={sale} receiptRows={receiptRows} onClose={()=>setShowReceipt(false)}/>}
+      {showReceipt&&<ReceiptModal title={sale.name} subtitle={sale.buyerName?`For ${sale.buyerName}`:undefined} date={sale.date} total={sale.salePrice} receiptRows={receiptRows} onClose={()=>setShowReceipt(false)}/>}
     </div>
   );
 }
@@ -3263,16 +3311,16 @@ function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,o
    TransactionDetailSheet), not cost share, since a receipt should reflect plausible
    retail-style pricing per component, not the owner's internal cost structure.
 ═══════════════════════════════════════════ */
-function ReceiptModal({sale,receiptRows,onClose}) {
+function ReceiptModal({title,subtitle,date,total,label,receiptRows,onClose}) {
   const [copied,setCopied]=useState(false);
 
   const copyReceipt=()=>{
     const lines=[
-      sale.name,
+      title,
       "",
       ...receiptRows.map(p=>`${p.name}: ${fmt(p.scaledPrice)}`),
       "",
-      `Total: ${fmt(sale.salePrice)}`,
+      `Total: ${fmt(total)}`,
     ];
     const text=lines.join("\n");
     navigator.clipboard?.writeText(text).then(
@@ -3286,10 +3334,10 @@ function ReceiptModal({sale,receiptRows,onClose}) {
       <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,
         width:"100%",maxWidth:400,animation:"fadeUp 0.2s ease",overflow:"hidden"}}>
         <div style={{padding:"20px 22px 16px",borderBottom:"1px solid #27272a"}}>
-          <div style={{color:"#71717a",fontSize:10,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:4}}>Sales Receipt</div>
-          <div style={{color:"#fff",fontWeight:700,fontSize:17}}>{sale.name}</div>
-          {sale.buyerName&&<div style={{color:"#a1a1aa",fontSize:12,marginTop:3}}>For {sale.buyerName}</div>}
-          <div style={{color:"#52525b",fontSize:11,marginTop:2}}>{sale.date}</div>
+          <div style={{color:"#71717a",fontSize:10,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:4}}>{label||"Sales Receipt"}</div>
+          <div style={{color:"#fff",fontWeight:700,fontSize:17}}>{title}</div>
+          {subtitle&&<div style={{color:"#a1a1aa",fontSize:12,marginTop:3}}>{subtitle}</div>}
+          {date&&<div style={{color:"#52525b",fontSize:11,marginTop:2}}>{date}</div>}
         </div>
 
         <div style={{padding:"16px 22px"}}>
@@ -3303,7 +3351,7 @@ function ReceiptModal({sale,receiptRows,onClose}) {
           </div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",paddingTop:14,borderTop:"1px solid #27272a"}}>
             <span style={{color:"#fff",fontWeight:700,fontSize:15}}>Total</span>
-            <span style={{fontFamily:"monospace",fontWeight:800,fontSize:19,color:"#fff"}}>{fmt(sale.salePrice)}</span>
+            <span style={{fontFamily:"monospace",fontWeight:800,fontSize:19,color:"#fff"}}>{fmt(total)}</span>
           </div>
         </div>
 
