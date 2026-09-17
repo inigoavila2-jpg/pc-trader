@@ -2676,14 +2676,21 @@ function Builds({state,dispatch,toast,openLightbox}) {
                     </div>
                   </div>
 
-                  {/* Stops propagation so tapping this doesn't also open the detail sheet
-                      underneath it — this button needs to work as a standalone quick action
-                      right from the list, without requiring a trip into the build first. */}
-                  <button onClick={e=>{e.stopPropagation();setReceiptPromptBuild(build);}} style={{width:"100%",marginBottom:11,
-                    background:"#27272a",border:"1px solid #3f3f46",borderRadius:9,padding:"8px 0",cursor:"pointer",
-                    color:"#d4d4d8",fontSize:12.5,fontWeight:600}}>
-                    🧾 Make a Receipt
-                  </button>
+                  {/* Both stop propagation so tapping them doesn't also open the detail sheet
+                      underneath — these need to work as standalone quick actions right from the
+                      list, without requiring a trip into the build first. */}
+                  <div style={{display:"flex",gap:8,marginBottom:11}}>
+                    <button onClick={e=>{e.stopPropagation();setEditingBuild(build);}} style={{flex:1,
+                      background:"#27272a",border:"1px solid #3f3f46",borderRadius:9,padding:"8px 0",cursor:"pointer",
+                      color:"#d4d4d8",fontSize:12.5,fontWeight:600}}>
+                      ✏️ Edit Parts
+                    </button>
+                    <button onClick={e=>{e.stopPropagation();setReceiptPromptBuild(build);}} style={{flex:1,
+                      background:"#27272a",border:"1px solid #3f3f46",borderRadius:9,padding:"8px 0",cursor:"pointer",
+                      color:"#d4d4d8",fontSize:12.5,fontWeight:600}}>
+                      🧾 Make a Receipt
+                    </button>
+                  </div>
 
                   {/* Component badge tags — core parts at a glance */}
                   <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
