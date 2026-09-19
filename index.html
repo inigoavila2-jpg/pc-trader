@@ -7,6 +7,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>PC Trader</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- The app already sets fontFamily:"'Inter',system-ui,sans-serif" at its root, but nothing
+         ever actually loaded Inter — it's been silently falling back to the OS default font the
+         whole time. Fira Code covers every monospace price/number display throughout the app. -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>
       html, body { background: #09090b; margin: 0; padding: 0; min-height: 100%; }
       #root { min-height: 100vh; min-height: 100dvh; }
