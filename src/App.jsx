@@ -2437,7 +2437,7 @@ function BuildDetailSheet({build,parts,onClose,openLightbox,onDissolve,onCopySpe
         <ReceiptPricePromptModal buildName={build.name} onCancel={()=>setShowReceiptPrompt(false)} onConfirm={generateBuildReceipt}/>
       )}
       {buildReceipt&&(
-        <ReceiptModal title={build.name} subtitle="Quote — not yet sold" date={today()} total={buildReceipt.total}
+        <ReceiptModal title={build.name} date={today()} total={buildReceipt.total}
           receiptRows={buildReceipt.rows} onClose={()=>setBuildReceipt(null)}/>
       )}
     </div>
@@ -2542,7 +2542,7 @@ function Builds({state,dispatch,toast,openLightbox}) {
           onConfirm={(price)=>generateBuildReceipt(receiptPromptBuild,state.parts.filter(p=>receiptPromptBuild.partIds.includes(p.id)),price)}/>
       )}
       {buildReceipt&&(
-        <ReceiptModal title={buildReceipt.name} subtitle="Quote — not yet sold" date={today()} total={buildReceipt.total}
+        <ReceiptModal title={buildReceipt.name} date={today()} total={buildReceipt.total}
           receiptRows={buildReceipt.rows} onClose={()=>setBuildReceipt(null)}/>
       )}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
@@ -3382,8 +3382,9 @@ function ReceiptModal({title,subtitle,date,total,label,receiptRows,onClose}) {
         <div style={{padding:"16px 22px"}}>
           <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
             {receiptRows.map(p=>(
-              <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:10}}>
-                <span style={{color:"#d4d4d8",fontSize:13.5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</span>
+              <div key={p.id} style={{display:"flex",alignItems:"center",gap:10}}>
+                <PhotoThumb url={p.photoUrl} size={34} seed={p.id.length}/>
+                <span style={{flex:1,color:"#d4d4d8",fontSize:13.5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</span>
                 <span style={{fontFamily:"monospace",fontSize:14,color:"#fff",fontWeight:600,flexShrink:0}}>{fmt(p.scaledPrice)}</span>
               </div>
             ))}
