@@ -3383,7 +3383,14 @@ function ReceiptModal({title,subtitle,date,total,label,receiptRows,onClose}) {
           <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
             {receiptRows.map(p=>(
               <div key={p.id} style={{display:"flex",alignItems:"center",gap:10}}>
-                <PhotoThumb url={p.photoUrl} size={34} seed={p.id.length}/>
+                {p.photoUrl?(
+                  <PhotoThumb url={p.photoUrl} size={34} seed={p.id.length}/>
+                ):(
+                  <div style={{width:34,height:34,flexShrink:0,borderRadius:7,background:"#09090b",border:"1px solid #27272a",
+                    display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    <span style={{fontSize:14,opacity:0.3}}>🔧</span>
+                  </div>
+                )}
                 <span style={{flex:1,color:"#d4d4d8",fontSize:13.5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</span>
                 <span style={{fontFamily:"monospace",fontSize:14,color:"#fff",fontWeight:600,flexShrink:0}}>{fmt(p.scaledPrice)}</span>
               </div>
