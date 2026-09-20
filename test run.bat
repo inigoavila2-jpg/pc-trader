@@ -1,17 +1,17 @@
 @echo off
 cd /d "%~dp0"
 
-echo Fetching latest changes from GitHub...
-git pull origin main --rebase
-
-echo Staging all project files...
+echo Staging all changes...
 git add .
 
-set /p msg="Enter commit message (Press Enter for 'Update project'): "
-if "%msg%"=="" set msg=Update project
+set /p msg="Enter commit message (Press Enter for 'Update App.jsx'): "
+if "%msg%"=="" set msg=Update App.jsx
 
 echo Committing changes...
 git commit -m "%msg%"
+
+echo Fetching and integrating remote changes...
+git pull origin main --rebase
 
 echo Pushing to pc-trader...
 git push origin main
