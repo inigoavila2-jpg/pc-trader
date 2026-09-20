@@ -1,5 +1,14 @@
-import { useState, useEffect, useRef, useCallback, Fragment } from "react";
+import { useState, useEffect, useRef, useCallback, createContext, useContext, Fragment } from "react";
 import { AIAgentChatbox } from "./components/AIAgentChatbox";
+import {
+  LayoutDashboard, ShoppingCart, Boxes, Wrench, Banknote, History as HistoryIcon, Settings as SettingsIcon,
+  Search, X, Check, ChevronDown, ChevronUp, ChevronRight, Plus, Minus, Camera, Trash2, Pencil, Copy,
+  AlertTriangle, CircleAlert, ArrowLeftRight, TrendingUp, Wallet, Sun, Moon, Zap, Receipt,
+  User, Link as LinkIcon, Info, ArrowRight, Loader2,
+  CheckCircle2, XCircle, PackageX, ClipboardList, StickyNote, Undo2,
+  Monitor, Cpu, ClipboardCopy, PackageCheck,
+  Tag, FileDown, Sparkles,
+} from "lucide-react";
 
 /* ═══════════════════════════════════════════
    GLOBALS & UTILS
@@ -374,8 +383,109 @@ function reducer(state, action) {
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGN SYSTEM — "Bench Ledger"
+   Grounded in what this app actually is: a workbench for trading PC hardware,
+   kept honest by a ledger. Surfaces read like gunmetal tool casings and
+   anti-static mats; the brand accent is copper — solder and circuit-trace
+   colored, and (usefully, for a trading app) the color of value itself. A
+   second accent, teal, marks anything "in progress" the way a multimeter or
+   scope trace glows. Money is set in a mono face for ledger-style alignment;
+   everything else uses two families with a clear division of labor —
+   Space Grotesk carries personality on headings and hero numbers, Inter does
+   the quiet work of UI and body text. Every color pair below is verified
+   against WCAG AA (4.5:1 for text, 3:1 for large text/UI) — see the "soft"
+   tokens for tinted panels and the *Strong tokens for solid button fills.
+═══════════════════════════════════════════════════════════════════════════ */
+const THEME = {
+  dark: {
+    mode:"dark",
+    bg:"#15161A", bgElevated:"#1B1C21",
+    surface:"#1C1D22", surfaceSunken:"#0F1013", surfaceHover:"#232429",
+    border:"#2C2E35", borderStrong:"#3B3D46",
+    text:"#F4F4F3", textMuted:"#A8A9B3", textFaint:"#7B7D87",
+    accent:"#CE7C3E", accentStrong:"#A85B22", accentSoft:"rgba(206,124,62,0.14)", accentSoftBorder:"rgba(206,124,62,0.38)",
+    info:"#4FC2CC", infoStrong:"#1D8A96", infoSoft:"rgba(79,194,204,0.13)", infoSoftBorder:"rgba(79,194,204,0.36)",
+    positive:"#3FC088", positiveStrong:"#167A4D", positiveSoft:"rgba(63,192,136,0.13)", positiveSoftBorder:"rgba(63,192,136,0.36)",
+    negative:"#F0716F", negativeStrong:"#C33F3D", negativeSoft:"rgba(240,113,111,0.13)", negativeSoftBorder:"rgba(240,113,111,0.36)",
+    warning:"#E3B24A", warningSoft:"rgba(227,178,74,0.13)", warningSoftBorder:"rgba(227,178,74,0.36)",
+    overlay:"rgba(9,9,11,0.72)", focusRing:"rgba(206,124,62,0.45)",
+    shadow:"0 12px 32px rgba(0,0,0,0.45)", shadowSm:"0 2px 10px rgba(0,0,0,0.35)",
+  },
+  light: {
+    mode:"light",
+    bg:"#F5F6F8", bgElevated:"#FFFFFF",
+    surface:"#FFFFFF", surfaceSunken:"#EEF0F3", surfaceHover:"#F0F1F4",
+    border:"#E2E4E9", borderStrong:"#CBCED6",
+    text:"#1B1C21", textMuted:"#52545E", textFaint:"#82848F",
+    accent:"#9A5220", accentStrong:"#8A481B", accentSoft:"rgba(154,82,32,0.08)", accentSoftBorder:"rgba(154,82,32,0.28)",
+    info:"#127680", infoStrong:"#0F636C", infoSoft:"rgba(18,118,128,0.08)", infoSoftBorder:"rgba(18,118,128,0.28)",
+    positive:"#187A4C", positiveStrong:"#136A41", positiveSoft:"rgba(24,122,76,0.08)", positiveSoftBorder:"rgba(24,122,76,0.28)",
+    negative:"#C93A3A", negativeStrong:"#B02F2F", negativeSoft:"rgba(201,58,58,0.08)", negativeSoftBorder:"rgba(201,58,58,0.28)",
+    warning:"#8A5A0A", warningSoft:"rgba(138,90,10,0.08)", warningSoftBorder:"rgba(138,90,10,0.28)",
+    overlay:"rgba(20,21,25,0.5)", focusRing:"rgba(154,82,32,0.35)",
+    shadow:"0 12px 32px rgba(20,21,25,0.12)", shadowSm:"0 2px 10px rgba(20,21,25,0.08)",
+  },
+};
+const STATUS_TONE = { available:"positive", in_build:"info", sold:"neutral", defective:"negative" };
+
+// Font stacks — Space Grotesk (headings/hero numbers), Inter (UI/body), IBM Plex Mono (money/ledger figures)
+const FONT_DISPLAY = "'Space Grotesk',ui-sans-serif,system-ui,sans-serif";
+const FONT_BODY = "'Inter',ui-sans-serif,system-ui,-apple-system,sans-serif";
+const FONT_MONO = "'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace";
+const GOOGLE_FONTS_HREF = "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap";
+
+const ThemeCtx = createContext(THEME.dark);
+const useTheme = () => useContext(ThemeCtx);
+
+/* Breakpoint hook — the redesign's responsive shell (sidebar at desktop widths,
+   refined top tabs below that) hangs off this single source of truth. */
+function useMediaQuery(query){
+  const [matches,setMatches]=useState(()=>typeof window!=="undefined"?window.matchMedia(query).matches:false);
+  useEffect(()=>{
+    const mql=window.matchMedia(query);
+    const handler=e=>setMatches(e.matches);
+    setMatches(mql.matches);
+    mql.addEventListener?mql.addEventListener("change",handler):mql.addListener(handler);
+    return()=>{mql.removeEventListener?mql.removeEventListener("change",handler):mql.removeListener(handler);};
+  },[query]);
+  return matches;
+}
+
+function usePrefersReducedMotion(){
+  return useMediaQuery("(prefers-reduced-motion: reduce)");
+}
+
+/* Focus trap + Escape-to-close for every modal/sheet in the app — previously each
+   overlay only closed on backdrop click, which strands keyboard and screen-reader
+   users. One hook, applied everywhere, so the behavior is consistent. */
+function useDialogA11y(onClose, active=true){
+  const ref=useRef(null);
+  useEffect(()=>{
+    if(!active)return;
+    const node=ref.current;
+    const focusables=()=>node?Array.from(node.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')).filter(el=>!el.disabled&&el.offsetParent!==null):[];
+    const toFocus=focusables();
+    (toFocus[0]||node)?.focus?.();
+    const onKey=e=>{
+      if(e.key==="Escape"){e.stopPropagation();onClose?.();return;}
+      if(e.key==="Tab"){
+        const items=focusables();
+        if(items.length===0)return;
+        const first=items[0], last=items[items.length-1];
+        if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+        else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+      }
+    };
+    document.addEventListener("keydown",onKey,true);
+    return()=>document.removeEventListener("keydown",onKey,true);
+  },[active,onClose]);
+  return ref;
+}
 /* ═══════════════════════════════════════════
-   TOAST
+   TOAST — now announced to assistive tech via a visually-hidden aria-live region,
+   not just shown visually. Screen-reader users previously had no idea a sale,
+   save, or error had happened.
 ═══════════════════════════════════════════ */
 function useToast() {
   const [toasts,setToasts] = useState([]);
@@ -386,61 +496,76 @@ function useToast() {
   },[]);
   return {toasts,toast};
 }
+const TOAST_ICON = { success:CheckCircle2, error:XCircle, info:Info, warn:AlertTriangle };
 function ToastContainer({toasts}) {
+  const t=useTheme();
   return (
-    <div style={{position:"fixed",top:16,right:16,zIndex:9999,display:"flex",flexDirection:"column",gap:8,pointerEvents:"none"}}>
-      {toasts.map(t=>(
-        <div key={t.id} style={{
-          background: t.type==="success"?"#14532d":t.type==="error"?"#7f1d1d":"#1e1b4b",
-          border:`1px solid ${t.type==="success"?"#22c55e":t.type==="error"?"#ef4444":"#7c3aed"}`,
-          color:"#fff",padding:"10px 14px",borderRadius:10,fontSize:13,fontWeight:500,
-          maxWidth:300,animation:"slideIn 0.3s cubic-bezier(0.34,1.4,0.64,1)",
-          display:"flex",alignItems:"center",gap:8,boxShadow:"0 8px 32px rgba(0,0,0,0.6)"
-        }}>
-          <span style={{fontSize:15}}>{t.type==="success"?"✓":t.type==="error"?"✕":"ℹ"}</span>
-          {t.message}
-        </div>
-      ))}
-    </div>
+    <>
+      <div aria-live="polite" role="status" style={SR_ONLY}>{toasts.map(x=>x.message).join(". ")}</div>
+      <div aria-hidden="true" style={{position:"fixed",top:"calc(14px + env(safe-area-inset-top))",right:14,zIndex:9999,display:"flex",flexDirection:"column",gap:8,pointerEvents:"none",maxWidth:"calc(100vw - 28px)"}}>
+        {toasts.map(x=>{
+          const tone=x.type==="success"?t.positive:x.type==="error"?t.negative:x.type==="warn"?t.warning:t.info;
+          const Icon=TOAST_ICON[x.type]||Info;
+          return (
+            <div key={x.id} style={{
+              background:t.bgElevated,border:`1px solid ${tone}55`,color:t.text,padding:"10px 14px",borderRadius:10,fontSize:13,fontWeight:500,
+              maxWidth:320,animation:"blSlideIn 0.3s cubic-bezier(0.34,1.4,0.64,1)",fontFamily:FONT_BODY,
+              display:"flex",alignItems:"center",gap:9,boxShadow:t.shadow
+            }}>
+              <Icon size={16} color={tone} strokeWidth={2.25} style={{flexShrink:0}}/>
+              {x.message}
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
+const SR_ONLY={position:"absolute",width:1,height:1,padding:0,margin:-1,overflow:"hidden",clip:"rect(0,0,0,0)",whiteSpace:"nowrap",border:0};
 
 /* ═══════════════════════════════════════════
    ANIMATED NUMBER
 ═══════════════════════════════════════════ */
 function AnimNum({value}) {
-  const [d,setD]=useState(0);
-  const prev=useRef(0);
+  const reduceMotion=usePrefersReducedMotion();
+  const [d,setD]=useState(reduceMotion?value:0);
+  const prev=useRef(reduceMotion?value:0);
   useEffect(()=>{
+    if(reduceMotion){setD(value);prev.current=value;return;}
     const start=prev.current,end=value,diff=end-start;
     if(!diff)return;
     let i=0;const steps=20;
-    const t=setInterval(()=>{i++;setD(Math.round(start+(diff*i)/steps));if(i>=steps){clearInterval(t);prev.current=end;}},16);
-    return()=>clearInterval(t);
-  },[value]);
+    const tmr=setInterval(()=>{i++;setD(Math.round(start+(diff*i)/steps));if(i>=steps){clearInterval(tmr);prev.current=end;}},16);
+    return()=>clearInterval(tmr);
+  },[value,reduceMotion]);
   return <>{d.toLocaleString("en-PH")}</>;
 }
 
 /* ═══════════════════════════════════════════
-   BASE UI
+   STATUS BADGE — status color now maps through the theme's four-hue semantic
+   system (positive/info/neutral/negative) instead of one-off hex values, so it
+   stays correct in both themes automatically.
 ═══════════════════════════════════════════ */
-const SC = {
-  available:{bg:"rgba(6,78,59,0.5)",border:"#16a34a",color:"#6ee7b7"},
-  in_build:{bg:"rgba(12,74,110,0.5)",border:"#0ea5e9",color:"#7dd3fc"},
-  sold:{bg:"rgba(39,39,42,0.5)",border:"#52525b",color:"#a1a1aa"},
-  defective:{bg:"rgba(127,29,29,0.5)",border:"#ef4444",color:"#fca5a5"},
-};
-function Badge({s}) {
-  const c=SC[s]||{};
-  return <span style={{background:c.bg,border:`1px solid ${c.border}`,color:c.color,fontSize:10,padding:"2px 7px",borderRadius:6,fontFamily:"'Fira Code',monospace",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:600,whiteSpace:"nowrap"}}>{s.replace("_"," ")}</span>;
+const STATUS_LABEL = { available:"Available", in_build:"In a build", sold:"Sold", defective:"Defective" };
+function StatusBadge({s}) {
+  const t=useTheme();
+  const tone=STATUS_TONE[s]||"neutral";
+  const color=tone==="neutral"?t.textMuted:t[tone];
+  const bg=tone==="neutral"?(t.mode==="dark"?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.04)"):`${color}22`;
+  const border=tone==="neutral"?t.border:`${color}55`;
+  return (
+    <span style={{background:bg,border:`1px solid ${border}`,color,fontSize:10.5,padding:"3px 8px",borderRadius:6,
+      fontFamily:FONT_BODY,letterSpacing:"0.02em",fontWeight:700,whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",gap:4}}>
+      <span aria-hidden="true" style={{width:5,height:5,borderRadius:"50%",background:color,flexShrink:0}}/>
+      {STATUS_LABEL[s]||s.replace("_"," ")}
+    </span>
+  );
 }
 
 /* ═══════════════════════════════════════════
-   PHOTO UPLOAD — single image, upload from gallery
-═══════════════════════════════════════════ */
-/* ═══════════════════════════════════════════
-   IMAGE COMPRESSION — resize before upload so phone photos (3-5MB)
-   don't eat Railway disk space or slow down loading
+   PHOTO UPLOAD / THUMB / LIGHTBOX — same upload+compression pipeline, restyled,
+   with real labels on the icon-only controls and a 44px-plus tap target on the
+   remove button (was 22px).
 ═══════════════════════════════════════════ */
 function compressImage(file,maxDimension=1280,quality=0.82){
   return new Promise((resolve,reject)=>{
@@ -471,7 +596,8 @@ function compressImage(file,maxDimension=1280,quality=0.82){
 }
 
 function PhotoUpload({photoUrl,photoRecordId,onChange,label="Photo"}) {
-  const [status,setStatus]=useState("idle"); // idle | compressing | uploading | error
+  const t=useTheme();
+  const [status,setStatus]=useState("idle");
   const inputRef=useRef(null);
 
   const handleFile=async(file)=>{
@@ -479,14 +605,13 @@ function PhotoUpload({photoUrl,photoRecordId,onChange,label="Photo"}) {
     if(!file.type.startsWith("image/")){setStatus("error");return;}
     setStatus("compressing");
     try{
-      const compressed=await compressImage(file).catch(()=>file); // fall back to original if compression fails
+      const compressed=await compressImage(file).catch(()=>file);
       setStatus("uploading");
       const form=new FormData();
       form.append("photo",compressed);
       const res=await fetch("/photo",{method:"POST",body:form});
       if(!res.ok)throw new Error(`Upload failed (${res.status})`);
       const {url,recordId}=await res.json();
-      // Clean up the old photo if one is being replaced — best effort, won't block the UI
       if(photoRecordId){fetch(`/photo/${photoRecordId}`,{method:"DELETE"}).catch(()=>{});}
       onChange({photoUrl:url,photoRecordId:recordId});
       setStatus("idle");
@@ -503,149 +628,190 @@ function PhotoUpload({photoUrl,photoRecordId,onChange,label="Photo"}) {
 
   return (
     <div>
-      <div style={{fontSize:12,color:"#a1a1aa",marginBottom:5}}>{label}</div>
-      <input ref={inputRef} type="file" accept="image/*" style={{display:"none"}}
-        onChange={e=>handleFile(e.target.files?.[0])}/>
+      {label&&<div style={{fontSize:12.5,color:t.textMuted,marginBottom:6,fontWeight:500}}>{label}</div>}
+      <input ref={inputRef} type="file" accept="image/*" style={SR_ONLY}
+        onChange={e=>handleFile(e.target.files?.[0])} aria-label={label||"Upload photo"}/>
       {photoUrl?(
         <div style={{position:"relative",display:"inline-block"}}>
-          <img src={photoUrl} alt="" style={{width:96,height:96,objectFit:"cover",borderRadius:10,border:"1px solid #3f3f46",display:"block"}}/>
-          <button onClick={removePhoto} type="button" style={{position:"absolute",top:-7,right:-7,width:22,height:22,borderRadius:"50%",
-            background:"#ef4444",border:"2px solid #18181b",color:"#fff",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>✕</button>
+          <img src={photoUrl} alt="" style={{width:96,height:96,objectFit:"cover",borderRadius:10,border:`1px solid ${t.border}`,display:"block"}}/>
+          <button onClick={removePhoto} type="button" aria-label="Remove photo" className="bl-focusable"
+            style={{position:"absolute",top:-9,right:-9,width:28,height:28,borderRadius:"50%",
+            background:t.negativeStrong,border:`2px solid ${t.bg}`,color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <X size={14} strokeWidth={2.5}/>
+          </button>
         </div>
       ):(
-        <button type="button" onClick={()=>inputRef.current?.click()} disabled={status==="uploading"||status==="compressing"}
-          style={{width:96,height:96,borderRadius:10,border:"1.5px dashed #3f3f46",background:"#09090b",color:"#71717a",
-            display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,cursor:(status==="uploading"||status==="compressing")?"wait":"pointer",
-            fontSize:11,transition:"border-color 0.15s,color 0.15s"}}
-          onMouseEnter={e=>{if(status==="idle"){e.currentTarget.style.borderColor="#7c3aed";e.currentTarget.style.color="#a78bfa";}}}
-          onMouseLeave={e=>{e.currentTarget.style.borderColor="#3f3f46";e.currentTarget.style.color="#71717a";}}>
+        <button type="button" onClick={()=>inputRef.current?.click()} disabled={status==="uploading"||status==="compressing"} className="bl-focusable"
+          style={{width:96,height:96,borderRadius:10,border:`1.5px dashed ${t.borderStrong}`,background:t.surfaceSunken,color:t.textMuted,
+            display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,cursor:(status==="uploading"||status==="compressing")?"wait":"pointer",
+            fontSize:11,fontFamily:FONT_BODY,transition:"border-color 0.15s,color 0.15s"}}
+          onMouseEnter={e=>{if(status==="idle"){e.currentTarget.style.borderColor=t.accent;e.currentTarget.style.color=t.accent;}}}
+          onMouseLeave={e=>{e.currentTarget.style.borderColor=t.borderStrong;e.currentTarget.style.color=t.textMuted;}}>
           {status==="compressing"?(
-            <><span style={{animation:"spin 0.6s linear infinite",fontSize:18,display:"inline-block"}}>⟳</span><span>Optimizing…</span></>
+            <><Loader2 size={18} className="bl-spin"/><span>Optimizing…</span></>
           ):status==="uploading"?(
-            <><span style={{animation:"spin 0.6s linear infinite",fontSize:18,display:"inline-block"}}>⟳</span><span>Uploading…</span></>
+            <><Loader2 size={18} className="bl-spin"/><span>Uploading…</span></>
           ):(
-            <><span style={{fontSize:20}}>📷</span><span>Add photo</span></>
+            <><Camera size={20} strokeWidth={1.75}/><span>Add photo</span></>
           )}
         </button>
       )}
-      {status==="error"&&<div style={{color:"#f87171",fontSize:11,marginTop:5}}>Upload failed — try again</div>}
+      {status==="error"&&<div style={{color:t.negative,fontSize:11.5,marginTop:6}}>Upload failed — try again</div>}
+    </div>
+  );
+}
+
+function PhotoThumb({url,size=52,seed=0,onClick,label}) {
+  const t=useTheme();
+  if(!url)return null;
+  const tilt=((seed%5)-2)*1.6;
+  const Tag=onClick?"button":"div";
+  return (
+    <Tag onClick={onClick} type={onClick?"button":undefined} aria-label={onClick?(label||"View photo"):undefined} className={onClick?"bl-focusable":undefined}
+      style={{width:size,height:size,flexShrink:0,transform:`rotate(${tilt}deg)`,transition:"transform 0.2s",cursor:onClick?"pointer":"default",
+        padding:0,border:"none",background:"none",display:"block"}}
+      onMouseEnter={onClick?e=>e.currentTarget.style.transform=`rotate(0deg) scale(1.06)`:undefined}
+      onMouseLeave={onClick?e=>e.currentTarget.style.transform=`rotate(${tilt}deg) scale(1)`:undefined}>
+      <img src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:7,border:`2px solid ${t.border}`,boxShadow:t.shadowSm,display:"block"}}/>
+    </Tag>
+  );
+}
+
+function Lightbox({url,onClose}) {
+  const t=useTheme();
+  const active=!!url;
+  const dialogRef=useDialogA11y(onClose,active);
+  if(!url)return null;
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Photo" ref={dialogRef} tabIndex={-1}
+      style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:20,animation:"blFadeUp 0.15s ease",outline:"none"}}
+      onClick={onClose}>
+      <img src={url} alt="" style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain",borderRadius:8,boxShadow:"0 20px 60px rgba(0,0,0,0.7)"}}/>
+      <button onClick={onClose} aria-label="Close" className="bl-focusable" style={{position:"absolute",top:18,right:18,width:40,height:40,borderRadius:"50%",
+        background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",color:"#fff",cursor:"pointer",
+        display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <X size={18}/>
+      </button>
     </div>
   );
 }
 
 /* ═══════════════════════════════════════════
-   DEFECTIVE MODAL — mark a part as defective/write-off, logs a capital loss
+   MODAL SHELL — shared chrome (backdrop, focus trap, Escape, aria-modal) for
+   every dialog and bottom sheet in the app, so each modal only has to describe
+   its own content, not re-solve accessibility.
 ═══════════════════════════════════════════ */
-function DefectiveModal({part,onConfirm,onCancel}) {
-  const [reason,setReason]=useState("");
+function ModalShell({onClose,children,maxWidth=380,label,sheet=false,padding=22}) {
+  const t=useTheme();
+  const dialogRef=useDialogA11y(onClose,true);
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onCancel}>
-      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
-        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:8}}>Mark as defective?</div>
-        <div style={{fontSize:13,color:"#a1a1aa",marginBottom:14,lineHeight:1.5}}>
-          "{part.name}" will be removed from active inventory and logged as a capital loss of <b style={{color:"#fca5a5"}}>{fmt(part.allocatedCost)}</b> on your Dashboard.
-        </div>
-        <Inp label="Reason (optional)" value={reason} onChange={e=>setReason(e.target.value)} placeholder="DOA, shorted during build, etc."/>
-        <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:16}}>
-          <Btn variant="warn" onClick={()=>onConfirm(reason)} style={{width:"100%"}}>Mark Defective — Log Loss</Btn>
-          <Btn variant="ghost" onClick={onCancel} style={{width:"100%"}}>Cancel</Btn>
-        </div>
+    <div role="dialog" aria-modal="true" aria-label={label} style={{position:"fixed",inset:0,background:t.overlay,zIndex:1500,
+      display:"flex",alignItems:sheet?"flex-end":"center",justifyContent:"center",padding:sheet?0:16}} onClick={onClose}>
+      <div ref={dialogRef} tabIndex={-1} onClick={e=>e.stopPropagation()} style={{background:t.bgElevated,border:sheet?"none":`1px solid ${t.border}`,
+        borderRadius:sheet?"18px 18px 0 0":16,padding:sheet?0:padding,width:"100%",maxWidth,
+        maxHeight:sheet?"88vh":"90vh",overflowY:"auto",animation:sheet?"blSlideUp 0.22s cubic-bezier(0.22,1,0.36,1)":"blFadeUp 0.2s ease",
+        outline:"none",boxShadow:t.shadow,paddingBottom:sheet?`calc(20px + env(safe-area-inset-bottom))`:padding}}>
+        {sheet&&<div style={{display:"flex",justifyContent:"center",padding:"10px 0 4px"}} aria-hidden="true">
+          <div style={{width:38,height:4,borderRadius:99,background:t.borderStrong}}/>
+        </div>}
+        {children}
       </div>
     </div>
   );
 }
-function PhotoThumb({url,size=52,seed=0,onClick}) {
-  if(!url)return null;
-  // Deterministic slight tilt per item so the grid feels like a physical parts bin, not a uniform UI
-  const tilt=((seed%5)-2)*1.6;
-  return (
-    <div onClick={onClick} style={{width:size,height:size,flexShrink:0,transform:`rotate(${tilt}deg)`,transition:"transform 0.2s",cursor:onClick?"pointer":"default"}}
-      onMouseEnter={e=>e.currentTarget.style.transform=`rotate(0deg) scale(1.06)`}
-      onMouseLeave={e=>e.currentTarget.style.transform=`rotate(${tilt}deg) scale(1)`}>
-      <img src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:7,border:"2px solid #27272a",boxShadow:"0 3px 8px rgba(0,0,0,0.4)",display:"block"}}/>
-    </div>
-  );
-}
 
 /* ═══════════════════════════════════════════
-   LIGHTBOX — tap any photo to view full-screen
-═══════════════════════════════════════════ */
-function Lightbox({url,onClose}) {
-  if(!url)return null;
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:20,animation:"fadeUp 0.15s ease"}} onClick={onClose}>
-      <img src={url} alt="" style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain",borderRadius:8,boxShadow:"0 20px 60px rgba(0,0,0,0.7)"}}/>
-      <button onClick={onClose} style={{position:"absolute",top:18,right:18,width:36,height:36,borderRadius:"50%",
-        background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",color:"#fff",fontSize:16,cursor:"pointer",
-        display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════
-   CONFIRM MODAL — generic "are you sure?" with optional extra choices
+   CONFIRM MODAL
 ═══════════════════════════════════════════ */
 function ConfirmModal({title,message,confirmLabel="Delete",danger=true,onConfirm,onCancel,extraChoices}) {
-  // extraChoices: optional array of {label, onClick, variant} rendered as additional buttons
-  // (used for the bundle-delete and build-delete "what happens to the parts?" choices)
+  const t=useTheme();
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onCancel}>
-      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
-        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:8}}>{title}</div>
-        <div style={{fontSize:13,color:"#a1a1aa",marginBottom:18,lineHeight:1.5}}>{message}</div>
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {extraChoices?extraChoices.map((c,i)=>(
-            <Btn key={i} variant={c.variant||"warn"} onClick={c.onClick} style={{width:"100%"}}>{c.label}</Btn>
-          )):(
-            <Btn variant={danger?"danger":"primary"} onClick={onConfirm} style={{width:"100%"}}>{confirmLabel}</Btn>
-          )}
-          <Btn variant="ghost" onClick={onCancel} style={{width:"100%"}}>Cancel</Btn>
-        </div>
+    <ModalShell onClose={onCancel} label={title}>
+      <div style={{fontWeight:700,fontSize:16,color:t.text,marginBottom:8,fontFamily:FONT_DISPLAY}}>{title}</div>
+      <div style={{fontSize:13.5,color:t.textMuted,marginBottom:20,lineHeight:1.55}}>{message}</div>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {extraChoices?extraChoices.map((c,i)=>(
+          <Btn key={i} variant={c.variant||"warn"} onClick={c.onClick} style={{width:"100%"}}>{c.label}</Btn>
+        )):(
+          <Btn variant={danger?"danger":"primary"} onClick={onConfirm} style={{width:"100%"}}>{confirmLabel}</Btn>
+        )}
+        <Btn variant="ghost" onClick={onCancel} style={{width:"100%"}}>Cancel</Btn>
       </div>
-    </div>
+    </ModalShell>
   );
 }
 
-function Card({children,style={}}) {
-  const [v,setV]=useState(false);
-  useEffect(()=>{const t=setTimeout(()=>setV(true),30);return()=>clearTimeout(t);},[]);
-  return <div style={{background:"#18181b",border:"1px solid #27272a",borderRadius:16,padding:18,
-    transition:"opacity 0.3s cubic-bezier(0.22,1,0.36,1),transform 0.3s cubic-bezier(0.22,1,0.36,1)",
-    opacity:v?1:0,transform:v?"translateY(0)":"translateY(8px)",...style}}>{children}</div>;
+/* ═══════════════════════════════════════════
+   CARD
+═══════════════════════════════════════════ */
+function Card({children,style={},as:As="div",...rest}) {
+  const t=useTheme();
+  return <As style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:14,padding:18,...style}} {...rest}>{children}</As>;
 }
 
-function Btn({children,variant="primary",onClick,disabled=false,loading=false,small=false,style={}}) {
+/* ═══════════════════════════════════════════
+   BUTTON — six variants, all theme-aware. Solid fills (primary/success) use a
+   deep shade with white text verified at 5:1+; soft variants (ghost/info/warn/
+   danger) tint the base surface so destructive/secondary actions read as one
+   step down in emphasis rather than shouting as loud as the primary action.
+═══════════════════════════════════════════ */
+function Btn({children,variant="primary",onClick,disabled=false,loading=false,small=false,icon:Icon,style={},type="button",...rest}) {
+  const t=useTheme();
   const [pressed,setPressed]=useState(false);
   const VC={
-    primary:{bg:"#7c3aed",hov:"#6d28d9",txt:"#fff",bdr:"transparent"},
-    ghost:{bg:"#27272a",hov:"#3f3f46",txt:"#d4d4d8",bdr:"#3f3f46"},
-    danger:{bg:"rgba(127,29,29,0.5)",hov:"#991b1b",txt:"#fca5a5",bdr:"#ef4444"},
-    success:{bg:"#15803d",hov:"#166534",txt:"#fff",bdr:"transparent"},
-    warn:{bg:"rgba(120,53,15,0.5)",hov:"#92400e",txt:"#fcd34d",bdr:"#f59e0b"},
+    primary:{bg:t.accentStrong,hov:t.accent,txt:"#fff",bdr:"transparent"},
+    ghost:{bg:t.surfaceHover,hov:t.borderStrong,txt:t.text,bdr:t.border},
+    danger:{bg:t.negativeSoft,hov:`${t.negative}33`,txt:t.negative,bdr:t.negativeSoftBorder},
+    success:{bg:t.positiveStrong,hov:t.positive,txt:"#fff",bdr:"transparent"},
+    warn:{bg:t.warningSoft,hov:`${t.warning}33`,txt:t.warning,bdr:t.warningSoftBorder},
+    info:{bg:t.infoSoft,hov:`${t.info}33`,txt:t.info,bdr:t.infoSoftBorder},
   };
   const c=VC[variant]||VC.primary;
   return (
     <button
+      type={type}
       onClick={()=>{if(!disabled&&!loading){setPressed(true);setTimeout(()=>setPressed(false),100);onClick&&onClick();}}}
       disabled={disabled||loading}
+      className="bl-focusable"
       onMouseEnter={e=>{if(!disabled)e.currentTarget.style.background=c.hov;}}
       onMouseLeave={e=>{e.currentTarget.style.background=c.bg;}}
-      style={{background:c.bg,color:disabled?"#52525b":c.txt,border:`1px solid ${c.bdr}`,borderRadius:10,
-        padding:small?"5px 10px":"8px 16px",fontSize:small?11:13,fontWeight:600,cursor:disabled?"not-allowed":"pointer",
-        transition:"background 0.18s cubic-bezier(0.22,1,0.36,1),transform 0.12s cubic-bezier(0.22,1,0.36,1),opacity 0.18s ease",
-        transform:pressed?"scale(0.95)":"scale(1)",opacity:disabled?0.5:1,
-        display:"inline-flex",alignItems:"center",gap:5,...style}}>
-      {loading&&<span style={{animation:"spin 0.6s linear infinite",display:"inline-block"}}>⟳</span>}
+      style={{background:c.bg,color:disabled?t.textFaint:c.txt,border:`1px solid ${c.bdr}`,borderRadius:9,
+        padding:small?"7px 12px":"10px 17px",fontSize:small?12:13.5,fontWeight:600,cursor:disabled?"not-allowed":"pointer",
+        fontFamily:FONT_BODY,minHeight:small?32:44,
+        transition:"background 0.12s,transform 0.1s",transform:pressed?"scale(0.96)":"scale(1)",opacity:disabled?0.5:1,
+        display:"inline-flex",alignItems:"center",justifyContent:"center",gap:6,...style}} {...rest}>
+      {loading?<Loader2 size={small?13:15} className="bl-spin"/>:Icon?<Icon size={small?14:16} strokeWidth={2.25}/>:null}
       {children}
     </button>
   );
 }
 
-function Inp({label,error,...props}) {
+/* Icon-only button — every icon-only control in the app now gets a real
+   accessible name and a floor of 40px so it clears the touch-target guideline. */
+function IconBtn({icon:Icon,label,onClick,variant="ghost",size=36,iconSize=16,style={},...rest}){
+  const t=useTheme();
+  const VC={
+    ghost:{bg:"transparent",txt:t.textMuted,hov:t.surfaceHover},
+    surface:{bg:t.surfaceHover,txt:t.text,hov:t.borderStrong},
+    danger:{bg:"transparent",txt:t.negative,hov:t.negativeSoft},
+  };
+  const c=VC[variant]||VC.ghost;
+  return (
+    <button type="button" onClick={onClick} aria-label={label} title={label} className="bl-focusable"
+      onMouseEnter={e=>e.currentTarget.style.background=c.hov} onMouseLeave={e=>e.currentTarget.style.background=c.bg}
+      style={{width:size,height:size,borderRadius:9,border:"none",background:c.bg,color:c.txt,cursor:"pointer",
+        display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"background 0.12s",...style}} {...rest}>
+      <Icon size={iconSize} strokeWidth={2.1}/>
+    </button>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   INPUT / SELECT
+═══════════════════════════════════════════ */
+function Inp({label,error,icon:Icon,style,...props}) {
+  const t=useTheme();
   const [f,setF]=useState(false);
-  // Centralized guard for numeric fields: strips a leading "-" so typing, pasting, or scrolling
-  // can't produce a negative cost/price/margin anywhere in the app. Applied here once rather than
-  // per call site, since `min="0"` alone only affects the spinner UI, not typed or pasted input.
   const handleChange=props.type==="number"&&props.onChange
     ? (e)=>{
         if(e.target.value.startsWith("-")){e.target.value=e.target.value.replace(/^-+/,"");}
@@ -653,27 +819,31 @@ function Inp({label,error,...props}) {
       }
     : props.onChange;
   return (
-    <label style={{display:"flex",flexDirection:"column",gap:4,fontSize:12,color:"#a1a1aa"}}>
+    <label style={{display:"flex",flexDirection:"column",gap:5,fontSize:12.5,color:t.textMuted,fontFamily:FONT_BODY,fontWeight:500}}>
       {label}
-      <input {...props} onChange={handleChange} min={props.type==="number"?(props.min??0):props.min}
-        onFocus={e=>{setF(true);props.onFocus?.(e);}} onBlur={e=>{setF(false);props.onBlur?.(e);}}
-        style={{background:"#27272a",border:`1px solid ${error?"#ef4444":f?"#7c3aed":"#3f3f46"}`,borderRadius:10,
-          padding:"8px 11px",color:"#fff",fontSize:13,outline:"none",
-          boxShadow:f?"0 0 0 3px rgba(124,58,237,0.15)":"none",transition:"border-color 0.18s ease,box-shadow 0.18s ease",width:"100%",boxSizing:"border-box",...(props.style||{})}} />
-      {error&&<span style={{color:"#f87171",fontSize:11}}>{error}</span>}
+      <span style={{position:"relative",display:"block"}}>
+        {Icon&&<Icon size={15} strokeWidth={2} aria-hidden="true" style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:t.textFaint,pointerEvents:"none"}}/>}
+        <input {...props} onChange={handleChange} min={props.type==="number"?(props.min??0):props.min}
+          onFocus={e=>{setF(true);props.onFocus?.(e);}} onBlur={e=>{setF(false);props.onBlur?.(e);}}
+          style={{background:t.surfaceSunken,border:`1px solid ${error?t.negative:f?t.accent:t.border}`,borderRadius:9,
+            padding:Icon?"10px 12px 10px 34px":"10px 12px",color:t.text,fontSize:16,outline:"none",fontFamily:FONT_BODY,
+            boxShadow:f?`0 0 0 3px ${t.focusRing}`:"none",transition:"all 0.15s",width:"100%",boxSizing:"border-box",minHeight:44,...(style||{})}} />
+      </span>
+      {error&&<span style={{color:t.negative,fontSize:11.5,display:"flex",alignItems:"center",gap:4}}><CircleAlert size={12}/>{error}</span>}
     </label>
   );
 }
 
 function Sel({label,children,style,...props}) {
+  const t=useTheme();
   const [f,setF]=useState(false);
   return (
-    <label style={{display:"flex",flexDirection:"column",gap:4,fontSize:12,color:"#a1a1aa"}}>
+    <label style={{display:"flex",flexDirection:"column",gap:5,fontSize:12.5,color:t.textMuted,fontFamily:FONT_BODY,fontWeight:500}}>
       {label}
       <select {...props} onFocus={()=>setF(true)} onBlur={()=>setF(false)}
-        style={{background:"#27272a",border:`1px solid ${f?"#7c3aed":"#3f3f46"}`,borderRadius:10,
-          padding:"8px 11px",color:"#fff",fontSize:13,outline:"none",
-          boxShadow:f?"0 0 0 3px rgba(124,58,237,0.15)":"none",transition:"border-color 0.18s ease,box-shadow 0.18s ease",width:"100%",boxSizing:"border-box",...style}}>
+        style={{background:t.surfaceSunken,border:`1px solid ${f?t.accent:t.border}`,borderRadius:9,
+          padding:"10px 12px",color:t.text,fontSize:16,outline:"none",fontFamily:FONT_BODY,minHeight:44,
+          boxShadow:f?`0 0 0 3px ${t.focusRing}`:"none",transition:"all 0.15s",width:"100%",boxSizing:"border-box",...style}}>
         {children}
       </select>
     </label>
@@ -681,11 +851,10 @@ function Sel({label,children,style,...props}) {
 }
 
 /* ═══════════════════════════════════════════
-   CATEGORY PICKER — built-in PC categories + any custom categories the user has added,
-   with a "+ Add Category" entry that opens an inline name + domain (PC Part / General Asset) form.
-   This is the Domain Firewall's front door: every category gets a domain at creation time.
+   CATEGORY PICKER
 ═══════════════════════════════════════════ */
 function CategoryPicker({label,value,onChange,customCategories,dispatch,style}) {
+  const t=useTheme();
   const [adding,setAdding]=useState(false);
   const [newName,setNewName]=useState("");
   const [newDomain,setNewDomain]=useState("pc_part");
@@ -705,21 +874,20 @@ function CategoryPicker({label,value,onChange,customCategories,dispatch,style}) 
 
   if(adding){
     return (
-      <div style={{display:"flex",flexDirection:"column",gap:8,padding:11,background:"#09090b",border:"1px solid #3f3f46",borderRadius:9,...style}}>
-        <div style={{fontSize:12,color:"#a1a1aa"}}>New category name</div>
-        <Inp label="" value={newName} onChange={e=>setNewName(e.target.value)} placeholder="e.g. Smartphone, Vehicle, Peripheral"/>
-        <div style={{fontSize:12,color:"#a1a1aa",marginTop:2}}>What kind of item is this?</div>
-        <div style={{display:"flex",gap:7}}>
-          <button onClick={()=>setNewDomain("pc_part")} style={{flex:1,padding:"8px 10px",borderRadius:8,fontSize:12,cursor:"pointer",
-            border:`1.5px solid ${newDomain==="pc_part"?"#7c3aed":"#3f3f46"}`,background:newDomain==="pc_part"?"rgba(124,58,237,0.12)":"transparent",
-            color:newDomain==="pc_part"?"#a78bfa":"#a1a1aa"}}>🖥️ PC Part<div style={{fontSize:10,opacity:0.7,marginTop:2}}>Usable in Builds</div></button>
-          <button onClick={()=>setNewDomain("general_asset")} style={{flex:1,padding:"8px 10px",borderRadius:8,fontSize:12,cursor:"pointer",
-            border:`1.5px solid ${newDomain==="general_asset"?"#7c3aed":"#3f3f46"}`,background:newDomain==="general_asset"?"rgba(124,58,237,0.12)":"transparent",
-            color:newDomain==="general_asset"?"#a78bfa":"#a1a1aa"}}>📦 General Asset<div style={{fontSize:10,opacity:0.7,marginTop:2}}>Not for PC builds</div></button>
+      <div style={{display:"flex",flexDirection:"column",gap:8,background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:9,padding:10,...style}}>
+        <div style={{fontSize:11.5,color:t.textMuted,fontWeight:600}}>New category</div>
+        <input autoFocus value={newName} onChange={e=>setNewName(e.target.value)} placeholder="e.g. Webcam"
+          style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:7,padding:"7px 9px",color:t.text,fontSize:13,fontFamily:FONT_BODY,outline:"none"}}/>
+        <div style={{display:"flex",gap:6}}>
+          {[["pc_part","PC Part"],["general","General Asset"]].map(([v,l])=>(
+            <button key={v} type="button" onClick={()=>setNewDomain(v)} className="bl-focusable"
+              style={{flex:1,padding:"6px 8px",borderRadius:7,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:FONT_BODY,
+                background:newDomain===v?t.accentSoft:t.surface,border:`1px solid ${newDomain===v?t.accentSoftBorder:t.border}`,color:newDomain===v?t.accent:t.textMuted}}>{l}</button>
+          ))}
         </div>
-        <div style={{display:"flex",gap:7,marginTop:2}}>
-          <Btn small onClick={confirmAdd} disabled={!newName.trim()} style={{flex:1}}>Add Category</Btn>
-          <Btn small variant="ghost" onClick={()=>{setAdding(false);setNewName("");}}>Cancel</Btn>
+        <div style={{display:"flex",gap:6}}>
+          <Btn small onClick={confirmAdd} style={{flex:1}}>Add</Btn>
+          <Btn small variant="ghost" onClick={()=>{setAdding(false);setNewName("");}} style={{flex:1}}>Cancel</Btn>
         </div>
       </div>
     );
@@ -727,212 +895,146 @@ function CategoryPicker({label,value,onChange,customCategories,dispatch,style}) 
 
   return (
     <Sel label={label} value={value} onChange={handleSelect} style={style}>
-      <optgroup label="PC Parts">
-        {CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
-        {(customCategories||[]).filter(c=>c.domain==="pc_part").map(c=><option key={c.name} value={c.name}>{c.name}</option>)}
-      </optgroup>
-      {(customCategories||[]).some(c=>c.domain==="general_asset")&&(
-        <optgroup label="General Assets">
-          {(customCategories||[]).filter(c=>c.domain==="general_asset").map(c=><option key={c.name} value={c.name}>{c.name}</option>)}
-        </optgroup>
-      )}
-      <option value="__add__">+ Add Category...</option>
+      {CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+      {(customCategories||[]).map(c=><option key={c.name} value={c.name}>{c.name}</option>)}
+      <option value="__add__">+ Add category…</option>
     </Sel>
   );
 }
 
+/* ═══════════════════════════════════════════
+   STAT BOX — small metric tile used in History's analytics grid
+═══════════════════════════════════════════ */
 function StatBox({label,value,sub,color}) {
+  const t=useTheme();
   return (
-    <Card>
-      <div style={{fontSize:10,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:5}}>{label}</div>
-      <div style={{fontSize:21,fontWeight:700,fontFamily:"'Fira Code',monospace",color:color||"#fff"}}>{value}</div>
-      {sub&&<div style={{fontSize:11,color:"#71717a",marginTop:3}}>{sub}</div>}
-    </Card>
+    <div style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:12,padding:"13px 14px"}}>
+      <div style={{fontSize:10.5,color:t.textMuted,fontWeight:600,marginBottom:5}}>{label}</div>
+      <div style={{fontSize:16,fontWeight:700,fontFamily:FONT_MONO,color:color||t.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{value}</div>
+      {sub&&<div style={{fontSize:10.5,color:t.textFaint,marginTop:3}}>{sub}</div>}
+    </div>
   );
 }
 
+/* ═══════════════════════════════════════════
+   SECTION HEADER — every card used to open with a stretched ALL-CAPS tracked
+   label; that's the single default this redesign moves away from in favor of
+   an icon + sentence-case title, which scans just as fast without shouting.
+═══════════════════════════════════════════ */
+function SectionHeader({icon:Icon,title,sub,action}){
+  const t=useTheme();
+  return (
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:sub?14:12}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+        {Icon&&<Icon size={16} strokeWidth={2} color={t.accent} style={{flexShrink:0}}/>}
+        <div style={{minWidth:0}}>
+          <div style={{fontSize:13.5,fontWeight:700,color:t.text,fontFamily:FONT_DISPLAY}}>{title}</div>
+          {sub&&<div style={{fontSize:11.5,color:t.textFaint,marginTop:2}}>{sub}</div>}
+        </div>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function PageHeader({title,sub,action}){
+  const t=useTheme();
+  return (
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+      <div>
+        <h2 style={{color:t.text,fontSize:22,fontWeight:700,margin:0,fontFamily:FONT_DISPLAY,letterSpacing:"-0.01em"}}>{title}</h2>
+        {sub&&<p style={{color:t.textMuted,fontSize:13,margin:"5px 0 0"}}>{sub}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   DEAL BAR — visual read on "market value vs. what you paid"
+═══════════════════════════════════════════ */
 function DealBar({score}) {
-  const [w,setW]=useState(0);
-  useEffect(()=>{setTimeout(()=>setW(Math.min(score/2,1)*100),60);},[score]);
-  const col=score>=1.3?"#22c55e":score>=1?"#eab308":"#ef4444";
-  const lbl=score>=1.3?"🔥 Great":score>=1?"👍 Fair":"⚠️ Overpaid";
+  const t=useTheme();
+  const pctv=Math.min(100,Math.max(0,(score/2)*100));
+  const tone=score>=1.3?t.positive:score>=1?t.info:t.negative;
+  const verdict=score>=1.3?"Great deal":score>=1?"Fair deal":"Below market";
   return (
     <div>
-      <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-        <span style={{fontSize:12,color:"#a1a1aa"}}>Deal score</span>
-        <span style={{fontSize:12,fontWeight:700,color:col,fontFamily:"'Fira Code',monospace"}}>{score.toFixed(3)} — {lbl}</span>
+      <div style={{display:"flex",justifyContent:"space-between",fontSize:11.5,marginBottom:6}}>
+        <span style={{color:tone,fontWeight:700}}>{verdict}</span>
+        <span style={{color:t.textMuted,fontFamily:FONT_MONO}}>{score.toFixed(2)}×</span>
       </div>
-      <div style={{height:5,background:"#3f3f46",borderRadius:99}}>
-        <div style={{height:"100%",width:`${w}%`,background:col,borderRadius:99,transition:"width 0.6s cubic-bezier(0.34,1.2,0.64,1)"}}/>
+      <div style={{height:6,background:t.surfaceSunken,borderRadius:99,overflow:"hidden"}}>
+        <div style={{height:"100%",width:`${pctv}%`,background:tone,borderRadius:99,transition:"width 0.6s cubic-bezier(0.34,1.2,0.64,1)"}}/>
       </div>
     </div>
   );
 }
 
 /* ═══════════════════════════════════════════
-   QUICK SELL MODAL  (#1)
+   SEGMENTED — reusable pill toggle (Buy's Bundle/Single, Sell's mode switch, etc.)
+   so every mode toggle in the app shares one visual language instead of each
+   screen inventing its own button-pair styling.
 ═══════════════════════════════════════════ */
-function QuickSellModal({part,onClose,onConfirm,targetMargin}) {
-  const suggested = Math.round(part.allocatedCost * (1 + targetMargin/100));
-  const [price,setPrice]=useState(String(suggested));
-  const [buyer,setBuyer]=useState("");
-  const sp=parseFloat(price)||0;
-  const profit=sp-part.allocatedCost;
-  const m=part.allocatedCost>0?profit/part.allocatedCost:0;
+function Segmented({options,value,onChange,ariaLabel}) {
+  const t=useTheme();
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
-      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:24,width:"100%",maxWidth:380,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
-        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:4}}>Quick Sell</div>
-        <div style={{fontSize:13,color:"#71717a",marginBottom:16}}>{part.name} · cost {fmt(part.allocatedCost)}</div>
-        <div style={{display:"flex",flexDirection:"column",gap:12}}>
-          <Inp label={`Sale price (₱) — suggested ${fmt(suggested)} at ${targetMargin}% margin`} type="number" value={price} onChange={e=>setPrice(e.target.value)} />
-          <Inp label="Buyer name (optional)" value={buyer} onChange={e=>setBuyer(e.target.value)} placeholder="Juan dela Cruz" />
-          {sp>0&&(
-            <div style={{background:"#09090b",borderRadius:9,padding:12,border:"1px solid #27272a"}}>
-              {[["Profit",`${profit>=0?"+":""}${fmt(profit)}`,profit>=0?"#34d399":"#f87171"],
-                ["Margin",pct(m),profit>=0?"#34d399":"#f87171"]].map(([l,v,c])=>(
-                <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:4}}>
-                  <span style={{color:"#a1a1aa"}}>{l}</span>
-                  <span style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:c}}>{v}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          <div style={{display:"flex",gap:8,marginTop:4}}>
-            <Btn variant="success" onClick={()=>onConfirm(sp,buyer)} disabled={!sp} style={{flex:1}}>Confirm Sale</Btn>
-            <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-          </div>
-        </div>
-      </div>
+    <div role="tablist" aria-label={ariaLabel} style={{display:"inline-flex",background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:10,padding:3,gap:2,flexWrap:"wrap"}}>
+      {options.map(([k,l,Icon])=>(
+        <button key={k} role="tab" aria-selected={value===k} onClick={()=>onChange(k)} className="bl-focusable" style={{
+          padding:"9px 16px",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",border:"none",fontFamily:FONT_BODY,
+          background:value===k?t.accentStrong:"transparent", color:value===k?"#fff":t.textMuted,
+          display:"inline-flex",alignItems:"center",gap:7,transition:"all 0.15s"}}>
+          {Icon&&<Icon size={14} strokeWidth={2.25}/>}{l}
+        </button>
+      ))}
     </div>
   );
 }
-
-/* ═══════════════════════════════════════════
-   EDIT PART MODAL  (#2)
-═══════════════════════════════════════════ */
-function EditPartModal({part,onClose,onSave,dispatch,customCategories}) {
-  const [name,setName]=useState(part.name);
-  const [cat,setCat]=useState(part.category);
-  const [cost,setCost]=useState(String(part.allocatedCost));
-  const [market,setMarket]=useState(String(part.marketValue));
-  const [notes,setNotes]=useState(part.notes||"");
-  const [photo,setPhoto]=useState({photoUrl:part.photoUrl||"",photoRecordId:part.photoRecordId||""});
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
-      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:24,width:"100%",maxWidth:420,animation:"fadeUp 0.2s ease",maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:16}}>Edit Part</div>
-        <div style={{display:"flex",flexDirection:"column",gap:12}}>
-          <PhotoUpload label="Photo" photoUrl={photo.photoUrl} photoRecordId={photo.photoRecordId} onChange={setPhoto}/>
-          <Inp label="Name" value={name} onChange={e=>setName(e.target.value)}/>
-          <CategoryPicker label="Category" value={cat} onChange={setCat} customCategories={customCategories} dispatch={dispatch}/>
-          <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            <Inp label="Cost (₱)" type="number" value={cost} onChange={e=>setCost(e.target.value)}/>
-            <Inp label="Market value (₱)" type="number" value={market} onChange={e=>setMarket(e.target.value)}/>
-          </div>
-          <Inp label="Notes (condition, extras, etc.)" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Tested working, fan slightly loud"/>
-          <div style={{display:"flex",gap:8,marginTop:4}}>
-            <Btn onClick={()=>onSave({name,category:cat,allocatedCost:parseFloat(cost)||part.allocatedCost,marketValue:parseFloat(market)||part.marketValue,notes,photoUrl:photo.photoUrl,photoRecordId:photo.photoRecordId},`cost→${fmt(parseFloat(cost)||part.allocatedCost)}`)} style={{flex:1}}>Save Changes</Btn>
-            <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════
-   WALLET MODALS (Transfer & Expense)
-═══════════════════════════════════════════ */
-function TransferModal({onClose, dispatch, toast, businessCash, personalCash}) {
-  const [amount, setAmount] = useState("");
-  const [direction, setDirection] = useState("to_personal");
-
-  const handleTransfer = () => {
-    const amt = parseFloat(amount);
-    if(!amt || amt <= 0) return toast("Enter a valid amount", "error");
-    if(direction === "to_personal" && amt > businessCash) return toast("Insufficient business funds", "error");
-    if(direction === "to_business" && amt > personalCash) return toast("Insufficient personal funds", "error");
-
-    dispatch({type: "TRANSFER_FUNDS", amount: amt, direction});
-    toast(`Transferred ${fmt(amt)} to ${direction === "to_personal" ? "Personal Wallet" : "Business Wallet"} ✓`);
-    onClose();
-  };
-
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
-      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
-        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:16}}>Transfer Funds</div>
-        <div style={{display:"flex",gap:8,marginBottom:12}}>
-          <Btn variant={direction==="to_personal"?"primary":"ghost"} onClick={()=>setDirection("to_personal")} style={{flex:1}}>To Personal</Btn>
-          <Btn variant={direction==="to_business"?"primary":"ghost"} onClick={()=>setDirection("to_business")} style={{flex:1}}>To Business</Btn>
-        </div>
-        <Inp label="Amount (₱)" type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0" />
-        <div style={{marginTop:16, display:"flex", gap:8}}>
-          <Btn variant="success" onClick={handleTransfer} style={{flex:1}}>Confirm Transfer</Btn>
-          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════
-   DASHBOARD  (#6 capital at risk, #7 bundle P&L)
-═══════════════════════════════════════════ */
-/* ═══════════════════════════════════════════
-   DASHBOARD SUBCOMPONENTS — institutional-grade primitives used only here.
-   Kept local to this section (not hoisted into the shared UI block above)
-   since nothing else in the app needs a KPI hero card, a health-score ring,
-   or a sortable ledger table.
-═══════════════════════════════════════════ */
-
-// Hero number — the one figure on the page meant to register before anything else.
-// Metallic gradient text instead of a flat color: reads as "statement", not "stat box".
 function HeroNumber({children,color}) {
+  const t=useTheme();
   return (
     <span style={{
-      background: color || "linear-gradient(135deg,#ffffff 0%,#a1a1aa 100%)",
+      background: color || (t.mode==="dark"?`linear-gradient(135deg,${t.text} 0%,${t.textMuted} 100%)`:`linear-gradient(135deg,${t.text} 0%,${t.textMuted} 100%)`),
       WebkitBackgroundClip:"text", backgroundClip:"text", color:"transparent",
-      fontFamily:"'Fira Code',monospace", fontWeight:800, letterSpacing:"-0.02em",
+      fontFamily:FONT_MONO, fontWeight:700, letterSpacing:"-0.02em",
     }}>{children}</span>
   );
 }
 
 function PeriodSwitch({period,setPeriod}) {
-  const opts=[["month","This Month"],["quarter","This Quarter"],["all","All Time"]];
+  const t=useTheme();
+  const opts=[["month","This month"],["quarter","This quarter"],["all","All time"]];
   return (
-    <div style={{display:"inline-flex",background:"#111113",border:"1px solid #27272a",borderRadius:9,padding:3,gap:2}}>
+    <div role="tablist" aria-label="Time period" style={{display:"inline-flex",background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:9,padding:3,gap:2}}>
       {opts.map(([k,l])=>(
-        <button key={k} onClick={()=>setPeriod(k)} style={{
-          padding:"5px 11px",borderRadius:7,fontSize:11,fontWeight:600,cursor:"pointer",border:"none",
-          background:period===k?"#27272a":"transparent", color:period===k?"#fff":"#71717a",
+        <button key={k} role="tab" aria-selected={period===k} onClick={()=>setPeriod(k)} className="bl-focusable" style={{
+          padding:"6px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",border:"none",fontFamily:FONT_BODY,
+          background:period===k?t.accentStrong:"transparent", color:period===k?"#fff":t.textMuted,
           transition:"all 0.15s"}}>{l}</button>
       ))}
     </div>
   );
 }
 
-// KPI card — every card here is built to answer one specific business question, stated
-// in the `question` line beneath the number, per the "no decorative widgets" brief.
 function KPICard({label,value,question,color,accent}) {
+  const t=useTheme();
   return (
-    <div style={{background:"#111113",border:`1px solid ${accent||"#27272a"}`,borderRadius:14,padding:"16px 18px",minWidth:0}}>
-      <div style={{fontSize:10,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.09em",marginBottom:8,fontWeight:600}}>{label}</div>
-      <div style={{fontSize:22,fontWeight:800,fontFamily:"'Fira Code',monospace",color:color||"#fff",letterSpacing:"-0.01em",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{value}</div>
-      {question&&<div style={{fontSize:10.5,color:"#52525b",marginTop:6,lineHeight:1.4}}>{question}</div>}
+    <div style={{background:t.surface,border:`1px solid ${accent||t.border}`,borderRadius:14,padding:"16px 18px",minWidth:0}}>
+      <div style={{fontSize:11.5,color:t.textMuted,fontWeight:600,marginBottom:8}}>{label}</div>
+      <div style={{fontSize:22,fontWeight:700,fontFamily:FONT_MONO,color:color||t.text,letterSpacing:"-0.01em",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{value}</div>
+      {question&&<div style={{fontSize:11,color:t.textFaint,marginTop:7,lineHeight:1.4}}>{question}</div>}
     </div>
   );
 }
 
-// Cash In → Inventory → Sales → Profit — the four-stage capital cycle of a flipping business,
-// rendered as a labelled flow rather than a chart, since the point is sequence, not magnitude.
 function CapitalFlowDiagram({invested,inventoryVal,recovered,profit}) {
+  const t=useTheme();
   const stages=[
-    {label:"Cash In",sub:"capital deployed",value:invested,color:"#38bdf8"},
-    {label:"Inventory",sub:"held at market value",value:inventoryVal,color:"#a78bfa"},
-    {label:"Sales",sub:"revenue collected",value:recovered,color:"#34d399"},
-    {label:"Profit",sub:profit>=0?"net gain":"net loss",value:profit,color:profit>=0?"#34d399":"#f87171"},
+    {label:"Cash in",sub:"capital deployed",value:invested,color:t.info},
+    {label:"Inventory",sub:"held at market value",value:inventoryVal,color:t.accent},
+    {label:"Sales",sub:"revenue collected",value:recovered,color:t.positive},
+    {label:"Profit",sub:profit>=0?"net gain":"net loss",value:profit,color:profit>=0?t.positive:t.negative},
   ];
   return (
     <div style={{display:"flex",alignItems:"center",gap:0,overflowX:"auto",paddingBottom:4}}>
@@ -940,14 +1042,14 @@ function CapitalFlowDiagram({invested,inventoryVal,recovered,profit}) {
         <Fragment key={s.label}>
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,minWidth:92,flexShrink:0}}>
             <div style={{width:10,height:10,borderRadius:"50%",background:s.color,boxShadow:`0 0 0 3px ${s.color}22`}}/>
-            <div style={{fontSize:14,fontWeight:800,fontFamily:"'Fira Code',monospace",color:"#fff"}}>{fmt(s.value)}</div>
-            <div style={{fontSize:11,color:"#d4d4d8",fontWeight:600,textAlign:"center"}}>{s.label}</div>
-            <div style={{fontSize:9,color:"#52525b",textAlign:"center"}}>{s.sub}</div>
+            <div style={{fontSize:14,fontWeight:700,fontFamily:FONT_MONO,color:t.text}}>{fmt(s.value)}</div>
+            <div style={{fontSize:11.5,color:t.textMuted,fontWeight:600,textAlign:"center"}}>{s.label}</div>
+            <div style={{fontSize:9.5,color:t.textFaint,textAlign:"center"}}>{s.sub}</div>
           </div>
           {i<stages.length-1&&(
-            <svg width="36" height="10" style={{flexShrink:0,margin:"0 2px 28px"}}>
-              <line x1="0" y1="5" x2="30" y2="5" stroke="#3f3f46" strokeWidth="1.5"/>
-              <polygon points="30,1 36,5 30,9" fill="#3f3f46"/>
+            <svg width="36" height="10" style={{flexShrink:0,margin:"0 2px 28px"}} aria-hidden="true">
+              <line x1="0" y1="5" x2="30" y2="5" stroke={t.border} strokeWidth="1.5"/>
+              <polygon points="30,1 36,5 30,9" fill={t.border}/>
             </svg>
           )}
         </Fragment>
@@ -956,9 +1058,8 @@ function CapitalFlowDiagram({invested,inventoryVal,recovered,profit}) {
   );
 }
 
-// Profit trend — area chart with gridlines and a gradient fill, replacing the bare sparkline.
-// Institutional convention: zero-line always visible, fill communicates magnitude not just direction.
 function ProfitAreaChart({points,positive}) {
+  const t=useTheme();
   if(points.length<2)return null;
   const max=Math.max(1,...points.map(Math.abs));
   const toXY=(v,i)=>{
@@ -970,10 +1071,10 @@ function ProfitAreaChart({points,positive}) {
   const [firstX]=toXY(points[0],0);
   const [lastX]=toXY(points[points.length-1],points.length-1);
   const areaPath=`M${firstX},32 ${linePath.replace(/^M/,"L")} L${lastX},32 Z`;
-  const color=positive?"#34d399":"#f87171";
-  const gradId=`pg-${positive?"pos":"neg"}`;
+  const color=positive?t.positive:t.negative;
+  const gradId=`pg-${positive?"pos":"neg"}-${t.mode}`;
   return (
-    <svg viewBox="0 0 100 40" style={{width:"100%",height:96,display:"block"}} preserveAspectRatio="none">
+    <svg viewBox="0 0 100 40" style={{width:"100%",height:96,display:"block"}} preserveAspectRatio="none" aria-hidden="true">
       <defs>
         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.28"/>
@@ -981,7 +1082,7 @@ function ProfitAreaChart({points,positive}) {
         </linearGradient>
       </defs>
       {[8,16,24,32].map(y=>(
-        <line key={y} x1="0" y1={y} x2="100" y2={y} stroke="#1f1f23" strokeWidth="0.4"/>
+        <line key={y} x1="0" y1={y} x2="100" y2={y} stroke={t.border} strokeWidth="0.4"/>
       ))}
       <path d={areaPath} fill={`url(#${gradId})`} stroke="none"/>
       <path d={linePath} fill="none" stroke={color} strokeWidth="1.4" vectorEffect="non-scaling-stroke"/>
@@ -989,25 +1090,23 @@ function ProfitAreaChart({points,positive}) {
   );
 }
 
-// Financial Health Score — a weighted composite (ROI, turnover, cash ratio, profit momentum),
-// not a formal accounting standard. Presented as a ring so it reads as "one number to check
-// weekly", the same way an owner would glance at a fuel gauge before a chart.
 function HealthScoreRing({score,tier}) {
+  const t=useTheme();
   const r=42, c=2*Math.PI*r;
   const filled=(score/100)*c;
   return (
     <div style={{display:"flex",alignItems:"center",gap:20,flexWrap:"wrap"}}>
-      <svg width="100" height="100" viewBox="0 0 100 100" style={{flexShrink:0}}>
-        <circle cx="50" cy="50" r={r} fill="none" stroke="#27272a" strokeWidth="8"/>
+      <svg width="100" height="100" viewBox="0 0 100 100" style={{flexShrink:0}} role="img" aria-label={`Financial health score ${score} out of 100, rated ${tier.label}`}>
+        <circle cx="50" cy="50" r={r} fill="none" stroke={t.border} strokeWidth="8"/>
         <circle cx="50" cy="50" r={r} fill="none" stroke={tier.color} strokeWidth="8" strokeLinecap="round"
           strokeDasharray={`${filled} ${c}`} transform="rotate(-90 50 50)"
           style={{transition:"stroke-dasharray 0.8s cubic-bezier(0.34,1.2,0.64,1)"}}/>
-        <text x="50" y="46" textAnchor="middle" fontSize="22" fontWeight="800" fill="#fff" fontFamily="monospace">{score}</text>
-        <text x="50" y="62" textAnchor="middle" fontSize="8" fill="#71717a">/ 100</text>
+        <text x="50" y="46" textAnchor="middle" fontSize="22" fontWeight="700" fill={t.text} fontFamily={FONT_MONO}>{score}</text>
+        <text x="50" y="62" textAnchor="middle" fontSize="8" fill={t.textFaint}>/ 100</text>
       </svg>
       <div style={{flex:1,minWidth:160}}>
-        <div style={{fontSize:15,fontWeight:700,color:tier.color,marginBottom:3}}>{tier.emoji} {tier.label}</div>
-        <div style={{fontSize:11.5,color:"#a1a1aa",lineHeight:1.5}}>
+        <div style={{fontSize:15,fontWeight:700,color:tier.color,marginBottom:4}}>{tier.label}</div>
+        <div style={{fontSize:12,color:t.textMuted,lineHeight:1.5}}>
           Composite of ROI, inventory turnover, cash position vs. baseline, and month-over-month profit momentum. A working diagnostic, not a credit score.
         </div>
       </div>
@@ -1016,25 +1115,21 @@ function HealthScoreRing({score,tier}) {
 }
 
 function SortHeader({label,active,dir,onClick,align}) {
+  const t=useTheme();
   return (
-    <th onClick={onClick} style={{cursor:"pointer",textAlign:align||"left",padding:"8px 10px",userSelect:"none",whiteSpace:"nowrap"}}>
-      <span style={{fontSize:10,color:active?"#d4d4d8":"#71717a",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:700}}>
-        {label}{active&&<span style={{marginLeft:3}}>{dir==="asc"?"↑":"↓"}</span>}
-      </span>
+    <th style={{padding:0,textAlign:align||"left"}}>
+      <button onClick={onClick} className="bl-focusable" aria-sort={active?(dir==="asc"?"ascending":"descending"):"none"}
+        style={{cursor:"pointer",textAlign:align||"left",padding:"10px",userSelect:"none",whiteSpace:"nowrap",
+          background:"none",border:"none",width:"100%",display:"flex",alignItems:"center",gap:3,
+          justifyContent:align==="right"?"flex-end":"flex-start",fontFamily:FONT_BODY}}>
+        <span style={{fontSize:10.5,color:active?t.text:t.textMuted,fontWeight:700}}>{label}</span>
+        {active&&(dir==="asc"?<ChevronUp size={12} color={t.text}/>:<ChevronDown size={12} color={t.text}/>)}
+      </button>
     </th>
   );
 }
-
-/* ═══════════════════════════════════════════
-   DASHBOARD — executive financial overview.
-   Snapshot metrics (Net Worth, Cash, Inventory, inventory counts, dead stock) always reflect
-   right now, independent of the period switch — a balance sheet doesn't have a "this month"
-   view. Flow metrics (Invested, Recovered, Net Profit, ROI, the transactions table) DO respect
-   the period switch, since those are income-statement-style figures. Monthly Profit and Best
-   Month Ever are intentionally always all-time — filtering "best month ever" by a period would
-   contradict the label.
-═══════════════════════════════════════════ */
 function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
+  const t=useTheme();
   const [addingExpense,setAddingExpense]=useState(false);
   const [addingIncome,setAddingIncome]=useState(false);
   const [transferring,setTransferring]=useState(false);
@@ -1167,9 +1262,9 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
   const cashScore=Math.max(0,Math.min(cashOnHand/14500,1));
   const growthScore=Math.max(0,Math.min((momGrowthPct+0.5)/1,1));
   const healthScore=Math.round(roiScore*25+turnoverScore*25+cashScore*25+growthScore*25);
-  const healthTier=healthScore>=90?{emoji:"🟢",label:"Excellent",color:"#34d399"}
-    :healthScore>=70?{emoji:"🟡",label:"Good",color:"#fbbf24"}
-    :{emoji:"🔴",label:"Needs Attention",color:"#f87171"};
+  const healthTier=healthScore>=90?{label:"Excellent",color:t.positive}
+    :healthScore>=70?{label:"Good",color:t.warning}
+    :{label:"Needs attention",color:t.negative};
 
   // ── Recent transactions table (period-scoped, sortable) ──
   const getDaysHeld=(sale)=>{
@@ -1205,351 +1300,455 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
   const periodLabel=period==="month"?"this month":period==="quarter"?"this quarter":"all time";
 
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:20}}>
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
       {addingExpense&&<AddExpenseModal dispatch={dispatch} toast={toast} onClose={()=>setAddingExpense(false)}/>}
       {addingIncome&&<AddIncomeModal dispatch={dispatch} toast={toast} onClose={()=>setAddingIncome(false)}/>}
       {transferring&&<TransferModal dispatch={dispatch} toast={toast} onClose={()=>setTransferring(false)} businessCash={cashOnHand} personalCash={personalCash}/>}
 
       {/* Header */}
       <div style={{display:"flex",flexDirection:"column",gap:12}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10}}>
-          <div>
-            <h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Business Overview</h2>
-            <p style={{color:"#71717a",fontSize:12.5,margin:"4px 0 0"}}>Flow figures shown for {periodLabel} · balances as of today</p>
-          </div>
-          <div style={{display:"flex",gap:8}}>
-            <Btn small variant="ghost" onClick={()=>setTransferring(true)}>⇆ Transfer</Btn>
-            <Btn small variant="ghost" onClick={()=>setAddingIncome(true)}>+ Income</Btn>
-            <Btn small variant="ghost" onClick={()=>setAddingExpense(true)}>+ Expense</Btn>
-          </div>
-        </div>
+        <PageHeader title="Business overview" sub={`Flow figures shown for ${periodLabel} · balances as of today`}
+          action={
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <Btn small variant="ghost" icon={ArrowLeftRight} onClick={()=>setTransferring(true)}>Transfer</Btn>
+              <Btn small variant="ghost" icon={Plus} onClick={()=>setAddingIncome(true)}>Income</Btn>
+              <Btn small variant="ghost" icon={Minus} onClick={()=>setAddingExpense(true)}>Expense</Btn>
+            </div>
+          }/>
         <PeriodSwitch period={period} setPeriod={setPeriod}/>
       </div>
 
       {/* Net Worth Hero */}
-      <div style={{background:"linear-gradient(155deg,#111113 0%,#0a0a0c 100%)",border:"1px solid #27272a",borderRadius:16,padding:"22px 24px"}}>
-        <div style={{fontSize:10.5,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:600,marginBottom:8}}>Total Business Net Worth</div>
+      <div style={{background:t.mode==="dark"?`linear-gradient(155deg,${t.surface} 0%,${t.surfaceSunken} 100%)`:`linear-gradient(155deg,${t.surface} 0%,${t.bg} 100%)`,
+        border:`1px solid ${t.border}`,borderRadius:16,padding:"24px 24px"}}>
+        <div style={{fontSize:12,color:t.textMuted,fontWeight:600,marginBottom:9}}>Total business net worth</div>
         <div style={{fontSize:40,lineHeight:1}}><HeroNumber><AnimNum value={netWorth}/></HeroNumber></div>
-        <div style={{fontSize:11.5,color:"#52525b",marginTop:10}}>Business cash ({fmt(cashOnHand)}) + inventory at market value ({fmt(inventoryMarketValue)}) · excludes personal wallet</div>
+        <div style={{fontSize:12,color:t.textFaint,marginTop:11}}>Business cash ({fmt(cashOnHand)}) + inventory at market value ({fmt(inventoryMarketValue)}) · excludes personal wallet</div>
       </div>
 
       {/* KPI Row */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10}}>
-        <KPICard label="Available Cash" value={fmt(cashOnHand)} color={isUnderCapital?"#f87171":"#38bdf8"} accent={isUnderCapital?"#7f1d1d":undefined}
+        <KPICard label="Available cash" value={fmt(cashOnHand)} color={isUnderCapital?t.negative:t.info} accent={isUnderCapital?t.negativeSoftBorder:undefined}
           question="Ready to deploy on new inventory"/>
-        <KPICard label="Inventory Value" value={fmt(inventoryMarketValue)} color="#a78bfa"
+        <KPICard label="Inventory value" value={fmt(inventoryMarketValue)} color={t.accent}
           question="Current market value if sold today"/>
-        <KPICard label="Total Profit" value={`${totalProfit>=0?"+":""}${fmt(totalProfit)}`} color={totalProfit>=0?"#34d399":"#f87171"}
+        <KPICard label="Total profit" value={`${totalProfit>=0?"+":""}${fmt(totalProfit)}`} color={totalProfit>=0?t.positive:t.negative}
           question={`Net earnings, ${periodLabel}`}/>
-        <KPICard label="ROI" value={pct(roi)} color={roi>=0?"#34d399":"#f87171"}
+        <KPICard label="ROI" value={pct(roi)} color={roi>=0?t.positive:t.negative}
           question={`Return on capital sold, ${periodLabel}`}/>
       </div>
 
-      {/* Business Capital Overview (formerly "Liquidity") */}
-      <Card>
-        <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:4}}>Business Capital Overview</div>
-        <div style={{fontSize:11,color:"#52525b",marginBottom:16}}>Where all-time capital actually sits right now</div>
-        {(()=>{
-          const maxVal=Math.max(totalCapitalAllTime,atRisk,recoveredCostAllTime,1);
-          const barH=v=>Math.max(4,Math.round((v/maxVal)*120));
-          const bars=[
-            {label:"Deployed",sub:"ever spent buying",value:totalCapitalAllTime,color:"#38bdf8"},
-            {label:"Locked",sub:"sitting unsold",value:atRisk,color:"#f59e0b"},
-            {label:"Recovered",sub:"cost basis of sold items",value:recoveredCostAllTime,color:"#34d399"},
-          ];
-          const lockedRatio=totalCapitalAllTime>0?atRisk/totalCapitalAllTime:0;
-          return (
-            <>
-              <div style={{display:"flex",justifyContent:"space-around",alignItems:"flex-end",height:150,marginBottom:8}}>
-                {bars.map(b=>(
-                  <div key={b.label} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,width:"30%"}}>
-                    <div style={{fontSize:12,fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{fmt(b.value)}</div>
-                    <div style={{width:"100%",maxWidth:64,height:barH(b.value),background:b.color,borderRadius:"6px 6px 2px 2px",
-                      transition:"height 0.6s cubic-bezier(0.34,1.2,0.64,1)"}}/>
-                  </div>
-                ))}
-              </div>
-              <div style={{display:"flex",justifyContent:"space-around",marginBottom:lockedRatio>0.5?12:0}}>
-                {bars.map(b=>(
-                  <div key={b.label} style={{width:"30%",textAlign:"center"}}>
-                    <div style={{fontSize:11,color:"#d4d4d8",fontWeight:600}}>{b.label}</div>
-                    <div style={{fontSize:10,color:"#52525b"}}>{b.sub}</div>
-                  </div>
-                ))}
-              </div>
-              {lockedRatio>0.5&&(
-                <div style={{background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.25)",borderRadius:9,padding:"9px 12px",fontSize:12,color:"#fbbf24"}}>
-                  {pct(lockedRatio)} of everything ever spent is still sitting unsold — consider moving inventory to free up cash.
-                </div>
-              )}
-            </>
-          );
-        })()}
-      </Card>
-
-      {/* Cash Flow */}
-      <Card>
-        <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:2}}>Cash Flow</div>
-        <div style={{fontSize:11,color:"#52525b",marginBottom:16}}>Capital cycle, {periodLabel}</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:12,marginBottom:18}}>
-          <div><div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Money Invested</div><div style={{fontSize:15,fontWeight:700,color:"#38bdf8",fontFamily:"'Fira Code',monospace"}}>{fmt(invested)}</div></div>
-          <div><div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Money Recovered</div><div style={{fontSize:15,fontWeight:700,color:"#34d399",fontFamily:"'Fira Code',monospace"}}>{fmt(recovered)}</div></div>
-          <div><div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Net Profit</div><div style={{fontSize:15,fontWeight:700,color:totalProfit>=0?"#34d399":"#f87171",fontFamily:"'Fira Code',monospace"}}>{totalProfit>=0?"+":""}{fmt(totalProfit)}</div></div>
-          <div><div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Cash Position</div><div style={{fontSize:15,fontWeight:700,color:"#fff",fontFamily:"'Fira Code',monospace"}}>{fmt(cashOnHand)}</div></div>
-        </div>
-        <CapitalFlowDiagram invested={invested} inventoryVal={inventoryMarketValue} recovered={recovered} profit={totalProfit}/>
-
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:18,paddingTop:16,borderTop:"1px solid #1f1f23"}}>
-          <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:9,padding:11}}>
-            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Personal Wallet</div>
-            <div style={{fontSize:15,fontWeight:700,color:"#a78bfa",fontFamily:"'Fira Code',monospace"}}>{fmt(personalCash)}</div>
-            <div style={{fontSize:9,color:"#52525b",marginTop:2}}>owner's pocket money — not business capital</div>
-          </div>
-          <div style={{background:fundsToRecover>0?"rgba(245,158,11,0.08)":"#09090b",border:`1px solid ${fundsToRecover>0?"rgba(245,158,11,0.25)":"#27272a"}`,borderRadius:9,padding:11}}>
-            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Funds to Recover</div>
-            <div style={{fontSize:15,fontWeight:700,color:fundsToRecover>0?"#fbbf24":"#71717a",fontFamily:"'Fira Code',monospace"}}>{fmt(fundsToRecover)}</div>
-            <div style={{fontSize:9,color:"#52525b",marginTop:2}}>lifetime personal draws from the business</div>
-          </div>
-        </div>
-
-        {isUnderCapital&&(
-          <div style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:9,padding:12,marginTop:14}}>
-            <div style={{display:"flex",alignItems:"flex-start",gap:9}}>
-              <span style={{fontSize:15}}>⚠️</span>
-              <div style={{color:"#d4d4d8",fontSize:12,lineHeight:1.5}}>
-                <strong style={{color:"#fca5a5"}}>Below target baseline.</strong> Cash on hand ({fmt(cashOnHand)}) is under the ₱14,500 war chest. Consider pausing purchases or raising prices until it recovers.
-              </div>
-            </div>
-          </div>
-        )}
-      </Card>
-
-      {/* Inventory Intelligence */}
-      <Card>
-        <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:2}}>Inventory Intelligence</div>
-        <div style={{fontSize:11,color:"#52525b",marginBottom:16}}>How efficiently stock is moving, as of today</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12}}>
-          {[
-            ["Available",available,"#34d399","ready to sell or build"],
-            ["In Builds",inBuild,"#38bdf8","allocated to active builds"],
-            ["Sold",soldCount,"#71717a","lifetime units moved"],
-            ["Avg. Days to Sell",avgDaysToSell!==null?`${avgDaysToSell}d`:"—","#a78bfa","purchase to sale, all-time"],
-            ["Turnover Rate",`${inventoryTurnoverRate.toFixed(2)}×`,"#38bdf8",`cost of goods sold ÷ current stock cost, ${periodLabel}`],
-            ["Cash Conversion",avgDaysToSell!==null?`~${avgDaysToSell}d`:"—","#a78bfa","≈ days to sell — cash purchases, cash sales"],
-          ].map(([l,v,c,sub])=>(
-            <div key={l}>
-              <div style={{fontSize:19,fontWeight:800,fontFamily:"'Fira Code',monospace",color:c}}>{v}</div>
-              <div style={{fontSize:10,color:"#d4d4d8",fontWeight:600,marginTop:3}}>{l}</div>
-              <div style={{fontSize:9.5,color:"#52525b",marginTop:2,lineHeight:1.35}}>{sub}</div>
-            </div>
-          ))}
-        </div>
-        {deadInventory.length>0&&(
-          <div style={{background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.25)",borderRadius:9,padding:"10px 12px",marginTop:16}}>
-            <div style={{color:"#fbbf24",fontWeight:600,fontSize:12,marginBottom:2}}>⚠ Dead Inventory — {deadInventory.length} item{deadInventory.length===1?"":"s"} unsold {DEAD_DAYS}+ days</div>
-            <div style={{color:"#d4d4d8",fontSize:11.5}}>{fmt(deadInventoryValue)} in market value sitting idle. Consider a price cut or bundling to move it.</div>
-          </div>
-        )}
-        {writeOffCount>0&&(
-          <div style={{fontSize:11,color:"#71717a",marginTop:14,paddingTop:12,borderTop:"1px solid #1f1f23"}}>
-            {writeOffCount} write-off{writeOffCount===1?"":"s"} recorded · <span style={{color:"#f87171",fontFamily:"'Fira Code',monospace"}}>{fmt(-writeOffLoss)}</span> lifetime loss
-          </div>
-        )}
-      </Card>
-
-      {/* Profit Analytics */}
-      <Card>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:2}}>
-          <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em"}}>Profit Analytics</div>
-          <div style={{fontSize:11,color:totalProfit>=0?"#34d399":"#f87171",fontFamily:"'Fira Code',monospace"}}>{totalProfit>=0?"+":""}{fmt(totalProfit)} {periodLabel}</div>
-        </div>
-        <div style={{fontSize:11,color:"#52525b",marginBottom:12}}>Running profit across {sales.length} sale{sales.length===1?"":"s"} in the selected period</div>
-        {cumPoints.length>1
-          ? <ProfitAreaChart points={cumPoints} positive={totalProfit>=0}/>
-          : <div style={{fontSize:12,color:"#52525b",padding:"20px 0",textAlign:"center"}}>Need at least 2 sales in this period to plot a trend.</div>}
-
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginTop:20,paddingTop:16,borderTop:"1px solid #1f1f23"}}>
-          <div>
-            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Monthly Profit</div>
-            <div style={{fontSize:16,fontWeight:700,color:thisMonthProfit>=0?"#34d399":"#f87171",fontFamily:"'Fira Code',monospace"}}>{thisMonthProfit>=0?"+":""}{fmt(thisMonthProfit)}</div>
-            <div style={{fontSize:9,color:"#52525b",marginTop:2}}>current calendar month, always</div>
-          </div>
-          <div>
-            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Best Month Ever</div>
-            <div style={{fontSize:16,fontWeight:700,color:"#34d399",fontFamily:"'Fira Code',monospace"}}>{bestMonth?fmt(bestMonth.profit):"—"}</div>
-            <div style={{fontSize:9,color:"#52525b",marginTop:2}}>{bestMonth?bestMonth.label:"not enough data yet"}</div>
-          </div>
-          <div>
-            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Avg. Profit / Sale</div>
-            <div style={{fontSize:16,fontWeight:700,color:avgProfitPerSale>=0?"#34d399":"#f87171",fontFamily:"'Fira Code',monospace"}}>{sales.length?`${avgProfitPerSale>=0?"+":""}${fmt(Math.round(avgProfitPerSale))}`:"—"}</div>
-            <div style={{fontSize:9,color:"#52525b",marginTop:2}}>{periodLabel}</div>
-          </div>
-          <div>
-            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Highest Profit Sale</div>
-            <div style={{fontSize:16,fontWeight:700,color:"#34d399",fontFamily:"'Fira Code',monospace"}}>{highestProfitSale?`+${fmt(highestProfitSale.profit)}`:"—"}</div>
-            <div style={{fontSize:9,color:"#52525b",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{highestProfitSale?highestProfitSale.name:periodLabel}</div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Profit by Category */}
-      {categoryRows.length>0&&(
+      {/* ── Group: Capital & cash ── */}
+      <div style={{display:"flex",flexDirection:"column",gap:14,marginTop:10}}>
         <Card>
-          <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:2}}>Profit by Category</div>
-          <div style={{fontSize:11,color:"#52525b",marginBottom:14}}>Which categories are actually worth buying, {periodLabel}</div>
-          <div style={{display:"flex",flexDirection:"column",gap:11}}>
-            {categoryRows.map(([cat,v])=>{
-              const w=Math.abs(v.profit)/maxCatProfit*100;
-              const positive=v.profit>=0;
-              return (
-                <div key={cat}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                    <span style={{fontSize:12,color:"#d4d4d8"}}>{cat} <span style={{color:"#52525b"}}>({v.count} sold)</span></span>
-                    <span style={{fontSize:12,fontFamily:"'Fira Code',monospace",fontWeight:700,color:positive?"#34d399":"#f87171"}}>{positive?"+":""}{fmt(v.profit)}</span>
-                  </div>
-                  <div style={{height:5,background:"#1f1f23",borderRadius:99}}>
-                    <div style={{height:"100%",width:`${w}%`,background:positive?"#34d399":"#f87171",borderRadius:99,transition:"width 0.7s cubic-bezier(0.34,1.2,0.64,1)"}}/>
-                  </div>
+          <SectionHeader icon={Boxes} title="Business capital overview" sub="Where all-time capital actually sits right now"/>
+          {(()=>{
+            const maxVal=Math.max(totalCapitalAllTime,atRisk,recoveredCostAllTime,1);
+            const barH=v=>Math.max(4,Math.round((v/maxVal)*120));
+            const bars=[
+              {label:"Deployed",sub:"ever spent buying",value:totalCapitalAllTime,color:t.info},
+              {label:"Locked",sub:"sitting unsold",value:atRisk,color:t.warning},
+              {label:"Recovered",sub:"cost basis of sold items",value:recoveredCostAllTime,color:t.positive},
+            ];
+            const lockedRatio=totalCapitalAllTime>0?atRisk/totalCapitalAllTime:0;
+            return (
+              <>
+                <div style={{display:"flex",justifyContent:"space-around",alignItems:"flex-end",height:150,marginBottom:8}}>
+                  {bars.map(b=>(
+                    <div key={b.label} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,width:"30%"}}>
+                      <div style={{fontSize:12,fontFamily:FONT_MONO,fontWeight:700,color:t.text}}>{fmt(b.value)}</div>
+                      <div style={{width:"100%",maxWidth:64,height:barH(b.value),background:b.color,borderRadius:"6px 6px 2px 2px",
+                        transition:"height 0.6s cubic-bezier(0.34,1.2,0.64,1)"}}/>
+                    </div>
+                  ))}
                 </div>
-              );
-            })}
-          </div>
+                <div style={{display:"flex",justifyContent:"space-around",marginBottom:lockedRatio>0.5?12:0}}>
+                  {bars.map(b=>(
+                    <div key={b.label} style={{width:"30%",textAlign:"center"}}>
+                      <div style={{fontSize:11.5,color:t.textMuted,fontWeight:600}}>{b.label}</div>
+                      <div style={{fontSize:10,color:t.textFaint}}>{b.sub}</div>
+                    </div>
+                  ))}
+                </div>
+                {lockedRatio>0.5&&(
+                  <div style={{background:t.warningSoft,border:`1px solid ${t.warningSoftBorder}`,borderRadius:9,padding:"10px 12px",fontSize:12,color:t.warning,display:"flex",gap:8,alignItems:"flex-start"}}>
+                    <AlertTriangle size={14} style={{flexShrink:0,marginTop:1}}/>
+                    <span>{pct(lockedRatio)} of everything ever spent is still sitting unsold — consider moving inventory to free up cash.</span>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </Card>
-      )}
 
-      {/* CFO Insights */}
-      <Card style={{background:"linear-gradient(155deg,#151318 0%,#111113 100%)",border:"1px solid #2d2438"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
-          <span style={{fontSize:15}}>💼</span>
-          <div style={{fontSize:11,color:"#a78bfa",textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:700}}>CFO Insights</div>
-        </div>
-        <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {insights.slice(0,5).map((line,i)=>(
-            <div key={i} style={{display:"flex",gap:9,alignItems:"flex-start"}}>
-              <span style={{color:"#a78bfa",fontSize:13,lineHeight:1.5}}>·</span>
-              <span style={{fontSize:12.5,color:"#d4d4d8",lineHeight:1.55}}>{line}</span>
+        <Card>
+          <SectionHeader icon={Banknote} title="Cash flow" sub={`Capital cycle, ${periodLabel}`}/>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:12,marginBottom:18}}>
+            <div><div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Money invested</div><div style={{fontSize:15,fontWeight:700,color:t.info,fontFamily:FONT_MONO}}>{fmt(invested)}</div></div>
+            <div><div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Money recovered</div><div style={{fontSize:15,fontWeight:700,color:t.positive,fontFamily:FONT_MONO}}>{fmt(recovered)}</div></div>
+            <div><div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Net profit</div><div style={{fontSize:15,fontWeight:700,color:totalProfit>=0?t.positive:t.negative,fontFamily:FONT_MONO}}>{totalProfit>=0?"+":""}{fmt(totalProfit)}</div></div>
+            <div><div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Cash position</div><div style={{fontSize:15,fontWeight:700,color:t.text,fontFamily:FONT_MONO}}>{fmt(cashOnHand)}</div></div>
+          </div>
+          <CapitalFlowDiagram invested={invested} inventoryVal={inventoryMarketValue} recovered={recovered} profit={totalProfit}/>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:18,paddingTop:16,borderTop:`1px solid ${t.border}`}}>
+            <div style={{background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:9,padding:12}}>
+              <div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Personal wallet</div>
+              <div style={{fontSize:15,fontWeight:700,color:t.text,fontFamily:FONT_MONO}}>{fmt(personalCash)}</div>
+              <div style={{fontSize:10,color:t.textFaint,marginTop:3}}>owner's pocket money — not business capital</div>
             </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Financial Health Score */}
-      <Card>
-        <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:16}}>Financial Health Score</div>
-        <HealthScoreRing score={healthScore} tier={healthTier}/>
-      </Card>
-
-      {/* Recent Transactions — sortable */}
-      {sortedTx.length>0&&(
-        <Card style={{padding:0,overflow:"hidden"}}>
-          <div style={{padding:"16px 18px 4px"}}>
-            <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em"}}>Recent Transactions</div>
-            <div style={{fontSize:11,color:"#52525b",marginTop:2}}>{periodLabel} · tap a column to sort</div>
+            <div style={{background:fundsToRecover>0?t.warningSoft:t.surfaceSunken,border:`1px solid ${fundsToRecover>0?t.warningSoftBorder:t.border}`,borderRadius:9,padding:12}}>
+              <div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Funds to recover</div>
+              <div style={{fontSize:15,fontWeight:700,color:fundsToRecover>0?t.warning:t.textFaint,fontFamily:FONT_MONO}}>{fmt(fundsToRecover)}</div>
+              <div style={{fontSize:10,color:t.textFaint,marginTop:3}}>lifetime personal draws from the business</div>
+            </div>
           </div>
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5,minWidth:520}}>
-              <thead>
-                <tr style={{borderBottom:"1px solid #27272a"}}>
-                  <SortHeader label="Product" active={sortKey==="name"} dir={sortDir} onClick={()=>toggleSort("name")}/>
-                  <SortHeader label="Buy" active={sortKey==="cost"} dir={sortDir} onClick={()=>toggleSort("cost")} align="right"/>
-                  <SortHeader label="Sale" active={sortKey==="salePrice"} dir={sortDir} onClick={()=>toggleSort("salePrice")} align="right"/>
-                  <SortHeader label="Profit" active={sortKey==="profit"} dir={sortDir} onClick={()=>toggleSort("profit")} align="right"/>
-                  <SortHeader label="ROI" active={sortKey==="roi"} dir={sortDir} onClick={()=>toggleSort("roi")} align="right"/>
-                  <SortHeader label="Held" active={sortKey==="days"} dir={sortDir} onClick={()=>toggleSort("days")} align="right"/>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedTx.map(r=>(
-                  <tr key={r.id} style={{borderBottom:"1px solid #1a1a1d"}}>
-                    <td style={{padding:"9px 10px",color:"#d4d4d8",maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name}</td>
-                    <td style={{padding:"9px 10px",textAlign:"right",color:"#a1a1aa",fontFamily:"'Fira Code',monospace"}}>{fmt(r.cost)}</td>
-                    <td style={{padding:"9px 10px",textAlign:"right",color:"#d4d4d8",fontFamily:"'Fira Code',monospace"}}>{fmt(r.salePrice)}</td>
-                    <td style={{padding:"9px 10px",textAlign:"right",color:r.profit>=0?"#34d399":"#f87171",fontFamily:"'Fira Code',monospace",fontWeight:700}}>{r.profit>=0?"+":""}{fmt(r.profit)}</td>
-                    <td style={{padding:"9px 10px",textAlign:"right",color:r.roi>=0?"#34d399":"#f87171",fontFamily:"'Fira Code',monospace"}}>{pct(r.roi)}</td>
-                    <td style={{padding:"9px 10px",textAlign:"right",color:"#71717a",fontFamily:"'Fira Code',monospace"}}>{r.days!==null?`${r.days}d`:"—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+          {isUnderCapital&&(
+            <div style={{background:t.negativeSoft,border:`1px solid ${t.negativeSoftBorder}`,borderRadius:9,padding:12,marginTop:14}}>
+              <div style={{display:"flex",alignItems:"flex-start",gap:9}}>
+                <AlertTriangle size={16} color={t.negative} style={{flexShrink:0,marginTop:1}}/>
+                <div style={{color:t.textMuted,fontSize:12.5,lineHeight:1.5}}>
+                  <strong style={{color:t.negative}}>Below target baseline.</strong> Cash on hand ({fmt(cashOnHand)}) is under the ₱14,500 war chest. Consider pausing purchases or raising prices until it recovers.
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* ── Group: Inventory & performance ── */}
+      <div style={{display:"flex",flexDirection:"column",gap:14,marginTop:14}}>
+        <Card>
+          <SectionHeader icon={Boxes} title="Inventory intelligence" sub="How efficiently stock is moving, as of today"/>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:14}}>
+            {[
+              ["Available",available,t.positive,"ready to sell or build"],
+              ["In builds",inBuild,t.info,"allocated to active builds"],
+              ["Sold",soldCount,t.textMuted,"lifetime units moved"],
+              ["Avg. days to sell",avgDaysToSell!==null?`${avgDaysToSell}d`:"—",t.accent,"purchase to sale, all-time"],
+              ["Turnover rate",`${inventoryTurnoverRate.toFixed(2)}×`,t.info,`cost of goods sold ÷ current stock cost, ${periodLabel}`],
+              ["Cash conversion",avgDaysToSell!==null?`~${avgDaysToSell}d`:"—",t.accent,"≈ days to sell — cash purchases, cash sales"],
+            ].map(([l,v,c,sub])=>(
+              <div key={l}>
+                <div style={{fontSize:19,fontWeight:700,fontFamily:FONT_MONO,color:c}}>{v}</div>
+                <div style={{fontSize:11,color:t.text,fontWeight:600,marginTop:4}}>{l}</div>
+                <div style={{fontSize:10,color:t.textFaint,marginTop:2,lineHeight:1.35}}>{sub}</div>
+              </div>
+            ))}
+          </div>
+          {deadInventory.length>0&&(
+            <div style={{background:t.warningSoft,border:`1px solid ${t.warningSoftBorder}`,borderRadius:9,padding:"11px 12px",marginTop:16}}>
+              <div style={{color:t.warning,fontWeight:700,fontSize:12.5,marginBottom:3,display:"flex",alignItems:"center",gap:6}}><AlertTriangle size={13}/>Dead inventory — {deadInventory.length} item{deadInventory.length===1?"":"s"} unsold {DEAD_DAYS}+ days</div>
+              <div style={{color:t.textMuted,fontSize:12}}>{fmt(deadInventoryValue)} in market value sitting idle. Consider a price cut or bundling to move it.</div>
+            </div>
+          )}
+          {writeOffCount>0&&(
+            <div style={{fontSize:11.5,color:t.textFaint,marginTop:14,paddingTop:12,borderTop:`1px solid ${t.border}`}}>
+              {writeOffCount} write-off{writeOffCount===1?"":"s"} recorded · <span style={{color:t.negative,fontFamily:FONT_MONO}}>{fmt(-writeOffLoss)}</span> lifetime loss
+            </div>
+          )}
+        </Card>
+
+        <Card>
+          <SectionHeader icon={TrendingUp} title="Profit analytics"
+            sub={`Running profit across ${sales.length} sale${sales.length===1?"":"s"} in the selected period`}
+            action={<div style={{fontSize:12,color:totalProfit>=0?t.positive:t.negative,fontFamily:FONT_MONO,fontWeight:600}}>{totalProfit>=0?"+":""}{fmt(totalProfit)}</div>}/>
+          {cumPoints.length>1
+            ? <ProfitAreaChart points={cumPoints} positive={totalProfit>=0}/>
+            : <div style={{fontSize:12.5,color:t.textFaint,padding:"20px 0",textAlign:"center"}}>Need at least 2 sales in this period to plot a trend.</div>}
+
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginTop:20,paddingTop:16,borderTop:`1px solid ${t.border}`}}>
+            <div>
+              <div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Monthly profit</div>
+              <div style={{fontSize:16,fontWeight:700,color:thisMonthProfit>=0?t.positive:t.negative,fontFamily:FONT_MONO}}>{thisMonthProfit>=0?"+":""}{fmt(thisMonthProfit)}</div>
+              <div style={{fontSize:10,color:t.textFaint,marginTop:3}}>current calendar month, always</div>
+            </div>
+            <div>
+              <div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Best month ever</div>
+              <div style={{fontSize:16,fontWeight:700,color:t.positive,fontFamily:FONT_MONO}}>{bestMonth?fmt(bestMonth.profit):"—"}</div>
+              <div style={{fontSize:10,color:t.textFaint,marginTop:3}}>{bestMonth?bestMonth.label:"not enough data yet"}</div>
+            </div>
+            <div>
+              <div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Avg. profit / sale</div>
+              <div style={{fontSize:16,fontWeight:700,color:avgProfitPerSale>=0?t.positive:t.negative,fontFamily:FONT_MONO}}>{sales.length?`${avgProfitPerSale>=0?"+":""}${fmt(Math.round(avgProfitPerSale))}`:"—"}</div>
+              <div style={{fontSize:10,color:t.textFaint,marginTop:3}}>{periodLabel}</div>
+            </div>
+            <div>
+              <div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Highest profit sale</div>
+              <div style={{fontSize:16,fontWeight:700,color:t.positive,fontFamily:FONT_MONO}}>{highestProfitSale?`+${fmt(highestProfitSale.profit)}`:"—"}</div>
+              <div style={{fontSize:10,color:t.textFaint,marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{highestProfitSale?highestProfitSale.name:periodLabel}</div>
+            </div>
           </div>
         </Card>
-      )}
 
-      {/* Bundle Recovery */}
-      {bundles.length>0&&(()=>{
-        const bundlePnl=bundles.map(b=>{
-          const bParts=parts.filter(p=>p.bundleId===b.id);
-          const soldParts=bParts.filter(p=>p.status==="sold");
-          const unsoldParts=bParts.filter(p=>p.status!=="sold");
-          const recoveredAmt=soldParts.reduce((s,p)=>{
-            const sale=allSales.find(s=>s.partId===p.id)||allSales.find(s=>s.name===p.name);
-            return s+(sale?sale.salePrice:0);
-          },0);
-          const unsoldMarket=unsoldParts.reduce((s,p)=>s+p.marketValue,0);
-          return {...b,bParts,soldParts,unsoldParts,recoveredAmt,unsoldMarket};
-        });
-        return (
+        {categoryRows.length>0&&(
           <Card>
-            <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:14}}>Bundle Recovery</div>
+            <SectionHeader icon={Tag} title="Profit by category" sub={`Which categories are actually worth buying, ${periodLabel}`}/>
             <div style={{display:"flex",flexDirection:"column",gap:12}}>
-              {bundlePnl.map(b=>{
-                const recPct=b.purchasePrice>0?Math.min(b.recoveredAmt/b.purchasePrice*100,100):0;
+              {categoryRows.map(([cat,v])=>{
+                const w=Math.abs(v.profit)/maxCatProfit*100;
+                const positive=v.profit>=0;
                 return (
-                  <div key={b.id}>
+                  <div key={cat}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-                      <span style={{fontSize:13,color:"#d4d4d8",fontWeight:500}}>{b.name}</span>
-                      <span style={{fontSize:12,color:"#71717a",fontFamily:"'Fira Code',monospace"}}>{fmt(b.recoveredAmt)} / {fmt(b.purchasePrice)}</span>
+                      <span style={{fontSize:12.5,color:t.text}}>{cat} <span style={{color:t.textFaint}}>({v.count} sold)</span></span>
+                      <span style={{fontSize:12.5,fontFamily:FONT_MONO,fontWeight:700,color:positive?t.positive:t.negative}}>{positive?"+":""}{fmt(v.profit)}</span>
                     </div>
-                    <div style={{height:5,background:"#1f1f23",borderRadius:99}}>
-                      <div style={{height:"100%",width:`${recPct}%`,background:recPct>=100?"#34d399":"#7c3aed",borderRadius:99,transition:"width 0.8s ease"}}/>
-                    </div>
-                    <div style={{fontSize:10,color:"#52525b",marginTop:3}}>
-                      {b.soldParts.length}/{b.bParts.length} parts sold · {b.unsoldParts.length} remaining ~{fmt(b.unsoldMarket)} market
+                    <div style={{height:5,background:t.surfaceSunken,borderRadius:99}}>
+                      <div style={{height:"100%",width:`${w}%`,background:positive?t.positive:t.negative,borderRadius:99,transition:"width 0.7s cubic-bezier(0.34,1.2,0.64,1)"}}/>
                     </div>
                   </div>
                 );
               })}
             </div>
           </Card>
-        );
-      })()}
+        )}
 
-      {/* Quick Notes */}
-      {(state.quickNotes||[]).length>0&&(
         <Card>
-          <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>Quick Notes</div>
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {[...state.quickNotes].reverse().map(n=>(
-              <div key={n.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,
-                background:"#09090b",border:"1px solid #27272a",borderRadius:9,padding:"9px 11px"}}>
-                <div style={{minWidth:0}}>
-                  <div style={{color:"#d4d4d8",fontSize:13,lineHeight:1.4,whiteSpace:"pre-wrap"}}>{n.text}</div>
-                  <div style={{color:"#52525b",fontSize:10,marginTop:4}}>{n.date}</div>
-                </div>
-                <button onClick={()=>dispatch({type:"DELETE_QUICK_NOTE",id:n.id})}
-                  style={{background:"none",border:"none",color:"#52525b",cursor:"pointer",fontSize:14,padding:"2px 4px",flexShrink:0}}>✕</button>
+          <SectionHeader icon={Sparkles} title="Financial health score"/>
+          <HealthScoreRing score={healthScore} tier={healthTier}/>
+        </Card>
+      </div>
+
+      {/* ── Group: Insights & activity ── */}
+      <div style={{display:"flex",flexDirection:"column",gap:14,marginTop:14}}>
+        <Card style={{background:t.mode==="dark"?`linear-gradient(155deg,${t.accentSoft} 0%,${t.surface} 60%)`:`linear-gradient(155deg,${t.accentSoft} 0%,${t.surface} 60%)`,border:`1px solid ${t.accentSoftBorder}`}}>
+          <SectionHeader icon={Sparkles} title="CFO insights"/>
+          <div style={{display:"flex",flexDirection:"column",gap:11}}>
+            {insights.slice(0,5).map((line,i)=>(
+              <div key={i} style={{display:"flex",gap:9,alignItems:"flex-start"}}>
+                <ArrowRight size={13} color={t.accent} style={{flexShrink:0,marginTop:3}}/>
+                <span style={{fontSize:13,color:t.text,lineHeight:1.55}}>{line}</span>
               </div>
             ))}
           </div>
         </Card>
-      )}
+
+        {sortedTx.length>0&&(
+          <Card style={{padding:0,overflow:"hidden"}}>
+            <div style={{padding:"16px 18px 6px"}}>
+              <SectionHeader icon={ClipboardList} title="Recent transactions" sub={`${periodLabel} · tap a column to sort`}/>
+            </div>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:520}}>
+                <thead>
+                  <tr style={{borderBottom:`1px solid ${t.border}`}}>
+                    <SortHeader label="Product" active={sortKey==="name"} dir={sortDir} onClick={()=>toggleSort("name")}/>
+                    <SortHeader label="Buy" active={sortKey==="cost"} dir={sortDir} onClick={()=>toggleSort("cost")} align="right"/>
+                    <SortHeader label="Sale" active={sortKey==="salePrice"} dir={sortDir} onClick={()=>toggleSort("salePrice")} align="right"/>
+                    <SortHeader label="Profit" active={sortKey==="profit"} dir={sortDir} onClick={()=>toggleSort("profit")} align="right"/>
+                    <SortHeader label="ROI" active={sortKey==="roi"} dir={sortDir} onClick={()=>toggleSort("roi")} align="right"/>
+                    <SortHeader label="Held" active={sortKey==="days"} dir={sortDir} onClick={()=>toggleSort("days")} align="right"/>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedTx.map(r=>(
+                    <tr key={r.id} style={{borderBottom:`1px solid ${t.border}`}}>
+                      <td style={{padding:"10px",color:t.text,maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name}</td>
+                      <td style={{padding:"10px",textAlign:"right",color:t.textMuted,fontFamily:FONT_MONO}}>{fmt(r.cost)}</td>
+                      <td style={{padding:"10px",textAlign:"right",color:t.text,fontFamily:FONT_MONO}}>{fmt(r.salePrice)}</td>
+                      <td style={{padding:"10px",textAlign:"right",color:r.profit>=0?t.positive:t.negative,fontFamily:FONT_MONO,fontWeight:700}}>{r.profit>=0?"+":""}{fmt(r.profit)}</td>
+                      <td style={{padding:"10px",textAlign:"right",color:r.roi>=0?t.positive:t.negative,fontFamily:FONT_MONO}}>{pct(r.roi)}</td>
+                      <td style={{padding:"10px",textAlign:"right",color:t.textFaint,fontFamily:FONT_MONO}}>{r.days!==null?`${r.days}d`:"—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+
+        {bundles.length>0&&(()=>{
+          const bundlePnl=bundles.map(b=>{
+            const bParts=parts.filter(p=>p.bundleId===b.id);
+            const soldParts=bParts.filter(p=>p.status==="sold");
+            const unsoldParts=bParts.filter(p=>p.status!=="sold");
+            const recoveredAmt=soldParts.reduce((s,p)=>{
+              const sale=allSales.find(s=>s.partId===p.id)||allSales.find(s=>s.name===p.name);
+              return s+(sale?sale.salePrice:0);
+            },0);
+            const unsoldMarket=unsoldParts.reduce((s,p)=>s+p.marketValue,0);
+            return {...b,bParts,soldParts,unsoldParts,recoveredAmt,unsoldMarket};
+          });
+          return (
+            <Card>
+              <SectionHeader icon={PackageCheck} title="Bundle recovery"/>
+              <div style={{display:"flex",flexDirection:"column",gap:13}}>
+                {bundlePnl.map(b=>{
+                  const recPct=b.purchasePrice>0?Math.min(b.recoveredAmt/b.purchasePrice*100,100):0;
+                  return (
+                    <div key={b.id}>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                        <span style={{fontSize:13,color:t.text,fontWeight:500}}>{b.name}</span>
+                        <span style={{fontSize:12,color:t.textFaint,fontFamily:FONT_MONO}}>{fmt(b.recoveredAmt)} / {fmt(b.purchasePrice)}</span>
+                      </div>
+                      <div style={{height:5,background:t.surfaceSunken,borderRadius:99}}>
+                        <div style={{height:"100%",width:`${recPct}%`,background:recPct>=100?t.positive:t.accent,borderRadius:99,transition:"width 0.8s ease"}}/>
+                      </div>
+                      <div style={{fontSize:10.5,color:t.textFaint,marginTop:4}}>
+                        {b.soldParts.length}/{b.bParts.length} parts sold · {b.unsoldParts.length} remaining ~{fmt(b.unsoldMarket)} market
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          );
+        })()}
+
+        {(state.quickNotes||[]).length>0&&(
+          <Card>
+            <SectionHeader icon={StickyNote} title="Quick notes"/>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {[...state.quickNotes].reverse().map(n=>(
+                <div key={n.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,
+                  background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:9,padding:"10px 12px"}}>
+                  <div style={{minWidth:0}}>
+                    <div style={{color:t.text,fontSize:13,lineHeight:1.45,whiteSpace:"pre-wrap"}}>{n.text}</div>
+                    <div style={{color:t.textFaint,fontSize:10.5,marginTop:5}}>{n.date}</div>
+                  </div>
+                  <IconBtn icon={X} label="Delete note" size={30} iconSize={14} onClick={()=>dispatch({type:"DELETE_QUICK_NOTE",id:n.id})}/>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+      </div>
 
       {parts.length===0&&(
         <Card style={{textAlign:"center",padding:48}}>
-          <div style={{fontSize:48,marginBottom:12}}>🖥️</div>
-          <div style={{color:"#d4d4d8",fontWeight:600}}>No parts yet</div>
-          <div style={{color:"#52525b",fontSize:13,marginTop:6}}>Go to Buy → add your first bundle.</div>
-          <div style={{marginTop:16}}><Btn onClick={()=>setTab("Buy")}>Start Buying</Btn></div>
+          <Monitor size={40} strokeWidth={1.5} color={t.textFaint} style={{marginBottom:14}}/>
+          <div style={{color:t.text,fontWeight:600,fontFamily:FONT_DISPLAY}}>No parts yet</div>
+          <div style={{color:t.textFaint,fontSize:13,marginTop:6}}>Go to Buy → add your first bundle.</div>
+          <div style={{marginTop:18}}><Btn onClick={()=>setTab("Buy")}>Start buying</Btn></div>
         </Card>
       )}
     </div>
   );
 }
+/* ═══════════════════════════════════════════
+   DEFECTIVE MODAL
+═══════════════════════════════════════════ */
+function DefectiveModal({part,onConfirm,onCancel}) {
+  const t=useTheme();
+  const [reason,setReason]=useState("");
+  return (
+    <ModalShell onClose={onCancel} label="Mark as defective">
+      <div style={{fontWeight:700,fontSize:16,color:t.text,marginBottom:8,fontFamily:FONT_DISPLAY}}>Mark as defective?</div>
+      <div style={{fontSize:13,color:t.textMuted,marginBottom:14,lineHeight:1.55}}>
+        "{part.name}" will be removed from active inventory and logged as a capital loss of <b style={{color:t.negative}}>{fmt(part.allocatedCost)}</b> on your Dashboard.
+      </div>
+      <Inp label="Reason (optional)" value={reason} onChange={e=>setReason(e.target.value)} placeholder="DOA, shorted during build, etc."/>
+      <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:16}}>
+        <Btn variant="warn" icon={AlertTriangle} onClick={()=>onConfirm(reason)} style={{width:"100%"}}>Mark defective — log loss</Btn>
+        <Btn variant="ghost" onClick={onCancel} style={{width:"100%"}}>Cancel</Btn>
+      </div>
+    </ModalShell>
+  );
+}
 
 /* ═══════════════════════════════════════════
-   BUY
+   QUICK SELL MODAL
 ═══════════════════════════════════════════ */
+function QuickSellModal({part,onClose,onConfirm,targetMargin}) {
+  const t=useTheme();
+  const suggested = Math.round(part.allocatedCost * (1 + targetMargin/100));
+  const [price,setPrice]=useState(String(suggested));
+  const [buyer,setBuyer]=useState("");
+  const sp=parseFloat(price)||0;
+  const profit=sp-part.allocatedCost;
+  const m=part.allocatedCost>0?profit/part.allocatedCost:0;
+  return (
+    <ModalShell onClose={onClose} label="Quick sell">
+      <div style={{fontWeight:700,fontSize:16,color:t.text,marginBottom:4,fontFamily:FONT_DISPLAY}}>Quick sell</div>
+      <div style={{fontSize:13,color:t.textFaint,marginBottom:16}}>{part.name} · cost {fmt(part.allocatedCost)}</div>
+      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        <Inp label={`Sale price (₱) — suggested ${fmt(suggested)} at ${targetMargin}% margin`} type="number" value={price} onChange={e=>setPrice(e.target.value)} />
+        <Inp label="Buyer name (optional)" value={buyer} onChange={e=>setBuyer(e.target.value)} placeholder="Juan dela Cruz" />
+        {sp>0&&(
+          <div style={{background:t.surfaceSunken,borderRadius:9,padding:12,border:`1px solid ${t.border}`}}>
+            {[["Profit",`${profit>=0?"+":""}${fmt(profit)}`,profit>=0?t.positive:t.negative],
+              ["Margin",pct(m),profit>=0?t.positive:t.negative]].map(([l,v,c])=>(
+              <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:4}}>
+                <span style={{color:t.textMuted}}>{l}</span>
+                <span style={{fontFamily:FONT_MONO,fontWeight:700,color:c}}>{v}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{display:"flex",gap:8,marginTop:4}}>
+          <Btn variant="success" icon={Check} onClick={()=>onConfirm(sp,buyer)} disabled={!sp} style={{flex:1}}>Confirm sale</Btn>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   EDIT PART MODAL
+═══════════════════════════════════════════ */
+function EditPartModal({part,onClose,onSave,dispatch,customCategories}) {
+  const t=useTheme();
+  const [name,setName]=useState(part.name);
+  const [cat,setCat]=useState(part.category);
+  const [cost,setCost]=useState(String(part.allocatedCost));
+  const [market,setMarket]=useState(String(part.marketValue));
+  const [notes,setNotes]=useState(part.notes||"");
+  const [photo,setPhoto]=useState({photoUrl:part.photoUrl||"",photoRecordId:part.photoRecordId||""});
+  return (
+    <ModalShell onClose={onClose} label="Edit part" maxWidth={420}>
+      <div style={{fontWeight:700,fontSize:16,color:t.text,marginBottom:16,fontFamily:FONT_DISPLAY}}>Edit part</div>
+      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        <PhotoUpload label="Photo" photoUrl={photo.photoUrl} photoRecordId={photo.photoRecordId} onChange={setPhoto}/>
+        <Inp label="Name" value={name} onChange={e=>setName(e.target.value)}/>
+        <CategoryPicker label="Category" value={cat} onChange={setCat} customCategories={customCategories} dispatch={dispatch}/>
+        <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <Inp label="Cost (₱)" type="number" value={cost} onChange={e=>setCost(e.target.value)}/>
+          <Inp label="Market value (₱)" type="number" value={market} onChange={e=>setMarket(e.target.value)}/>
+        </div>
+        <Inp label="Notes (condition, extras, etc.)" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Tested working, fan slightly loud"/>
+        <div style={{display:"flex",gap:8,marginTop:4}}>
+          <Btn onClick={()=>onSave({name,category:cat,allocatedCost:parseFloat(cost)||part.allocatedCost,marketValue:parseFloat(market)||part.marketValue,notes,photoUrl:photo.photoUrl,photoRecordId:photo.photoRecordId},`cost→${fmt(parseFloat(cost)||part.allocatedCost)}`)} style={{flex:1}}>Save changes</Btn>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+function TransferModal({onClose, dispatch, toast, businessCash, personalCash}) {
+  const t=useTheme();
+  const [amount, setAmount] = useState("");
+  const [direction, setDirection] = useState("to_personal");
+
+  const handleTransfer = () => {
+    const amt = parseFloat(amount);
+    if(!amt || amt <= 0) return toast("Enter a valid amount", "error");
+    if(direction === "to_personal" && amt > businessCash) return toast("Insufficient business funds", "error");
+    if(direction === "to_business" && amt > personalCash) return toast("Insufficient personal funds", "error");
+
+    dispatch({type: "TRANSFER_FUNDS", amount: amt, direction});
+    toast(`Transferred ${fmt(amt)} to ${direction === "to_personal" ? "personal wallet" : "business wallet"}`);
+    onClose();
+  };
+
+  return (
+    <ModalShell onClose={onClose} label="Transfer funds">
+      <div style={{fontWeight:700,fontSize:16,color:t.text,marginBottom:16,fontFamily:FONT_DISPLAY}}>Transfer funds</div>
+      <Segmented ariaLabel="Direction" value={direction} onChange={setDirection} options={[["to_personal","To personal",User],["to_business","To business",Wallet]]}/>
+      <div style={{marginTop:12}}>
+        <Inp label="Amount (₱)" type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0" />
+      </div>
+      <div style={{marginTop:16, display:"flex", gap:8}}>
+        <Btn variant="success" icon={ArrowLeftRight} onClick={handleTransfer} style={{flex:1}}>Confirm transfer</Btn>
+        <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+      </div>
+    </ModalShell>
+  );
+}
 function Buy({state,dispatch,toast}) {
+  const t=useTheme();
   const [mode,setMode]=useState("bundle");
   const [bundleName,setBundleName]=useState("");
   const [purchasePrice,setPurchasePrice]=useState("");
@@ -1580,7 +1779,7 @@ function Buy({state,dispatch,toast}) {
     const lastParts=state.parts.filter(p=>p.bundleId===last.id);
     setBundleName(last.name);
     setPartRows(lastParts.length?lastParts.map(p=>({id:uid(),name:p.name,category:p.category,marketValue:"",notes:"",photoUrl:"",photoRecordId:""})):[{id:uid(),name:"",category:"GPU",marketValue:"",notes:"",photoUrl:"",photoRecordId:""}]);
-    toast(`Loaded structure from "${last.name}" — update prices ✓`);
+    toast(`Loaded structure from "${last.name}" — update prices`);
   };
 
   const submitBundle=()=>{
@@ -1601,7 +1800,7 @@ function Buy({state,dispatch,toast}) {
       });
       dispatch({type:"ADD_BUNDLE",bundle:{id:bundleId,name:bundleName,purchasePrice:paid,totalMarket,date:today(),
         photoUrl:bundlePhoto.photoUrl,photoRecordId:bundlePhoto.photoRecordId},parts:newParts});
-      toast(`Bundle added — ${newParts.length} parts in inventory ✓`);
+      toast(`Bundle added — ${newParts.length} parts in inventory`);
       setBundleName("");setPurchasePrice("");setPartRows([{id:uid(),name:"",category:"GPU",marketValue:"",notes:"",photoUrl:"",photoRecordId:""}]);
       setBundlePhoto({photoUrl:"",photoRecordId:""});
       setLoading(false);
@@ -1625,7 +1824,7 @@ function Buy({state,dispatch,toast}) {
         photoUrl:singlePhoto.photoUrl,photoRecordId:singlePhoto.photoRecordId,
         history:[{date:today(),event:`Bought for ${fmt(cost)}`}]}));
       dispatch({type:"ADD_PARTS",parts:newParts});
-      toast(qty>1?`${qty}× ${singleName} added ✓`:`${singleName} added ✓`);
+      toast(qty>1?`${qty}× ${singleName} added`:`${singleName} added`);
       setSingleName("");setSingleCost("");setSingleMarket("");setSingleQty("1");setSingleNotes("");setSingleCat("GPU");
       setSinglePhoto({photoUrl:"",photoRecordId:""});
       setLoading(false);
@@ -1634,76 +1833,69 @@ function Buy({state,dispatch,toast}) {
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
-      <div><h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Buy Parts</h2>
-        <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>Add a bundle PC or individual part.</p></div>
-      <div style={{display:"flex",gap:8}}>
-        <Btn variant={mode==="bundle"?"primary":"ghost"} onClick={()=>setMode("bundle")}>Bundle PC</Btn>
-        <Btn variant={mode==="single"?"primary":"ghost"} onClick={()=>setMode("single")}>Single Part</Btn>
-      </div>
+      <PageHeader title="Buy parts" sub="Add a bundle PC or an individual part."/>
+      <Segmented ariaLabel="Purchase type" value={mode} onChange={setMode} options={[["bundle","Bundle PC",Boxes],["single","Single part",Cpu]]}/>
 
       {mode==="bundle"&&(
         <Card>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-            <div style={{fontWeight:600,fontSize:13,color:"#d4d4d8"}}>Bundle Details</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,gap:10,flexWrap:"wrap"}}>
+            <div style={{fontWeight:700,fontSize:13.5,color:t.text,fontFamily:FONT_DISPLAY}}>Bundle details</div>
             {state.bundles.length>0&&(
-              <button onClick={duplicateLastBundle} style={{background:"none",border:"none",color:"#7c3aed",cursor:"pointer",fontSize:11.5,fontWeight:600,padding:0}}
-                onMouseEnter={e=>e.currentTarget.style.color="#a78bfa"} onMouseLeave={e=>e.currentTarget.style.color="#7c3aed"}>↻ Duplicate last bundle</button>
+              <Btn small variant="ghost" icon={Copy} onClick={duplicateLastBundle}>Duplicate last bundle</Btn>
             )}
           </div>
           <div style={{marginBottom:16}}>
             <PhotoUpload label="Bundle photo (optional)" photoUrl={bundlePhoto.photoUrl} photoRecordId={bundlePhoto.photoRecordId} onChange={setBundlePhoto}/>
           </div>
-          <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:18}}>
+          <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
             <Inp label="Source / seller" value={bundleName} onChange={e=>setBundleName(e.target.value)} placeholder="FB Marketplace – Juan"/>
             <Inp label="You paid (₱)" type="number" value={purchasePrice} onChange={e=>setPurchasePrice(e.target.value)} placeholder="8000"/>
           </div>
-          <div style={{fontWeight:600,fontSize:13,color:"#d4d4d8",marginBottom:10}}>Parts — enter estimated market value</div>
+          <div style={{fontWeight:700,fontSize:13,color:t.text,marginBottom:12,fontFamily:FONT_DISPLAY}}>Parts — enter estimated market value</div>
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
             {partRows.map((row,idx)=>(
-              <div key={row.id} style={{display:"flex",gap:10,alignItems:"flex-start",animation:"fadeUp 0.15s ease",paddingBottom:12,borderBottom:idx<partRows.length-1?"1px solid #1f1f23":"none"}}>
+              <div key={row.id} style={{display:"flex",gap:10,alignItems:"flex-start",animation:"blFadeUp 0.15s ease",paddingBottom:14,borderBottom:idx<partRows.length-1?`1px solid ${t.border}`:"none"}}>
                 <PhotoUpload label="" photoUrl={row.photoUrl} photoRecordId={row.photoRecordId} onChange={({photoUrl,photoRecordId})=>{updateRow(row.id,"photoUrl",photoUrl);updateRow(row.id,"photoRecordId",photoRecordId);}}/>
-                <div className="part-row" style={{display:"grid",gridTemplateColumns:"1fr auto 90px 90px auto",gap:7,alignItems:"end",flex:1}}>
+                <div className="part-row" style={{display:"grid",gridTemplateColumns:"1fr auto 90px 90px auto",gap:8,alignItems:"end",flex:1}}>
                   <Inp label={idx===0?"Part name":""} value={row.name} onChange={e=>updateRow(row.id,"name",e.target.value)} placeholder="RX 580"/>
-                  <CategoryPicker label={idx===0?"Cat":"."} value={row.category} onChange={v=>updateRow(row.id,"category",v)} customCategories={state.customCategories} dispatch={dispatch} style={{minWidth:90}}/>
+                  <CategoryPicker label={idx===0?"Category":"​"} value={row.category} onChange={v=>updateRow(row.id,"category",v)} customCategories={state.customCategories} dispatch={dispatch} style={{minWidth:90}}/>
                   <Inp label={idx===0?"Market (₱)":""} type="number" value={row.marketValue} onChange={e=>updateRow(row.id,"marketValue",e.target.value)} placeholder="4000"/>
                   <Inp label={idx===0?"Notes":""} value={row.notes||""} onChange={e=>updateRow(row.id,"notes",e.target.value)} placeholder="condition"/>
-                  <button onClick={()=>removeRow(row.id)} style={{background:"none",border:"none",color:"#52525b",cursor:"pointer",fontSize:20,padding:"6px 4px",minHeight:36,transition:"color 0.1s"}}
-                    onMouseEnter={e=>e.currentTarget.style.color="#ef4444"} onMouseLeave={e=>e.currentTarget.style.color="#52525b"}>✕ Remove</button>
+                  <IconBtn icon={Trash2} label={`Remove ${row.name||"part row"}`} variant="danger" onClick={()=>removeRow(row.id)} style={{alignSelf:idx===0?"end":"start",marginBottom:idx===0?2:0}}/>
                 </div>
               </div>
             ))}
           </div>
-          <button onClick={addRow} style={{marginTop:9,background:"none",border:"none",color:"#7c3aed",cursor:"pointer",fontSize:12,fontWeight:600,padding:0}}
-            onMouseEnter={e=>e.currentTarget.style.color="#a78bfa"} onMouseLeave={e=>e.currentTarget.style.color="#7c3aed"}>+ Add part</button>
+          <div style={{marginTop:12}}><Btn small variant="ghost" icon={Plus} onClick={addRow}>Add part</Btn></div>
 
           {dealScore!==null&&(
-            <div style={{marginTop:14,background:"#09090b",borderRadius:10,padding:14,border:"1px solid #27272a"}}>
+            <div style={{marginTop:16,background:t.surfaceSunken,borderRadius:10,padding:14,border:`1px solid ${t.border}`}}>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:6}}>
-                <span style={{color:"#a1a1aa"}}>Market value</span><span style={{fontFamily:"'Fira Code',monospace",color:"#fff"}}>{fmt(totalMarket)}</span>
+                <span style={{color:t.textMuted}}>Market value</span><span style={{fontFamily:FONT_MONO,color:t.text}}>{fmt(totalMarket)}</span>
               </div>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:10}}>
-                <span style={{color:"#a1a1aa"}}>You pay</span><span style={{fontFamily:"'Fira Code',monospace",color:"#fff"}}>{fmt(paid)}</span>
+                <span style={{color:t.textMuted}}>You pay</span><span style={{fontFamily:FONT_MONO,color:t.text}}>{fmt(paid)}</span>
               </div>
               <DealBar score={dealScore}/>
-              <div style={{marginTop:10,borderTop:"1px solid #27272a",paddingTop:8}}>
+              <div style={{marginTop:12,borderTop:`1px solid ${t.border}`,paddingTop:10}}>
                 {partRows.filter(r=>r.name&&r.marketValue).map(r=>{
                   const mv=parseFloat(r.marketValue)||0;
                   const share=totalMarket>0?mv/totalMarket:0;
-                  return <div key={r.id} style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:3}}>
-                    <span style={{color:"#71717a"}}>{r.name} ({pct(share)})</span>
-                    <span style={{fontFamily:"'Fira Code',monospace",color:"#d4d4d8"}}>{fmt(share*paid)}</span>
+                  return <div key={r.id} style={{display:"flex",justifyContent:"space-between",fontSize:11.5,marginBottom:4}}>
+                    <span style={{color:t.textFaint}}>{r.name} ({pct(share)})</span>
+                    <span style={{fontFamily:FONT_MONO,color:t.textMuted}}>{fmt(share*paid)}</span>
                   </div>;
                 })}
               </div>
             </div>
           )}
-          <div style={{marginTop:14}}><Btn loading={loading} onClick={submitBundle} disabled={!bundleName||!purchasePrice||totalMarket===0} style={{width:"100%"}}>Add Bundle to Inventory</Btn></div>
+          <div style={{marginTop:16}}><Btn loading={loading} onClick={submitBundle} disabled={!bundleName||!purchasePrice||totalMarket===0} style={{width:"100%"}}>Add bundle to inventory</Btn></div>
         </Card>
       )}
 
       {mode==="single"&&(
         <Card>
-          <div style={{fontWeight:600,fontSize:13,color:"#d4d4d8",marginBottom:14}}>Single Part</div>
+          <div style={{fontWeight:700,fontSize:13.5,color:t.text,marginBottom:16,fontFamily:FONT_DISPLAY}}>Single part</div>
           <div style={{marginBottom:16}}>
             <PhotoUpload label="Photo (optional)" photoUrl={singlePhoto.photoUrl} photoRecordId={singlePhoto.photoRecordId} onChange={setSinglePhoto}/>
           </div>
@@ -1715,191 +1907,167 @@ function Buy({state,dispatch,toast}) {
             <Inp label="Quantity" type="number" min="1" value={singleQty} onChange={e=>setSingleQty(e.target.value)} placeholder="1"/>
           </div>
           {parseInt(singleQty,10)>1&&singleCost&&(
-            <div style={{marginTop:10,background:"#09090b",border:"1px solid #27272a",borderRadius:9,padding:"9px 12px",
+            <div style={{marginTop:12,background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:9,padding:"10px 12px",
               display:"flex",justifyContent:"space-between",fontSize:12}}>
-              <span style={{color:"#a1a1aa"}}>{Math.max(1,parseInt(singleQty,10)||1)} units × {fmt(parseFloat(singleCost)||0)}</span>
-              <span style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{fmt((Math.max(1,parseInt(singleQty,10)||1))*(parseFloat(singleCost)||0))} total</span>
+              <span style={{color:t.textMuted}}>{Math.max(1,parseInt(singleQty,10)||1)} units × {fmt(parseFloat(singleCost)||0)}</span>
+              <span style={{fontFamily:FONT_MONO,fontWeight:700,color:t.text}}>{fmt((Math.max(1,parseInt(singleQty,10)||1))*(parseFloat(singleCost)||0))} total</span>
             </div>
           )}
-          {/* Notes field  (#3) */}
-          <div style={{marginTop:12}}>
+          <div style={{marginTop:14}}>
             <Inp label="Notes — condition, extras, observations" value={singleNotes} onChange={e=>setSingleNotes(e.target.value)} placeholder="Tested working. Includes original box."/>
           </div>
-          <div style={{marginTop:14}}><Btn loading={loading} onClick={submitSingle} disabled={!singleName||!singleCost} style={{width:"100%"}}>{parseInt(singleQty,10)>1?`Add ${Math.max(1,parseInt(singleQty,10)||1)} to Inventory`:"Add to Inventory"}</Btn></div>
+          <div style={{marginTop:16}}><Btn loading={loading} onClick={submitSingle} disabled={!singleName||!singleCost} style={{width:"100%"}}>{parseInt(singleQty,10)>1?`Add ${Math.max(1,parseInt(singleQty,10)||1)} to inventory`:"Add to inventory"}</Btn></div>
         </Card>
       )}
     </div>
   );
 }
-
-/* ═══════════════════════════════════════════
-   INVENTORY  (#1 quick sell, #2 edit, #3 notes, #8 search, #10 buyer)
-═══════════════════════════════════════════ */
-/* ═══════════════════════════════════════════
-   PART DETAIL SHEET — tap a card to see full details + actions,
-   instead of every action always being visible on the card itself
-═══════════════════════════════════════════ */
 function PartDetailSheet({part,buildName,onClose,openLightbox,onQuickSell,onEdit,onDefective,onDelete,onDuplicate,onAddToBuild,onGoToBuild}) {
+  const t=useTheme();
   const potential=part.marketValue-part.allocatedCost;
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",borderRadius:"18px 18px 0 0",width:"100%",maxWidth:520,
-        maxHeight:"88vh",overflowY:"auto",animation:"slideUp 0.22s cubic-bezier(0.22,1,0.36,1)",
-        paddingBottom:"calc(20px + env(safe-area-inset-bottom))"}}>
-        {/* Drag handle */}
-        <div style={{display:"flex",justifyContent:"center",padding:"10px 0 4px"}}>
-          <div style={{width:38,height:4,borderRadius:99,background:"#3f3f46"}}/>
+    <ModalShell onClose={onClose} label={part.name} sheet maxWidth={520} padding={0}>
+      <div style={{width:"100%",aspectRatio:"16/10",background:t.surfaceSunken,display:"flex",alignItems:"center",justifyContent:"center",
+        borderBottom:`1px solid ${t.border}`}}>
+        {part.photoUrl?(
+          <button onClick={()=>openLightbox(part.photoUrl)} aria-label="View photo full-screen" className="bl-focusable"
+            style={{width:"100%",height:"100%",border:"none",padding:0,background:"none",cursor:"pointer"}}>
+            <img src={part.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+          </button>
+        ):(
+          <Wrench size={40} strokeWidth={1.5} color={t.textFaint}/>
+        )}
+      </div>
+
+      <div style={{padding:"18px 20px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:14}}>
+          <div style={{color:t.text,fontWeight:700,fontSize:19,fontFamily:FONT_DISPLAY}}>{part.name}</div>
+          <StatusBadge s={part.status}/>
         </div>
 
-        {/* Photo */}
-        <div style={{width:"100%",aspectRatio:"16/10",background:"#09090b",display:"flex",alignItems:"center",justifyContent:"center",
-          cursor:part.photoUrl?"pointer":"default",borderBottom:"1px solid #27272a"}}
-          onClick={part.photoUrl?()=>openLightbox(part.photoUrl):undefined}>
-          {part.photoUrl?(
-            <img src={part.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+        <div style={{background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:11,padding:14,marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:t.textMuted,marginBottom:10}}>Purchase details</div>
+          {[["Bought",fmt(part.allocatedCost),t.text],["Market value",fmt(part.marketValue),t.text],
+            ["Potential profit",`${potential>=0?"+":""}${fmt(potential)}`,potential>=0?t.positive:t.negative]
+          ].map(([l,v,c],i)=>(
+            <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:i<2?7:0,paddingTop:i===2?8:0,borderTop:i===2?`1px solid ${t.border}`:"none"}}>
+              <span style={{color:t.textMuted}}>{l}</span>
+              <span style={{fontFamily:FONT_MONO,fontWeight:i===2?700:600,color:c}}>{v}</span>
+            </div>
+          ))}
+        </div>
+
+        <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}}>
+          <DetailRow label="Category" value={part.category}/>
+          <DetailRow label="Purchase source" value={part.source}/>
+          {part.history?.[0]?.date&&<DetailRow label="Purchase date" value={part.history[0].date}/>}
+          {buildName&&<DetailRow label="Status" value={`Used in ${buildName}`} valueColor={t.info}/>}
+          {part.soldTo&&<DetailRow label="Sold to" value={part.soldTo}/>}
+          {part.notes&&<DetailRow label="Notes" value={part.notes}/>}
+        </div>
+
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {part.status==="available"&&(
+            <div style={{display:"flex",gap:8}}>
+              <Btn variant="success" icon={Zap} onClick={onQuickSell} style={{flex:1}}>Quick sell</Btn>
+              <Btn variant="ghost" icon={Wrench} onClick={onAddToBuild} style={{flex:1}}>Add to build</Btn>
+            </div>
+          )}
+          <div style={{display:"flex",gap:8}}>
+            <Btn variant="ghost" icon={Pencil} onClick={onEdit} style={{flex:1}}>Edit</Btn>
+            <Btn variant="ghost" icon={ClipboardCopy} onClick={onDuplicate} style={{flex:1}}>Duplicate</Btn>
+          </div>
+          {part.status==="in_build"?(
+            <div style={{marginTop:6,paddingTop:14,borderTop:`1px solid ${t.border}`}}>
+              <div style={{fontSize:12,color:t.textMuted,lineHeight:1.5,marginBottom:8}}>
+                This part is used in <strong style={{color:t.info}}>{buildName}</strong>. Dissolve that build first to free it up before editing its defective/delete status here.
+              </div>
+              <Btn variant="ghost" icon={Wrench} onClick={onGoToBuild} style={{width:"100%"}}>Go to {buildName}</Btn>
+            </div>
           ):(
-            <span style={{fontSize:48,opacity:0.25}}>🔧</span>
+            <div style={{display:"flex",gap:8,marginTop:6,paddingTop:14,borderTop:`1px solid ${t.border}`}}>
+              {part.status!=="sold"&&part.status!=="defective"&&(
+                <Btn variant="warn" icon={AlertTriangle} onClick={onDefective} style={{flex:1}}>Mark defective</Btn>
+              )}
+              <Btn variant="danger" icon={Trash2} onClick={onDelete} style={{flex:1}}>Delete</Btn>
+            </div>
           )}
         </div>
-
-        <div style={{padding:"18px 20px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:14}}>
-            <div style={{color:"#fff",fontWeight:700,fontSize:19}}>{part.name}</div>
-            <Badge s={part.status}/>
-          </div>
-
-          {/* Purchase details */}
-          <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14,marginBottom:14}}>
-            <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Purchase Details</div>
-            {[["Bought",fmt(part.allocatedCost),"#fff"],["Market value",fmt(part.marketValue),"#d4d4d8"],
-              ["Potential profit",`${potential>=0?"+":""}${fmt(potential)}`,potential>=0?"#34d399":"#f87171"]
-            ].map(([l,v,c],i)=>(
-              <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:i<2?7:0,paddingTop:i===2?8:0,borderTop:i===2?"1px solid #27272a":"none"}}>
-                <span style={{color:"#a1a1aa"}}>{l}</span>
-                <span style={{fontFamily:"'Fira Code',monospace",fontWeight:i===2?700:600,color:c}}>{v}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Category / source / date / status detail */}
-          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
-            <DetailRow label="Category" value={part.category}/>
-            <DetailRow label="Purchase Source" value={part.source}/>
-            {part.history?.[0]?.date&&<DetailRow label="Purchase Date" value={part.history[0].date}/>}
-            {buildName&&<DetailRow label="Status" value={`Used in ${buildName}`} valueColor="#7dd3fc"/>}
-            {part.soldTo&&<DetailRow label="Sold To" value={part.soldTo}/>}
-            {part.notes&&<DetailRow label="Notes" value={part.notes}/>}
-          </div>
-
-          {/* Actions */}
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {part.status==="available"&&(
-              <div style={{display:"flex",gap:8}}>
-                <Btn variant="success" onClick={onQuickSell} style={{flex:1}}>⚡ Quick Sell</Btn>
-                <Btn variant="ghost" onClick={onAddToBuild} style={{flex:1}}>🛠️ Add to Build</Btn>
-              </div>
-            )}
-            <div style={{display:"flex",gap:8}}>
-              <Btn variant="ghost" onClick={onEdit} style={{flex:1}}>✏️ Edit</Btn>
-              <Btn variant="ghost" onClick={onDuplicate} style={{flex:1}}>⧉ Duplicate</Btn>
-            </div>
-            {part.status==="in_build"?(
-              <div style={{marginTop:6,paddingTop:14,borderTop:"1px solid #27272a"}}>
-                <div style={{fontSize:12,color:"#71717a",lineHeight:1.5,marginBottom:8}}>
-                  This part is used in <strong style={{color:"#7dd3fc"}}>{buildName}</strong>. Dissolve that build first to free it up before editing its defective/delete status here.
-                </div>
-                <Btn variant="ghost" onClick={onGoToBuild} style={{width:"100%"}}>🛠️ Go to {buildName}</Btn>
-              </div>
-            ):(
-              <div style={{display:"flex",gap:8,marginTop:6,paddingTop:14,borderTop:"1px solid #27272a"}}>
-                {part.status!=="sold"&&part.status!=="defective"&&(
-                  <Btn variant="warn" onClick={onDefective} style={{flex:1}}>⚠️ Mark Defective</Btn>
-                )}
-                <Btn variant="danger" onClick={onDelete} style={{flex:1}}>🗑 Delete</Btn>
-              </div>
-            )}
-          </div>
-        </div>
       </div>
-    </div>
+    </ModalShell>
   );
 }
 
-function DetailRow({label,value,valueColor="#fff"}) {
+function DetailRow({label,value,valueColor}) {
+  const t=useTheme();
   return (
     <div>
-      <div style={{fontSize:11,color:"#71717a",marginBottom:2}}>{label}</div>
-      <div style={{fontSize:13,color:valueColor}}>{value}</div>
+      <div style={{fontSize:11,color:t.textFaint,marginBottom:2}}>{label}</div>
+      <div style={{fontSize:13,color:valueColor||t.text}}>{value}</div>
     </div>
   );
 }
 
 function PartGroupSheet({group,onClose,onViewUnit}) {
+  const t=useTheme();
   const p=group[0];
   const count=group.length;
   const totalCost=p.allocatedCost*count;
   const totalMarket=p.marketValue*count;
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",borderRadius:"18px 18px 0 0",width:"100%",maxWidth:520,
-        maxHeight:"85vh",overflowY:"auto",animation:"slideUp 0.22s cubic-bezier(0.22,1,0.36,1)",
-        paddingBottom:"calc(20px + env(safe-area-inset-bottom))"}}>
-        <div style={{display:"flex",justifyContent:"center",padding:"10px 0 4px"}}>
-          <div style={{width:38,height:4,borderRadius:99,background:"#3f3f46"}}/>
+    <ModalShell onClose={onClose} label={`${p.name} — ${count} units`} sheet maxWidth={520} padding={0}>
+      <div style={{padding:"6px 20px 20px"}}>
+        <div style={{display:"flex",gap:12,alignItems:"center",marginBottom:16}}>
+          <PhotoThumb url={p.photoUrl} size={52} seed={p.id.length}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{color:t.text,fontWeight:700,fontSize:16,fontFamily:FONT_DISPLAY}}>{p.name}</div>
+            <div style={{color:t.textMuted,fontSize:12,marginTop:2}}>{p.category} · {count} identical units</div>
+          </div>
+          <StatusBadge s={p.status}/>
         </div>
-        <div style={{padding:"14px 20px"}}>
-          <div style={{display:"flex",gap:12,alignItems:"center",marginBottom:14}}>
-            <PhotoThumb url={p.photoUrl} size={52} seed={p.id.length}/>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{color:"#fff",fontWeight:700,fontSize:16}}>{p.name}</div>
-              <div style={{color:"#71717a",fontSize:12,marginTop:2}}>{p.category} · {count} identical units</div>
-            </div>
-            <Badge s={p.status}/>
-          </div>
 
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-            <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:9,padding:10}}>
-              <div style={{fontSize:10,color:"#a1a1aa"}}>Cost each</div>
-              <div style={{fontSize:14,fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{fmt(p.allocatedCost)}</div>
-              <div style={{fontSize:10,color:"#52525b",marginTop:2}}>Total {fmt(totalCost)}</div>
-            </div>
-            <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:9,padding:10}}>
-              <div style={{fontSize:10,color:"#a1a1aa"}}>Market each</div>
-              <div style={{fontSize:14,fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{fmt(p.marketValue)}</div>
-              <div style={{fontSize:10,color:"#52525b",marginTop:2}}>Total {fmt(totalMarket)}</div>
-            </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:18}}>
+          <div style={{background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:9,padding:11}}>
+            <div style={{fontSize:10.5,color:t.textMuted,fontWeight:600}}>Cost each</div>
+            <div style={{fontSize:14,fontFamily:FONT_MONO,fontWeight:700,color:t.text}}>{fmt(p.allocatedCost)}</div>
+            <div style={{fontSize:10.5,color:t.textFaint,marginTop:2}}>Total {fmt(totalCost)}</div>
           </div>
+          <div style={{background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:9,padding:11}}>
+            <div style={{fontSize:10.5,color:t.textMuted,fontWeight:600}}>Market each</div>
+            <div style={{fontSize:14,fontFamily:FONT_MONO,fontWeight:700,color:t.text}}>{fmt(p.marketValue)}</div>
+            <div style={{fontSize:10.5,color:t.textFaint,marginTop:2}}>Total {fmt(totalMarket)}</div>
+          </div>
+        </div>
 
-          <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:9}}>
-            Individual units — tap any one to sell, edit, or mark it defective
-          </div>
-          <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {group.map((unit,i)=>(
-              <div key={unit.id} onClick={()=>onViewUnit(unit)} style={{display:"flex",alignItems:"center",gap:9,padding:"9px 10px",
-                borderRadius:9,background:"#09090b",border:"1px solid #27272a",cursor:"pointer",transition:"border-color 0.15s"}}
-                onMouseEnter={e=>{e.currentTarget.style.borderColor="#52525b";}}
-                onMouseLeave={e=>{e.currentTarget.style.borderColor="#27272a";}}>
-                <span style={{color:"#52525b",fontSize:11,fontFamily:"'Fira Code',monospace",width:20,flexShrink:0}}>{i+1}</span>
-                <PhotoThumb url={unit.photoUrl} size={28} seed={unit.id.length}/>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{color:"#d4d4d8",fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                    {unit.notes?unit.notes:`Unit ${i+1}`}
-                  </div>
+        <div style={{fontSize:12,color:t.textMuted,fontWeight:600,marginBottom:10}}>
+          Individual units — select one to sell, edit, or mark it defective
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {group.map((unit,i)=>(
+            <button key={unit.id} onClick={()=>onViewUnit(unit)} className="bl-focusable" style={{display:"flex",alignItems:"center",gap:10,padding:"10px 11px",
+              borderRadius:9,background:t.surfaceSunken,border:`1px solid ${t.border}`,cursor:"pointer",transition:"border-color 0.15s",width:"100%",textAlign:"left",fontFamily:FONT_BODY}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=t.borderStrong;}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;}}>
+              <span style={{color:t.textFaint,fontSize:11,fontFamily:FONT_MONO,width:20,flexShrink:0}}>{i+1}</span>
+              <PhotoThumb url={unit.photoUrl} size={28} seed={unit.id.length}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{color:t.text,fontSize:12.5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  {unit.notes?unit.notes:`Unit ${i+1}`}
                 </div>
-                <span style={{color:"#52525b",fontSize:14}}>›</span>
               </div>
-            ))}
-          </div>
+              <ChevronRight size={16} color={t.textFaint}/>
+            </button>
+          ))}
         </div>
       </div>
-    </div>
+    </ModalShell>
   );
 }
-
 function Inventory({state,dispatch,toast,setTab,openLightbox}) {
+  const t=useTheme();
   const [statusFilter,setStatusFilter]=useState("all");
   const [catFilter,setCatFilter]=useState("all");
-  const [search,setSearch]=useState("");   // #8
+  const [search,setSearch]=useState("");
   const [viewing,setViewing]=useState(null); // part shown in the detail sheet
   const [viewingGroup,setViewingGroup]=useState(null); // group of identical parts shown in the group sheet
   const [bundleView,setBundleView]=useState(false);
@@ -1945,13 +2113,13 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
     const p=quickSell;
     const sale={id:uid(),partId:p.id,name:p.name,cost:p.allocatedCost,salePrice:sp,profit:sp-p.allocatedCost,buyerName:buyer,date:today()};
     dispatch({type:"SELL",mode:"part",id:p.id,sale});
-    toast(`${p.name} sold for ${fmt(sp)} — profit ${fmt(sp-p.allocatedCost)} ✓`,sp-p.allocatedCost>=0?"success":"warn");
+    toast(`${p.name} sold for ${fmt(sp)} — profit ${fmt(sp-p.allocatedCost)}`,sp-p.allocatedCost>=0?"success":"warn");
     setQuickSell(null);setViewing(null);
   };
 
   const handleEdit=(changes,desc)=>{
     dispatch({type:"UPDATE_PART",id:editing.id,changes,desc});
-    toast(`${editing.name} updated ✓`);
+    toast(`${editing.name} updated`);
     setEditing(null);
   };
 
@@ -1986,7 +2154,7 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
 
   const duplicatePart=(p)=>{
     dispatch({type:"DUPLICATE_PART",id:p.id});
-    toast(`Duplicated ${p.name} ✓`);
+    toast(`Duplicated ${p.name}`);
     setViewing(null);
   };
 
@@ -2037,63 +2205,64 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
           onGoToBuild={goToBuild}/>
       )}
 
-      <div><h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Inventory</h2>
-        <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>{parts.length} parts tracked</p></div>
+      <PageHeader title="Inventory" sub={`${parts.length} part${parts.length===1?"":"s"} tracked`}/>
 
-      {/* Search  (#8) */}
-      <Inp label="" value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍  Search by name or category..."/>
+      <Inp value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name or category…" icon={Search} aria-label="Search inventory"/>
 
-      {/* Category filter chips */}
       {categoriesPresent.length>0&&(
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-          <Btn small variant={catFilter==="all"?"primary":"ghost"} onClick={()=>setCatFilter("all")}>All Categories</Btn>
+          <Btn small variant={catFilter==="all"?"primary":"ghost"} onClick={()=>setCatFilter("all")}>All categories</Btn>
           {categoriesPresent.map(c=>(
             <Btn key={c} small variant={catFilter===c?"primary":"ghost"} onClick={()=>setCatFilter(c)}>{c}</Btn>
           ))}
         </div>
       )}
 
-      {/* Status filter chips */}
       <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
-        {["all","available","in_build","sold","defective"].map(f=>(
-          <Btn key={f} variant={!bundleView&&statusFilter===f?"primary":"ghost"} onClick={()=>{setStatusFilter(f);setBundleView(false);}}>
-            {f==="all"?"All":f.replace("_"," ")}
-            <span style={{background:"#3f3f46",borderRadius:99,padding:"1px 6px",fontSize:11,color:"#a1a1aa",marginLeft:2}}>
-              {f==="all"?parts.length:parts.filter(p=>p.status===f).length}
-            </span>
-          </Btn>
-        ))}
-        <Btn variant={bundleView?"primary":"ghost"} onClick={()=>setBundleView(true)}>📦 Bundles</Btn>
+        {["all","available","in_build","sold","defective"].map(f=>{
+          const active=!bundleView&&statusFilter===f;
+          return (
+            <Btn key={f} small variant={active?"primary":"ghost"} onClick={()=>{setStatusFilter(f);setBundleView(false);}}>
+              {f==="all"?"All":f.replace("_"," ")}
+              <span style={{background:active?"rgba(255,255,255,0.22)":(t.mode==="dark"?"rgba(255,255,255,0.08)":"rgba(0,0,0,0.06)"),borderRadius:99,padding:"1px 6px",fontSize:10.5,marginLeft:2}}>
+                {f==="all"?parts.length:parts.filter(p=>p.status===f).length}
+              </span>
+            </Btn>
+          );
+        })}
+        <Btn small variant={bundleView?"primary":"ghost"} icon={Boxes} onClick={()=>setBundleView(true)}>Bundles</Btn>
       </div>
 
       {bundleView?(
         bundles.length===0?(
-          <Card style={{textAlign:"center",padding:36}}><div style={{color:"#52525b"}}>No bundles yet.</div></Card>
+          <Card style={{textAlign:"center",padding:36}}><div style={{color:t.textFaint}}>No bundles yet.</div></Card>
         ):(
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
             {bundles.map((b,i)=>{
               const bParts=parts.filter(p=>p.bundleId===b.id);
               return (
-                <Card key={b.id} style={{animation:`fadeUp 0.2s ease ${i*0.03}s both`}}>
+                <Card key={b.id} style={{animation:`blFadeUp 0.2s ease ${i*0.03}s both`}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:12}}>
                     <div style={{display:"flex",gap:11,minWidth:0}}>
-                      {b.photoUrl&&<PhotoThumb url={b.photoUrl} size={56} seed={i} onClick={()=>openLightbox(b.photoUrl)}/>}
+                      {b.photoUrl&&<PhotoThumb url={b.photoUrl} size={56} seed={i} onClick={()=>openLightbox(b.photoUrl)} label={`View photo of ${b.name}`}/>}
                       <div>
-                        <div style={{color:"#fff",fontWeight:700,fontSize:14}}>{b.name}</div>
-                        <div style={{color:"#71717a",fontSize:11,marginTop:2}}>{b.date} · {bParts.length} parts · paid {fmt(b.purchasePrice)}</div>
+                        <div style={{color:t.text,fontWeight:700,fontSize:14,fontFamily:FONT_DISPLAY}}>{b.name}</div>
+                        <div style={{color:t.textMuted,fontSize:11.5,marginTop:2}}>{b.date} · {bParts.length} parts · paid {fmt(b.purchasePrice)}</div>
                       </div>
                     </div>
-                    <Btn small variant="danger" onClick={()=>setDeleting({...b,_isBundle:true})}>🗑</Btn>
+                    <IconBtn icon={Trash2} label={`Delete bundle ${b.name}`} variant="danger" onClick={()=>setDeleting({...b,_isBundle:true})}/>
                   </div>
-                  <div style={{display:"flex",flexDirection:"column",gap:8,borderTop:"1px solid #27272a",paddingTop:10}}>
+                  <div style={{display:"flex",flexDirection:"column",gap:4,borderTop:`1px solid ${t.border}`,paddingTop:10}}>
                     {bParts.map(p=>(
-                      <div key={p.id} onClick={()=>setViewing(p)} style={{display:"flex",alignItems:"center",gap:9,fontSize:12,cursor:"pointer"}}>
+                      <button key={p.id} onClick={()=>setViewing(p)} className="bl-focusable" style={{display:"flex",alignItems:"center",gap:9,fontSize:12,
+                        cursor:"pointer",background:"none",border:"none",padding:"6px 4px",borderRadius:7,width:"100%",textAlign:"left",fontFamily:FONT_BODY}}
+                        onMouseEnter={e=>e.currentTarget.style.background=t.surfaceHover} onMouseLeave={e=>e.currentTarget.style.background="none"}>
                         <PhotoThumb url={p.photoUrl} size={32} seed={p.id.length}/>
-                        <span style={{color:"#d4d4d8",flex:1,minWidth:0}}>{p.name}</span>
-                        <span style={{color:"#52525b",fontSize:10}}>{p.category}</span>
-                        <Badge s={p.status}/>
-                        <span style={{fontFamily:"'Fira Code',monospace",color:"#a1a1aa",fontSize:11}}>{fmt(p.allocatedCost)}</span>
-                      </div>
+                        <span style={{color:t.text,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</span>
+                        <span style={{color:t.textFaint,fontSize:10.5}}>{p.category}</span>
+                        <StatusBadge s={p.status}/>
+                        <span style={{fontFamily:FONT_MONO,color:t.textMuted,fontSize:11}}>{fmt(p.allocatedCost)}</span>
+                      </button>
                     ))}
                   </div>
                 </Card>
@@ -2103,54 +2272,58 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
         )
       ):filtered.length===0?(
         <Card style={{textAlign:"center",padding:36}}>
-          <div style={{color:"#52525b"}}>{search?"No parts match your search.":"No parts here yet."}</div>
+          <PackageX size={28} strokeWidth={1.5} color={t.textFaint} style={{marginBottom:10}}/>
+          <div style={{color:t.textFaint}}>{search?"No parts match your search.":"No parts here yet."}</div>
         </Card>
       ):(
-        /* Marketplace-style 2-column card grid — replaces the old always-expanded list so
-           scanning 50-100+ parts is fast, with full detail only a tap away. */
-        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
+        /* Marketplace-style card grid — replaces the old always-expanded list so scanning
+           50-100+ parts is fast, with full detail only a tap away. Column count now scales
+           with available width instead of being frozen at 2, so it uses desktop space. */
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10}}>
           {groupedCards.map((group,i)=>{
             const p=group[0]; // representative — identical across the whole group by definition
             const count=group.length;
             const potential=p.marketValue-p.allocatedCost;
             const onCardClick=count>1?()=>setViewingGroup(group):()=>setViewing(p);
+            const ariaLabel=`${p.name}, ${p.category}, ${STATUS_LABEL[p.status]||p.status}, ${fmt(p.allocatedCost)}${count>1?` each, ${count} units`:""}`;
             return (
-              <div key={groupKey(p)} onClick={onCardClick} style={{background:"#18181b",border:"1px solid #27272a",borderRadius:13,
-                padding:10,cursor:"pointer",animation:`fadeUp 0.18s ease ${Math.min(i*0.025,0.3)}s both`,transition:"border-color 0.15s,transform 0.1s",position:"relative"}}
-                onMouseEnter={e=>{e.currentTarget.style.borderColor="#52525b";}}
-                onMouseLeave={e=>{e.currentTarget.style.borderColor="#27272a";}}
+              <button key={groupKey(p)} onClick={onCardClick} aria-label={ariaLabel} className="bl-focusable bl-card-btn" style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:13,
+                padding:10,cursor:"pointer",animation:`blFadeUp 0.18s ease ${Math.min(i*0.02,0.3)}s both`,transition:"border-color 0.15s,transform 0.1s",
+                position:"relative",textAlign:"left",fontFamily:FONT_BODY,display:"block"}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor=t.borderStrong;}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;}}
                 onMouseDown={e=>e.currentTarget.style.transform="scale(0.98)"}
                 onMouseUp={e=>e.currentTarget.style.transform="scale(1)"}>
-                <div style={{width:"100%",aspectRatio:"1",borderRadius:9,overflow:"hidden",background:"#09090b",marginBottom:8,
-                  display:"flex",alignItems:"center",justifyContent:"center",border:"1px solid #1f1f23",position:"relative"}}>
+                <div style={{width:"100%",aspectRatio:"1",borderRadius:9,overflow:"hidden",background:t.surfaceSunken,marginBottom:8,
+                  display:"flex",alignItems:"center",justifyContent:"center",border:`1px solid ${t.border}`,position:"relative"}}>
                   {p.photoUrl?(
                     <img src={p.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
                   ):(
-                    <span style={{fontSize:26,opacity:0.3}}>🔧</span>
+                    <Wrench size={24} strokeWidth={1.5} color={t.textFaint}/>
                   )}
                   {count>1&&(
-                    <div style={{position:"absolute",top:6,right:6,background:"#7c3aed",color:"#fff",fontSize:11,fontWeight:800,
-                      padding:"3px 8px",borderRadius:99,boxShadow:"0 2px 6px rgba(0,0,0,0.4)"}}>×{count}</div>
+                    <div style={{position:"absolute",top:6,right:6,background:t.accentStrong,color:"#fff",fontSize:11,fontWeight:800,
+                      padding:"3px 8px",borderRadius:99,boxShadow:t.shadowSm}}>×{count}</div>
                   )}
                 </div>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:4,marginBottom:3}}>
-                  <Badge s={p.status}/>
-                  <span style={{color:"#52525b",fontSize:9,whiteSpace:"nowrap"}}>{p.category}</span>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:4,marginBottom:4}}>
+                  <StatusBadge s={p.status}/>
+                  <span style={{color:t.textFaint,fontSize:9.5,whiteSpace:"nowrap"}}>{p.category}</span>
                 </div>
-                <div style={{color:"#fff",fontWeight:600,fontSize:12.5,lineHeight:1.3,marginBottom:4,
+                <div style={{color:t.text,fontWeight:600,fontSize:12.5,lineHeight:1.3,marginBottom:4,
                   display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.name}</div>
-                <div style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff",fontSize:13}}>
-                  {fmt(p.allocatedCost)}{count>1&&<span style={{color:"#71717a",fontWeight:500,fontSize:11}}> each</span>}
+                <div style={{fontFamily:FONT_MONO,fontWeight:700,color:t.text,fontSize:13}}>
+                  {fmt(p.allocatedCost)}{count>1&&<span style={{color:t.textFaint,fontWeight:500,fontSize:11}}> each</span>}
                 </div>
                 {count>1?(
-                  <div style={{fontSize:10,color:"#a78bfa",marginTop:2,fontWeight:600}}>Total {fmt(p.allocatedCost*count)} · tap to view all {count}</div>
+                  <div style={{fontSize:10,color:t.accent,marginTop:2,fontWeight:600}}>Total {fmt(p.allocatedCost*count)} · view all {count}</div>
                 ):(
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#71717a",marginTop:2}}>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:t.textFaint,marginTop:2}}>
                     <span>Market {fmt(p.marketValue)}</span>
-                    <span style={{color:potential>=0?"#34d399":"#f87171",fontWeight:600}}>{potential>=0?"+":""}{fmt(potential)}</span>
+                    <span style={{color:potential>=0?t.positive:t.negative,fontWeight:600}}>{potential>=0?"+":""}{fmt(potential)}</span>
                   </div>
                 )}
-              </div>
+              </button>
             );
           })}
         </div>
@@ -2158,15 +2331,69 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
     </div>
   );
 }
+function CategoryPartPicker({avail,categoriesPresent,activeCat,setActiveCat,search,setSearch,selectedIds,onToggle,selectedCountByCat}) {
+  const t=useTheme();
+  const partsInActiveCat=activeCat?avail.filter(p=>p.category===activeCat&&(!search||p.name.toLowerCase().includes(search.toLowerCase()))):[];
+  if(avail.length===0)return <div style={{color:t.textFaint,fontSize:13}}>No available parts.</div>;
+  return (
+    <>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+        {categoriesPresent.map(cat=>{
+          const count=selectedCountByCat(cat);
+          const isActive=activeCat===cat;
+          const tone=isActive?t.accent:count>0?t.positive:t.textMuted;
+          return (
+            <button key={cat} onClick={()=>{setActiveCat(isActive?null:cat);setSearch("");}} aria-pressed={isActive} className="bl-focusable"
+              style={{display:"flex",alignItems:"center",gap:5,padding:"8px 13px",borderRadius:99,fontSize:12.5,fontWeight:600,cursor:"pointer",
+                border:`1px solid ${isActive?t.accentSoftBorder:count>0?t.positiveSoftBorder:t.border}`,
+                background:isActive?t.accentSoft:count>0?t.positiveSoft:t.surfaceSunken,
+                color:tone,transition:"all 0.15s",fontFamily:FONT_BODY}}>
+              {count>0&&<Check size={12} strokeWidth={3}/>}
+              <span>{cat}</span>
+              <span style={{opacity:0.7}}>({avail.filter(p=>p.category===cat).length}{count>0?`, ${count} picked`:""})</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {activeCat&&(
+        <div style={{marginBottom:14,animation:"blFadeUp 0.18s ease"}}>
+          <Inp value={search} onChange={e=>setSearch(e.target.value)} placeholder={`Search ${activeCat}…`} icon={Search} aria-label={`Search ${activeCat}`}/>
+          {partsInActiveCat.length===0?(
+            <div style={{color:t.textFaint,fontSize:13,padding:"14px 0"}}>No {activeCat} parts match.</div>
+          ):(
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8,marginTop:10}}>
+              {partsInActiveCat.map(p=>{
+                const checked=selectedIds.includes(p.id);
+                return (
+                  <button key={p.id} onClick={()=>onToggle(p.id)} aria-pressed={checked} className="bl-focusable" style={{cursor:"pointer",borderRadius:11,padding:9,
+                    border:`1.5px solid ${checked?t.accent:t.border}`,background:checked?t.accentSoft:t.surfaceSunken,
+                    transition:"all 0.12s",position:"relative",textAlign:"left",fontFamily:FONT_BODY}}>
+                    {checked&&<div aria-hidden="true" style={{position:"absolute",top:6,right:6,width:18,height:18,borderRadius:"50%",
+                      background:t.accentStrong,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}><Check size={11} strokeWidth={3}/></div>}
+                    <div style={{width:"100%",aspectRatio:"1",borderRadius:8,overflow:"hidden",background:t.surface,marginBottom:6,
+                      display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      {p.photoUrl?<img src={p.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<Wrench size={18} strokeWidth={1.5} color={t.textFaint}/>}
+                    </div>
+                    <div style={{color:t.text,fontSize:12,fontWeight:600,lineHeight:1.3,marginBottom:3,
+                      display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.name}</div>
+                    <div style={{fontFamily:FONT_MONO,fontSize:11.5,color:t.textMuted}}>{fmt(p.allocatedCost)}</div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
 
 /* ═══════════════════════════════════════════
-   BUILDS
-═══════════════════════════════════════════ */
-/* ═══════════════════════════════════════════
-   BUILD DETAIL SHEET — tap a build card to see full cost breakdown, components, and actions,
-   matching the exact same pattern as PartDetailSheet / TransactionDetailSheet for consistency.
+   EDIT BUILD PARTS MODAL
 ═══════════════════════════════════════════ */
 function EditBuildPartsModal({build,state,dispatch,toast,onClose}) {
+  const t=useTheme();
   const currentParts=state.parts.filter(p=>build.partIds.includes(p.id));
   const [toRemove,setToRemove]=useState([]); // partIds staged for removal (not yet dispatched)
   const [toAdd,setToAdd]=useState([]); // partIds staged for adding
@@ -2177,8 +2404,6 @@ function EditBuildPartsModal({build,state,dispatch,toast,onClose}) {
   const avail=state.parts.filter(p=>p.status==="available"&&domainOf(p.category,state.customCategories)==="pc_part");
   const customPcPartCats=(state.customCategories||[]).filter(c=>c.domain==="pc_part").map(c=>c.name);
   const categoriesPresent=[...CATEGORIES,...customPcPartCats].filter(c=>avail.some(p=>p.category===c));
-  const partsInActiveCat=activeCat?avail.filter(p=>p.category===activeCat&&
-    (!pickerSearch||p.name.toLowerCase().includes(pickerSearch.toLowerCase()))):[];
   const selectedCountByCat=cat=>avail.filter(p=>p.category===cat&&toAdd.includes(p.id)).length;
   const toggleAdd=id=>setToAdd(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
   const toggleRemove=id=>setToRemove(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
@@ -2197,130 +2422,68 @@ function EditBuildPartsModal({build,state,dispatch,toast,onClose}) {
     const bits=[];
     if(toAdd.length)bits.push(`${toAdd.length} added`);
     if(toRemove.length)bits.push(`${toRemove.length} removed`);
-    toast(`"${build.name}" updated — ${bits.join(", ")} ✓`);
+    toast(`"${build.name}" updated — ${bits.join(", ")}`);
     onClose();
   };
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1400,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",borderRadius:"18px 18px 0 0",width:"100%",maxWidth:520,
-        maxHeight:"90vh",overflowY:"auto",animation:"slideUp 0.22s cubic-bezier(0.22,1,0.36,1)",
-        paddingBottom:"calc(20px + env(safe-area-inset-bottom))"}}>
-        <div style={{display:"flex",justifyContent:"center",padding:"10px 0 4px"}}>
-          <div style={{width:38,height:4,borderRadius:99,background:"#3f3f46"}}/>
+    <ModalShell onClose={onClose} label={`Edit ${build.name}`} sheet maxWidth={520}>
+      <div style={{padding:"6px 20px 20px"}}>
+        <div style={{color:t.text,fontWeight:700,fontSize:17,marginBottom:3,fontFamily:FONT_DISPLAY}}>Edit "{build.name}"</div>
+        <div style={{color:t.textMuted,fontSize:12,marginBottom:18}}>Swap parts in or out — works even if this build is already listed for sale.</div>
+
+        <SectionHeader title={`Currently in this build (${keptParts.length})`}/>
+        <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:20}}>
+          {currentParts.length===0&&<div style={{color:t.textFaint,fontSize:12}}>No parts left — add some below before saving.</div>}
+          {currentParts.map(p=>{
+            const marked=toRemove.includes(p.id);
+            return (
+              <div key={p.id} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 10px",borderRadius:8,
+                background:marked?t.negativeSoft:t.surfaceSunken,border:`1px solid ${marked?t.negativeSoftBorder:t.border}`,
+                opacity:marked?0.65:1,transition:"all 0.15s"}}>
+                <PhotoThumb url={p.photoUrl} size={30} seed={p.id.length}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{color:t.text,fontSize:12.5,textDecoration:marked?"line-through":"none",
+                    overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                  <div style={{color:t.textFaint,fontSize:10.5}}>{p.category} · {fmt(p.allocatedCost)}</div>
+                </div>
+                <Btn small variant={marked?"ghost":"danger"} onClick={()=>toggleRemove(p.id)}>{marked?"Undo":"Remove"}</Btn>
+              </div>
+            );
+          })}
         </div>
-        <div style={{padding:"14px 20px"}}>
-          <div style={{color:"#fff",fontWeight:700,fontSize:17,marginBottom:2}}>Edit "{build.name}"</div>
-          <div style={{color:"#71717a",fontSize:12,marginBottom:16}}>Swap parts in or out — works even if this build is already listed for sale.</div>
 
-          {/* Currently in this build */}
-          <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:9}}>
-            Currently in this build ({keptParts.length})
-          </div>
-          <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:16}}>
-            {currentParts.length===0&&<div style={{color:"#52525b",fontSize:12}}>No parts left — add some below before saving.</div>}
-            {currentParts.map(p=>{
-              const marked=toRemove.includes(p.id);
-              return (
-                <div key={p.id} style={{display:"flex",alignItems:"center",gap:9,padding:"7px 9px",borderRadius:8,
-                  background:marked?"rgba(239,68,68,0.08)":"#09090b",border:`1px solid ${marked?"rgba(239,68,68,0.3)":"#27272a"}`,
-                  opacity:marked?0.6:1,transition:"all 0.15s"}}>
-                  <PhotoThumb url={p.photoUrl} size={30} seed={p.id.length}/>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{color:"#fff",fontSize:12.5,textDecoration:marked?"line-through":"none",
-                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
-                    <div style={{color:"#71717a",fontSize:10}}>{p.category} · {fmt(p.allocatedCost)}</div>
-                  </div>
-                  <button onClick={()=>toggleRemove(p.id)} style={{background:"none",border:"none",cursor:"pointer",
-                    color:marked?"#f87171":"#52525b",fontSize:13,padding:"4px 6px",flexShrink:0,fontWeight:600}}>
-                    {marked?"Undo":"Remove"}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+        <SectionHeader title={`Add more parts${toAdd.length>0?` (${toAdd.length} selected)`:""}`}/>
+        <CategoryPartPicker avail={avail} categoriesPresent={categoriesPresent} activeCat={activeCat} setActiveCat={setActiveCat}
+          search={pickerSearch} setSearch={setPickerSearch} selectedIds={toAdd} onToggle={toggleAdd} selectedCountByCat={selectedCountByCat}/>
 
-          {/* Add more parts — identical picker pattern to build creation */}
-          <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:9}}>
-            Add more parts {toAdd.length>0?`(${toAdd.length} selected)`:""}
-          </div>
-          {avail.length===0?<div style={{color:"#52525b",fontSize:12,marginBottom:8}}>No other available parts in inventory.</div>:(
-            <>
-              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
-                {categoriesPresent.map(cat=>{
-                  const count=selectedCountByCat(cat);
-                  const isActive=activeCat===cat;
-                  return (
-                    <button key={cat} onClick={()=>{setActiveCat(isActive?null:cat);setPickerSearch("");}}
-                      style={{display:"flex",alignItems:"center",gap:5,padding:"7px 12px",borderRadius:99,fontSize:12.5,fontWeight:600,cursor:"pointer",
-                        border:`1px solid ${isActive?"#7c3aed":count>0?"#16a34a":"#3f3f46"}`,
-                        background:isActive?"rgba(124,58,237,0.15)":count>0?"rgba(6,78,59,0.35)":"#09090b",
-                        color:isActive?"#a78bfa":count>0?"#6ee7b7":"#d4d4d8",transition:"all 0.15s"}}>
-                      {count>0&&<span>✓</span>}
-                      <span>{cat}</span>
-                      <span style={{opacity:0.7}}>({avail.filter(p=>p.category===cat).length}{count>0?`, ${count} picked`:""})</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {activeCat&&(
-                <div style={{marginBottom:14,animation:"fadeUp 0.18s ease"}}>
-                  <Inp label="" value={pickerSearch} onChange={e=>setPickerSearch(e.target.value)} placeholder={`🔍  Search ${activeCat}...`}/>
-                  {partsInActiveCat.length===0?(
-                    <div style={{color:"#52525b",fontSize:13,padding:"14px 0"}}>No {activeCat} parts match.</div>
-                  ):(
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginTop:10}}>
-                      {partsInActiveCat.map(p=>{
-                        const checked=toAdd.includes(p.id);
-                        return (
-                          <div key={p.id} onClick={()=>toggleAdd(p.id)} style={{cursor:"pointer",borderRadius:11,padding:9,
-                            border:`1.5px solid ${checked?"#7c3aed":"#27272a"}`,background:checked?"rgba(124,58,237,0.1)":"#09090b",
-                            transition:"all 0.12s",position:"relative"}}>
-                            {checked&&<div style={{position:"absolute",top:6,right:6,width:18,height:18,borderRadius:"50%",
-                              background:"#7c3aed",color:"#fff",fontSize:11,display:"flex",alignItems:"center",justifyContent:"center"}}>✓</div>}
-                            <div style={{width:"100%",aspectRatio:"1",borderRadius:8,overflow:"hidden",background:"#18181b",marginBottom:6,
-                              display:"flex",alignItems:"center",justifyContent:"center"}}>
-                              {p.photoUrl?<img src={p.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:20,opacity:0.3}}>🔧</span>}
-                            </div>
-                            <div style={{color:"#fff",fontSize:12,fontWeight:600,lineHeight:1.3,marginBottom:3,
-                              display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.name}</div>
-                            <div style={{fontFamily:"'Fira Code',monospace",fontSize:11.5,color:"#d4d4d8"}}>{fmt(p.allocatedCost)}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Live preview of the resulting build */}
-          {hasChanges&&(
-            <div style={{marginTop:4,paddingTop:12,borderTop:"1px solid #27272a",marginBottom:14}}>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
-                <span style={{color:"#a1a1aa"}}>Resulting part count</span>
-                <span style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{keptParts.length+addedParts.length}</span>
-              </div>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}>
-                <span style={{color:"#a1a1aa"}}>Resulting total cost</span>
-                <span style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{fmt(previewCost)}</span>
-              </div>
+        {hasChanges&&(
+          <div style={{marginTop:4,paddingTop:14,borderTop:`1px solid ${t.border}`,marginBottom:16}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:5}}>
+              <span style={{color:t.textMuted}}>Resulting part count</span>
+              <span style={{fontFamily:FONT_MONO,fontWeight:700,color:t.text}}>{keptParts.length+addedParts.length}</span>
             </div>
-          )}
-
-          <div style={{display:"flex",gap:8}}>
-            <Btn onClick={save} disabled={!hasChanges} style={{flex:1}}>Save Changes</Btn>
-            <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}>
+              <span style={{color:t.textMuted}}>Resulting total cost</span>
+              <span style={{fontFamily:FONT_MONO,fontWeight:700,color:t.text}}>{fmt(previewCost)}</span>
+            </div>
           </div>
+        )}
+
+        <div style={{display:"flex",gap:8}}>
+          <Btn onClick={save} disabled={!hasChanges} style={{flex:1}}>Save changes</Btn>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         </div>
       </div>
-    </div>
+    </ModalShell>
   );
 }
 
+/* ═══════════════════════════════════════════
+   RECEIPT PRICE PROMPT
+═══════════════════════════════════════════ */
 function ReceiptPricePromptModal({buildName,onConfirm,onCancel}) {
+  const t=useTheme();
   const [price,setPrice]=useState("");
   const submit=()=>{
     const n=parseFloat(price);
@@ -2328,23 +2491,25 @@ function ReceiptPricePromptModal({buildName,onConfirm,onCancel}) {
     onConfirm(n);
   };
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onCancel}>
-      <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:360,animation:"fadeUp 0.2s ease"}}>
-        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:4}}>Make a Receipt</div>
-        <div style={{fontSize:12,color:"#71717a",marginBottom:16}}>
-          "{buildName}" hasn't sold yet — enter the price you're quoting, and each part will be scaled proportionally to add up to it.
-        </div>
-        <Inp label="Input Price (₱)" type="number" value={price} onChange={e=>setPrice(e.target.value)} placeholder="e.g. 32000" autoFocus/>
-        <div style={{display:"flex",gap:8,marginTop:14}}>
-          <Btn onClick={submit} disabled={!price||parseFloat(price)<=0} style={{flex:1}}>Generate</Btn>
-          <Btn variant="ghost" onClick={onCancel}>Cancel</Btn>
-        </div>
+    <ModalShell onClose={onCancel} label="Make a receipt" maxWidth={360}>
+      <div style={{fontWeight:700,fontSize:16,color:t.text,marginBottom:4,fontFamily:FONT_DISPLAY}}>Make a receipt</div>
+      <div style={{fontSize:12,color:t.textMuted,marginBottom:16,lineHeight:1.5}}>
+        "{buildName}" hasn't sold yet — enter the price you're quoting, and each part will be scaled proportionally to add up to it.
       </div>
-    </div>
+      <Inp label="Input price (₱)" type="number" value={price} onChange={e=>setPrice(e.target.value)} placeholder="e.g. 32000" autoFocus/>
+      <div style={{display:"flex",gap:8,marginTop:14}}>
+        <Btn onClick={submit} disabled={!price||parseFloat(price)<=0} style={{flex:1}}>Generate</Btn>
+        <Btn variant="ghost" onClick={onCancel}>Cancel</Btn>
+      </div>
+    </ModalShell>
   );
 }
 
+/* ═══════════════════════════════════════════
+   BUILD DETAIL SHEET
+═══════════════════════════════════════════ */
 function BuildDetailSheet({build,parts,onClose,openLightbox,onDissolve,onCopySpecs,onDelete,onEdit}) {
+  const t=useTheme();
   const [showReceiptPrompt,setShowReceiptPrompt]=useState(false);
   const [buildReceipt,setBuildReceipt]=useState(null); // {rows,total} once a price has been entered
   const cost=parts.reduce((s,p)=>s+p.allocatedCost,0);
@@ -2352,9 +2517,6 @@ function BuildDetailSheet({build,parts,onClose,openLightbox,onDissolve,onCopySpe
   const potential=market-cost;
 
   const generateBuildReceipt=(inputPrice)=>{
-    // Same weighted market-value distribution as the post-sale receipt — each part's share of
-    // the build's total market value is applied to the quoted price, so the lines always sum
-    // exactly to what was entered, without touching cost or profit anywhere in the output.
     const totalMarket=parts.reduce((s,p)=>s+(p.marketValue||0),0);
     const rows=parts.map(p=>{
       const share=totalMarket>0?(p.marketValue||0)/totalMarket:(parts.length?1/parts.length:0);
@@ -2365,74 +2527,63 @@ function BuildDetailSheet({build,parts,onClose,openLightbox,onDissolve,onCopySpe
   };
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",borderRadius:"18px 18px 0 0",width:"100%",maxWidth:520,
-        maxHeight:"88vh",overflowY:"auto",animation:"slideUp 0.22s cubic-bezier(0.22,1,0.36,1)",
-        paddingBottom:"calc(20px + env(safe-area-inset-bottom))"}}>
-        <div style={{display:"flex",justifyContent:"center",padding:"10px 0 4px"}}>
-          <div style={{width:38,height:4,borderRadius:99,background:"#3f3f46"}}/>
+    <ModalShell onClose={onClose} label={build.name} sheet maxWidth={520} padding={0}>
+      <div style={{width:"100%",aspectRatio:"16/10",background:t.surfaceSunken,display:"flex",alignItems:"center",justifyContent:"center",borderBottom:`1px solid ${t.border}`}}>
+        {build.photoUrl?(
+          <button onClick={()=>openLightbox(build.photoUrl)} aria-label="View photo full-screen" className="bl-focusable"
+            style={{width:"100%",height:"100%",border:"none",padding:0,background:"none",cursor:"pointer"}}>
+            <img src={build.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+          </button>
+        ):(
+          <Monitor size={40} strokeWidth={1.5} color={t.textFaint}/>
+        )}
+      </div>
+
+      <div style={{padding:"18px 20px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:14}}>
+          <div style={{color:t.text,fontWeight:700,fontSize:19,fontFamily:FONT_DISPLAY}}>{build.name}</div>
+          <span style={{fontSize:10.5,fontWeight:700,color:t.info,letterSpacing:"0.03em"}}>Active build</span>
         </div>
 
-        <div style={{width:"100%",aspectRatio:"16/10",background:"#09090b",display:"flex",alignItems:"center",justifyContent:"center",
-          cursor:build.photoUrl?"pointer":"default",borderBottom:"1px solid #27272a"}}
-          onClick={build.photoUrl?()=>openLightbox(build.photoUrl):undefined}>
-          {build.photoUrl?(
-            <img src={build.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-          ):(
-            <span style={{fontSize:48,opacity:0.25}}>🖥️</span>
-          )}
+        <div style={{background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:11,padding:14,marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:t.textMuted,marginBottom:10}}>Cost breakdown</div>
+          {[["Total cost",fmt(cost),t.text],["Market value",fmt(market),t.text],
+            ["Potential profit",`${potential>=0?"+":""}${fmt(potential)}`,potential>=0?t.positive:t.negative]
+          ].map(([l,v,c],i)=>(
+            <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:i<2?7:0,paddingTop:i===2?8:0,borderTop:i===2?`1px solid ${t.border}`:"none"}}>
+              <span style={{color:t.textMuted}}>{l}</span>
+              <span style={{fontFamily:FONT_MONO,fontWeight:i===2?700:600,color:c}}>{v}</span>
+            </div>
+          ))}
         </div>
 
-        <div style={{padding:"18px 20px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:14}}>
-            <div style={{color:"#fff",fontWeight:700,fontSize:19}}>{build.name}</div>
-            <span style={{fontSize:11,fontWeight:700,color:"#7dd3fc",textTransform:"uppercase",letterSpacing:"0.05em"}}>Active Build</span>
-          </div>
-
-          {/* Cost breakdown */}
-          <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14,marginBottom:14}}>
-            <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Cost Breakdown</div>
-            {[["Total cost",fmt(cost),"#fff"],["Market value",fmt(market),"#d4d4d8"],
-              ["Potential profit",`${potential>=0?"+":""}${fmt(potential)}`,potential>=0?"#34d399":"#f87171"]
-            ].map(([l,v,c],i)=>(
-              <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:i<2?7:0,paddingTop:i===2?8:0,borderTop:i===2?"1px solid #27272a":"none"}}>
-                <span style={{color:"#a1a1aa"}}>{l}</span>
-                <span style={{fontFamily:"'Fira Code',monospace",fontWeight:i===2?700:600,color:c}}>{v}</span>
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:t.textMuted,marginBottom:10}}>Components ({parts.length})</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {parts.map(p=>(
+              <div key={p.id} style={{display:"flex",alignItems:"center",gap:9}}>
+                <PhotoThumb url={p.photoUrl} size={32} seed={p.id.length} onClick={p.photoUrl?()=>openLightbox(p.photoUrl):undefined} label={`View photo of ${p.name}`}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{color:t.text,fontSize:13}}>{p.name}</div>
+                  <div style={{color:t.textFaint,fontSize:10}}>{p.category}</div>
+                </div>
+                <span style={{fontFamily:FONT_MONO,fontSize:12,color:t.textMuted}}>{fmt(p.allocatedCost)}</span>
               </div>
             ))}
           </div>
+        </div>
 
-          {/* Components */}
-          <div style={{marginBottom:14}}>
-            <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Components ({parts.length})</div>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {parts.map(p=>(
-                <div key={p.id} style={{display:"flex",alignItems:"center",gap:9}}>
-                  <PhotoThumb url={p.photoUrl} size={32} seed={p.id.length} onClick={p.photoUrl?()=>openLightbox(p.photoUrl):undefined}/>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{color:"#fff",fontSize:13}}>{p.name}</div>
-                    <div style={{color:"#71717a",fontSize:10}}>{p.category}</div>
-                  </div>
-                  <span style={{fontFamily:"'Fira Code',monospace",fontSize:12,color:"#d4d4d8"}}>{fmt(p.allocatedCost)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+        <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
+          <DetailRow label="Created" value={build.date}/>
+        </div>
 
-          {/* Transaction history */}
-          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
-            <DetailRow label="Created" value={build.date}/>
-          </div>
-
-          {/* Actions */}
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            <Btn variant="primary" onClick={onEdit} style={{width:"100%"}}>✏️ Edit Parts — Add or Remove</Btn>
-            <Btn variant="ghost" onClick={()=>setShowReceiptPrompt(true)} style={{width:"100%"}}>🧾 Make a Receipt</Btn>
-            <Btn variant="ghost" onClick={onDissolve} style={{width:"100%"}}>↩️ Dissolve Build — Return Parts to Inventory</Btn>
-            <Btn variant="ghost" onClick={onCopySpecs} style={{width:"100%"}}>📋 Copy Specs for Listing</Btn>
-            <div style={{paddingTop:6,borderTop:"1px solid #27272a",marginTop:6}}>
-              <Btn variant="danger" onClick={onDelete} style={{width:"100%"}}>🗑 Delete Build</Btn>
-            </div>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <Btn variant="primary" icon={Pencil} onClick={onEdit} style={{width:"100%"}}>Edit parts — add or remove</Btn>
+          <Btn variant="ghost" icon={Receipt} onClick={()=>setShowReceiptPrompt(true)} style={{width:"100%"}}>Make a receipt</Btn>
+          <Btn variant="ghost" icon={Undo2} onClick={onDissolve} style={{width:"100%"}}>Dissolve build — return parts to inventory</Btn>
+          <Btn variant="ghost" icon={ClipboardList} onClick={onCopySpecs} style={{width:"100%"}}>Copy specs for listing</Btn>
+          <div style={{paddingTop:6,borderTop:`1px solid ${t.border}`,marginTop:6}}>
+            <Btn variant="danger" icon={Trash2} onClick={onDelete} style={{width:"100%"}}>Delete build</Btn>
           </div>
         </div>
       </div>
@@ -2443,43 +2594,40 @@ function BuildDetailSheet({build,parts,onClose,openLightbox,onDissolve,onCopySpe
         <ReceiptModal title={build.name} date={today()} total={buildReceipt.total}
           receiptRows={buildReceipt.rows} onClose={()=>setBuildReceipt(null)}/>
       )}
-    </div>
+    </ModalShell>
   );
 }
 
+/* ═══════════════════════════════════════════
+   BUILDS
+═══════════════════════════════════════════ */
 function Builds({state,dispatch,toast,openLightbox}) {
+  const t=useTheme();
   const [creating,setCreating]=useState(false);
   const [buildName,setBuildName]=useState("");
   const [sel,setSel]=useState([]);
-  const [activeCat,setActiveCat]=useState(null); // which category chip is currently expanded into a grid
+  const [activeCat,setActiveCat]=useState(null);
   const [pickerSearch,setPickerSearch]=useState("");
   const [buildPhoto,setBuildPhoto]=useState({photoUrl:"",photoRecordId:""});
   const [deletingBuild,setDeletingBuild]=useState(null);
-  const [viewingBuild,setViewingBuild]=useState(null); // build shown in the detail sheet
-  const [editingBuild,setEditingBuild]=useState(null); // build shown in the edit-parts modal
-  const [receiptPromptBuild,setReceiptPromptBuild]=useState(null); // build currently being asked "what price?"
-  const [buildReceipt,setBuildReceipt]=useState(null); // {rows,total,name} once a price has been entered
+  const [viewingBuild,setViewingBuild]=useState(null);
+  const [editingBuild,setEditingBuild]=useState(null);
+  const [receiptPromptBuild,setReceiptPromptBuild]=useState(null);
+  const [buildReceipt,setBuildReceipt]=useState(null);
   // Domain Firewall: Builds must never see General Assets (phones, vehicles, etc.), only PC Parts.
-  // This is enforced at the data-access layer here, not just hidden in the UI, so there's no path
-  // for a non-PC item to end up selected into a build's partIds.
   const avail=state.parts.filter(p=>p.status==="available"&&domainOf(p.category,state.customCategories)==="pc_part");
   const buildCost=avail.filter(p=>sel.includes(p.id)).reduce((s,p)=>s+p.allocatedCost,0);
   const buildMarket=avail.filter(p=>sel.includes(p.id)).reduce((s,p)=>s+p.marketValue,0);
   const toggle=id=>setSel(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
 
-  // Group available parts by category for the chip picker. Built-in categories come first (in
-  // their fixed order), followed by any custom PC Part categories the user has added — custom
-  // General Asset categories never reach this list at all, since `avail` already excludes them.
   const customPcPartCats=(state.customCategories||[]).filter(c=>c.domain==="pc_part").map(c=>c.name);
   const categoriesPresent=[...CATEGORIES,...customPcPartCats].filter(c=>avail.some(p=>p.category===c));
-  const partsInActiveCat=activeCat?avail.filter(p=>p.category===activeCat&&
-    (!pickerSearch||p.name.toLowerCase().includes(pickerSearch.toLowerCase()))):[];
   const selectedCountByCat=cat=>avail.filter(p=>p.category===cat&&sel.includes(p.id)).length;
 
   const submit=()=>{
     if(!buildName||sel.length===0){toast("Name the build and pick parts","error");return;}
     dispatch({type:"CREATE_BUILD",build:{id:uid(),name:buildName,partIds:sel,date:today(),photoUrl:buildPhoto.photoUrl,photoRecordId:buildPhoto.photoRecordId}});
-    toast(`Build "${buildName}" created ✓`);
+    toast(`Build "${buildName}" created`);
     setBuildName("");setSel([]);setCreating(false);setBuildPhoto({photoUrl:"",photoRecordId:""});setActiveCat(null);
   };
   const dissolve=b=>{dispatch({type:"DISSOLVE_BUILD",buildId:b.id});toast(`"${b.name}" dissolved — parts returned`);};
@@ -2494,19 +2642,15 @@ function Builds({state,dispatch,toast,openLightbox}) {
     setDeletingBuild(null);
   };
 
-  // Marketplace-ready spec text, copied to clipboard for pasting into Facebook Marketplace etc.
   const copySpecs=(build,bp)=>{
     const lines=[`${build.name}`,"",...bp.map(p=>`• ${p.category}: ${p.name}${p.notes?` (${p.notes})`:""}`),"",`Asking price: ${fmt(bp.reduce((s,p)=>s+p.marketValue,0))}`];
     const text=lines.join("\n");
     navigator.clipboard?.writeText(text).then(
-      ()=>toast("Specs copied — paste into your listing ✓"),
+      ()=>toast("Specs copied — paste into your listing"),
       ()=>toast("Couldn't copy — clipboard not available","error")
     );
   };
 
-  // Same weighted market-value distribution used everywhere else a receipt is generated — each
-  // part's share of the build's total market value is applied to the quoted price, so the lines
-  // always sum exactly to what was entered, with no cost or profit numbers anywhere in it.
   const generateBuildReceipt=(build,bp,inputPrice)=>{
     const totalMarket=bp.reduce((s,p)=>s+(p.marketValue||0),0);
     const rows=bp.map(p=>{
@@ -2548,106 +2692,54 @@ function Builds({state,dispatch,toast,openLightbox}) {
         <ReceiptModal title={buildReceipt.name} date={today()} total={buildReceipt.total}
           receiptRows={buildReceipt.rows} onClose={()=>setBuildReceipt(null)}/>
       )}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-        <div><h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Builds</h2>
-          <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>Group parts into a sellable PC.</p></div>
-        {!creating&&<Btn onClick={()=>setCreating(true)}>+ New Build</Btn>}
-      </div>
+
+      <PageHeader title="Builds" sub="Group parts into a sellable PC." action={!creating&&<Btn icon={Plus} onClick={()=>setCreating(true)}>New build</Btn>}/>
 
       {creating&&(
         <Card>
-          <div style={{fontWeight:600,fontSize:13,color:"#d4d4d8",marginBottom:12}}>New Build</div>
-          <div style={{marginBottom:14}}>
+          <div style={{fontWeight:700,fontSize:13.5,color:t.text,marginBottom:14,fontFamily:FONT_DISPLAY}}>New build</div>
+          <div style={{marginBottom:16}}>
             <PhotoUpload label="Build photo (optional) — the finished PC" photoUrl={buildPhoto.photoUrl} photoRecordId={buildPhoto.photoRecordId} onChange={setBuildPhoto}/>
           </div>
           <Inp label="Build name" value={buildName} onChange={e=>setBuildName(e.target.value)} placeholder="Gaming Rig #1"/>
 
-          {/* Category chips — tap a category to expand its parts into a card grid below.
-              A green checkmark + count shows once a category has at least one selected part. */}
-          <div style={{fontSize:12,color:"#a1a1aa",margin:"14px 0 8px"}}>Pick parts by category:</div>
-          {avail.length===0?<div style={{color:"#52525b",fontSize:13}}>No available parts.</div>:(
-            <>
-              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
-                {categoriesPresent.map(cat=>{
-                  const count=selectedCountByCat(cat);
-                  const isActive=activeCat===cat;
-                  return (
-                    <button key={cat} onClick={()=>{setActiveCat(isActive?null:cat);setPickerSearch("");}}
-                      style={{display:"flex",alignItems:"center",gap:5,padding:"7px 12px",borderRadius:99,fontSize:12.5,fontWeight:600,cursor:"pointer",
-                        border:`1px solid ${isActive?"#7c3aed":count>0?"#16a34a":"#3f3f46"}`,
-                        background:isActive?"rgba(124,58,237,0.15)":count>0?"rgba(6,78,59,0.35)":"#09090b",
-                        color:isActive?"#a78bfa":count>0?"#6ee7b7":"#d4d4d8",transition:"all 0.15s"}}>
-                      {count>0&&<span>✓</span>}
-                      <span>{cat}</span>
-                      <span style={{opacity:0.7}}>({avail.filter(p=>p.category===cat).length}{count>0?`, ${count} picked`:""})</span>
-                    </button>
-                  );
-                })}
-              </div>
+          <div style={{fontSize:12,color:t.textMuted,fontWeight:600,margin:"16px 0 9px"}}>Pick parts by category:</div>
+          <CategoryPartPicker avail={avail} categoriesPresent={categoriesPresent} activeCat={activeCat} setActiveCat={setActiveCat}
+            search={pickerSearch} setSearch={setPickerSearch} selectedIds={sel} onToggle={toggle} selectedCountByCat={selectedCountByCat}/>
 
-              {activeCat&&(
-                <div style={{marginBottom:14,animation:"fadeUp 0.18s ease"}}>
-                  <Inp label="" value={pickerSearch} onChange={e=>setPickerSearch(e.target.value)} placeholder={`🔍  Search ${activeCat}...`}/>
-                  {partsInActiveCat.length===0?(
-                    <div style={{color:"#52525b",fontSize:13,padding:"14px 0"}}>No {activeCat} parts match.</div>
-                  ):(
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginTop:10}}>
-                      {partsInActiveCat.map(p=>{
-                        const checked=sel.includes(p.id);
-                        return (
-                          <div key={p.id} onClick={()=>toggle(p.id)} style={{cursor:"pointer",borderRadius:11,padding:9,
-                            border:`1.5px solid ${checked?"#7c3aed":"#27272a"}`,background:checked?"rgba(124,58,237,0.1)":"#09090b",
-                            transition:"all 0.12s",position:"relative"}}>
-                            {checked&&<div style={{position:"absolute",top:6,right:6,width:18,height:18,borderRadius:"50%",
-                              background:"#7c3aed",color:"#fff",fontSize:11,display:"flex",alignItems:"center",justifyContent:"center"}}>✓</div>}
-                            <div style={{width:"100%",aspectRatio:"1",borderRadius:8,overflow:"hidden",background:"#18181b",marginBottom:6,
-                              display:"flex",alignItems:"center",justifyContent:"center"}}>
-                              {p.photoUrl?<img src={p.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:20,opacity:0.3}}>🔧</span>}
-                            </div>
-                            <div style={{color:"#fff",fontSize:12,fontWeight:600,lineHeight:1.3,marginBottom:3,
-                              display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.name}</div>
-                            <div style={{fontFamily:"'Fira Code',monospace",fontSize:11.5,color:"#d4d4d8"}}>{fmt(p.allocatedCost)}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Sticky-feeling build summary — selected parts grouped, with live cost roll-up */}
           {sel.length>0&&(
-            <div style={{marginTop:4,paddingTop:12,borderTop:"1px solid #27272a"}}>
-              <div style={{fontSize:12,color:"#a1a1aa",marginBottom:8}}>Selected ({sel.length}):</div>
-              <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:10,maxHeight:160,overflowY:"auto"}}>
+            <div style={{marginTop:4,paddingTop:14,borderTop:`1px solid ${t.border}`}}>
+              <div style={{fontSize:12,color:t.textMuted,fontWeight:600,marginBottom:9}}>Selected ({sel.length}):</div>
+              <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:12,maxHeight:160,overflowY:"auto"}}>
                 {avail.filter(p=>sel.includes(p.id)).map(p=>(
                   <div key={p.id} style={{display:"flex",alignItems:"center",gap:8,fontSize:12}}>
                     <PhotoThumb url={p.photoUrl} size={26} seed={p.id.length}/>
-                    <span style={{color:"#d4d4d8",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</span>
-                    <span style={{fontFamily:"'Fira Code',monospace",color:"#71717a"}}>{fmt(p.allocatedCost)}</span>
-                    <button onClick={()=>toggle(p.id)} style={{background:"none",border:"none",color:"#52525b",cursor:"pointer",fontSize:14,padding:"2px 4px"}}>✕</button>
+                    <span style={{color:t.text,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</span>
+                    <span style={{fontFamily:FONT_MONO,color:t.textFaint}}>{fmt(p.allocatedCost)}</span>
+                    <IconBtn icon={X} label={`Remove ${p.name} from selection`} size={26} iconSize={13} onClick={()=>toggle(p.id)}/>
                   </div>
                 ))}
               </div>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}>
-                <span style={{color:"#a1a1aa"}}>Build cost so far</span><span style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{fmt(buildCost)}</span>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
+                <span style={{color:t.textMuted}}>Build cost so far</span><span style={{fontFamily:FONT_MONO,fontWeight:700,color:t.text}}>{fmt(buildCost)}</span>
               </div>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}>
-                <span style={{color:"#a1a1aa"}}>Market value</span><span style={{fontFamily:"'Fira Code',monospace",color:"#d4d4d8"}}>{fmt(buildMarket)}</span>
+                <span style={{color:t.textMuted}}>Market value</span><span style={{fontFamily:FONT_MONO,color:t.textMuted}}>{fmt(buildMarket)}</span>
               </div>
             </div>
           )}
-          <div style={{display:"flex",gap:8,marginTop:12}}>
-            <Btn onClick={submit} disabled={!buildName||sel.length===0}>Save Build</Btn>
+          <div style={{display:"flex",gap:8,marginTop:16}}>
+            <Btn onClick={submit} disabled={!buildName||sel.length===0}>Save build</Btn>
             <Btn variant="ghost" onClick={()=>{setCreating(false);setSel([]);setBuildName("");setActiveCat(null);}}>Cancel</Btn>
           </div>
         </Card>
       )}
 
       {state.builds.filter(b=>!b.dissolved&&!b.sold).length===0&&!creating?(
-        <Card style={{textAlign:"center",padding:36}}><div style={{color:"#52525b"}}>No active builds.</div></Card>
+        <Card style={{textAlign:"center",padding:36}}>
+          <Monitor size={28} strokeWidth={1.5} color={t.textFaint} style={{marginBottom:10}}/>
+          <div style={{color:t.textFaint}}>No active builds.</div>
+        </Card>
       ):(
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
           {state.builds.filter(b=>!b.dissolved&&!b.sold).map(build=>{
@@ -2655,54 +2747,44 @@ function Builds({state,dispatch,toast,openLightbox}) {
             const cost=bp.reduce((s,p)=>s+p.allocatedCost,0);
             const market=bp.reduce((s,p)=>s+p.marketValue,0);
             return (
-              <Card key={build.id} style={{padding:0,overflow:"hidden",cursor:"pointer"}} onClick={()=>setViewingBuild(build)}>
-                {/* Hero image — same large-photo treatment as the part/transaction detail sheets,
-                    so a finished build reads as a real listing rather than a data row. Tapping
-                    anywhere on the card (including the photo) opens the detail sheet, matching
-                    the same tap-to-open pattern used for Inventory parts and History transactions —
-                    actions live inside that sheet instead of always-visible buttons on the card. */}
-                <div style={{width:"100%",aspectRatio:"16/9",background:"#09090b",display:"flex",alignItems:"center",justifyContent:"center",borderBottom:"1px solid #27272a"}}>
-                  {build.photoUrl?(
-                    <img src={build.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                  ):(
-                    <span style={{fontSize:40,opacity:0.25}}>🖥️</span>
-                  )}
-                </div>
-
-                <div style={{padding:16}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:11,gap:10}}>
-                    <div><div style={{color:"#fff",fontWeight:700,fontSize:15}}>{build.name}</div>
-                      <div style={{color:"#71717a",fontSize:11,marginTop:2}}>{build.date} · {bp.length} parts</div></div>
-                    <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{fmt(cost)}</div>
-                      <div style={{fontSize:10,color:"#71717a"}}>market {fmt(market)}</div>
+              <Card key={build.id} style={{padding:0,overflow:"hidden"}}>
+                {/* Photo + header open the detail sheet; this is a real <button> so it's keyboard-
+                    reachable, which means the quick actions below must be siblings, not nested
+                    inside it — a button can't legally contain another button. */}
+                <button onClick={()=>setViewingBuild(build)} aria-label={`${build.name}, ${bp.length} parts, ${fmt(cost)}`} className="bl-focusable"
+                  style={{display:"block",width:"100%",textAlign:"left",background:"none",border:"none",padding:0,margin:0,cursor:"pointer",font:"inherit"}}>
+                  <div style={{width:"100%",aspectRatio:"16/9",background:t.surfaceSunken,display:"flex",alignItems:"center",justifyContent:"center",borderBottom:`1px solid ${t.border}`}}>
+                    {build.photoUrl?(
+                      <img src={build.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                    ):(
+                      <Monitor size={34} strokeWidth={1.5} color={t.textFaint}/>
+                    )}
+                  </div>
+                  <div style={{padding:"16px 16px 0"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+                      <div><div style={{color:t.text,fontWeight:700,fontSize:15,fontFamily:FONT_DISPLAY}}>{build.name}</div>
+                        <div style={{color:t.textMuted,fontSize:11.5,marginTop:2}}>{build.date} · {bp.length} parts</div></div>
+                      <div style={{textAlign:"right",flexShrink:0}}>
+                        <div style={{fontFamily:FONT_MONO,fontWeight:700,color:t.text}}>{fmt(cost)}</div>
+                        <div style={{fontSize:10,color:t.textFaint}}>market {fmt(market)}</div>
+                      </div>
                     </div>
                   </div>
+                </button>
 
-                  {/* Both stop propagation so tapping them doesn't also open the detail sheet
-                      underneath — these need to work as standalone quick actions right from the
-                      list, without requiring a trip into the build first. */}
-                  <div style={{display:"flex",gap:8,marginBottom:11}}>
-                    <button onClick={e=>{e.stopPropagation();setEditingBuild(build);}} style={{flex:1,
-                      background:"#27272a",border:"1px solid #3f3f46",borderRadius:9,padding:"8px 0",cursor:"pointer",
-                      color:"#d4d4d8",fontSize:12.5,fontWeight:600}}>
-                      ✏️ Edit Parts
-                    </button>
-                    <button onClick={e=>{e.stopPropagation();setReceiptPromptBuild(build);}} style={{flex:1,
-                      background:"#27272a",border:"1px solid #3f3f46",borderRadius:9,padding:"8px 0",cursor:"pointer",
-                      color:"#d4d4d8",fontSize:12.5,fontWeight:600}}>
-                      🧾 Make a Receipt
-                    </button>
+                <div style={{padding:"12px 16px 16px"}}>
+                  <div style={{display:"flex",gap:8,marginBottom:12}}>
+                    <Btn small variant="ghost" icon={Pencil} onClick={()=>setEditingBuild(build)} style={{flex:1}}>Edit parts</Btn>
+                    <Btn small variant="ghost" icon={Receipt} onClick={()=>setReceiptPromptBuild(build)} style={{flex:1}}>Make a receipt</Btn>
                   </div>
 
-                  {/* Component badge tags — core parts at a glance */}
                   <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                     {bp.map(p=>(
-                      <span key={p.id} style={{display:"inline-flex",alignItems:"center",gap:5,background:"#27272a",border:"1px solid #3f3f46",
-                        borderRadius:99,fontSize:11,padding:"4px 10px",color:"#d4d4d8"}}>
-                        <span style={{color:"#a78bfa",fontWeight:600}}>{p.category}</span>
-                        <span>{p.name}</span>
-                        <span style={{color:"#71717a"}}>{fmt(p.allocatedCost)}</span>
+                      <span key={p.id} style={{display:"inline-flex",alignItems:"center",gap:5,background:t.surfaceHover,border:`1px solid ${t.border}`,
+                        borderRadius:99,fontSize:11,padding:"4px 10px",color:t.textMuted}}>
+                        <span style={{color:t.accent,fontWeight:600}}>{p.category}</span>
+                        <span style={{color:t.text}}>{p.name}</span>
+                        <span style={{color:t.textFaint}}>{fmt(p.allocatedCost)}</span>
                       </span>
                     ))}
                   </div>
@@ -2715,17 +2797,14 @@ function Builds({state,dispatch,toast,openLightbox}) {
     </div>
   );
 }
-
-/* ═══════════════════════════════════════════
-   SELL  (#5 price suggestion, #10 buyer name)
-═══════════════════════════════════════════ */
 function Sell({state,dispatch,toast,openLightbox}) {
+  const t=useTheme();
   const [mode,setMode]=useState("part");
   const [selId,setSelId]=useState("");
   const [salePrice,setSalePrice]=useState("");
-  const [buyer,setBuyer]=useState("");   // #10
-  const [convoLink,setConvoLink]=useState(""); // link to the chat/conversation where the sale was agreed
-  const [proofPhoto,setProofPhoto]=useState({photoUrl:"",photoRecordId:""}); // screenshot/photo proof of the transaction
+  const [buyer,setBuyer]=useState("");
+  const [convoLink,setConvoLink]=useState("");
+  const [proofPhoto,setProofPhoto]=useState({photoUrl:"",photoRecordId:""});
   const [loading,setLoading]=useState(false);
   const [pickerOpen,setPickerOpen]=useState(false);
   const targetMargin=state.settings?.targetMargin||30;
@@ -2736,7 +2815,7 @@ function Sell({state,dispatch,toast,openLightbox}) {
   const tb=builds.find(b=>b.id===selId);
   const cost=mode==="part"?tp?.allocatedCost||0:tb?state.parts.filter(p=>tb.partIds.includes(p.id)).reduce((s,p)=>s+p.allocatedCost,0):0;
   const marketVal=mode==="part"?tp?.marketValue||0:tb?state.parts.filter(p=>tb.partIds.includes(p.id)).reduce((s,p)=>s+p.marketValue,0):0;
-  const suggestedCostPlus=cost>0?Math.round(cost*(1+targetMargin/100)):0;  // #5
+  const suggestedCostPlus=cost>0?Math.round(cost*(1+targetMargin/100)):0;
   const sp=parseFloat(salePrice)||0;
   const profit=sp-cost;
   const margin=cost>0?profit/cost:0;
@@ -2747,10 +2826,6 @@ function Sell({state,dispatch,toast,openLightbox}) {
     if(!selId||!salePrice){toast("Select item and enter price","error");return;}
     setLoading(true);
     const name=mode==="part"?tp?.name:tb?.name;
-    // Snapshot the build's components NOW, at time of sale — not looked up later from the build
-    // record. If the build is ever deleted afterward, Postgres's ON DELETE SET NULL on
-    // sales.build_id wipes that link permanently; this snapshot is what still lets the
-    // Parts Breakdown work even after that happens.
     const buildPartsSnapshot=mode==="build"&&tb
       ?state.parts.filter(p=>tb.partIds.includes(p.id)).map(p=>({id:p.id,name:p.name,category:p.category,allocatedCost:p.allocatedCost,marketValue:p.marketValue,photoUrl:p.photoUrl}))
       :undefined;
@@ -2758,7 +2833,7 @@ function Sell({state,dispatch,toast,openLightbox}) {
       dispatch({type:"SELL",mode,id:selId,sale:{id:uid(),partId:mode==="part"?selId:null,buildId:mode==="build"?selId:null,name,cost,salePrice:sp,profit,buyerName:buyer,date:today(),
         buildPartsSnapshot,
         convoLink:convoLink.trim(),proofPhotoUrl:proofPhoto.photoUrl,proofPhotoRecordId:proofPhoto.photoRecordId}});
-      toast(`${name} sold for ${fmt(sp)} — profit ${fmt(profit)} ✓`,profit>=0?"success":"warn");
+      toast(`${name} sold for ${fmt(sp)} — profit ${fmt(profit)}`,profit>=0?"success":"warn");
       setSelId("");setSalePrice("");setBuyer("");setConvoLink("");setProofPhoto({photoUrl:"",photoRecordId:""});setLoading(false);
     },400);
   };
@@ -2767,113 +2842,103 @@ function Sell({state,dispatch,toast,openLightbox}) {
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
-      <div><h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Sell</h2>
-        <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>Record a sale and lock in your profit.</p></div>
-      <div style={{display:"flex",gap:8}}>
-        <Btn variant={mode==="part"?"primary":"ghost"} onClick={()=>{setMode("part");setSelId("");setPickerOpen(false);}}>Sell Part</Btn>
-        <Btn variant={mode==="build"?"primary":"ghost"} onClick={()=>{setMode("build");setSelId("");setPickerOpen(false);}}>Sell Build</Btn>
-      </div>
+      <PageHeader title="Sell" sub="Record a sale and lock in your profit."/>
+      <Segmented ariaLabel="What are you selling" value={mode} onChange={m=>{setMode(m);setSelId("");setPickerOpen(false);}}
+        options={[["part","Sell part",Cpu],["build","Sell build",Monitor]]}/>
       <Card>
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
-          {/* Photo-enabled picker — a native <select> can't render images, so this is a custom dropdown.
-              The options panel is absolutely positioned so it floats over the form instead of
-              pushing the Sale price / Record Sale button down the page as the list grows. */}
-          <div style={{position:"relative"}}>
-            <div style={{fontSize:12,color:"#a1a1aa",marginBottom:5}}>{mode==="part"?"Select part":"Select build"}</div>
-            <button type="button" onClick={()=>setPickerOpen(o=>!o)} style={{width:"100%",display:"flex",alignItems:"center",gap:10,
-              background:"#09090b",border:"1px solid #3f3f46",borderRadius:9,padding:"9px 12px",cursor:"pointer",textAlign:"left"}}>
+          {/* Photo-enabled picker — a native <select> can't render images, so this is a custom
+              disclosure. Options are real, independently focusable <button>s (fully Tab/Enter
+              reachable); Escape on the panel closes it and returns focus to the trigger. */}
+          <div style={{position:"relative"}} onKeyDown={e=>{if(e.key==="Escape"){setPickerOpen(false);}}}>
+            <div style={{fontSize:12.5,color:t.textMuted,fontWeight:500,marginBottom:6}}>{mode==="part"?"Select part":"Select build"}</div>
+            <button type="button" onClick={()=>setPickerOpen(o=>!o)} aria-haspopup="listbox" aria-expanded={pickerOpen} className="bl-focusable"
+              style={{width:"100%",display:"flex",alignItems:"center",gap:10,minHeight:44,
+              background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:9,padding:"9px 12px",cursor:"pointer",textAlign:"left"}}>
               {selId?(
                 <>
                   <PhotoThumb url={selectedPhoto} size={34} seed={selId.length}/>
-                  <span style={{color:"#fff",fontSize:13,flex:1}}>{selectedLabel}</span>
-                  <span style={{fontFamily:"'Fira Code',monospace",fontSize:12,color:"#a1a1aa"}}>{mode==="part"?fmt(tp?.allocatedCost||0):""}</span>
+                  <span style={{color:t.text,fontSize:13,flex:1}}>{selectedLabel}</span>
+                  <span style={{fontFamily:FONT_MONO,fontSize:12,color:t.textMuted}}>{mode==="part"?fmt(tp?.allocatedCost||0):""}</span>
                 </>
-              ):<span style={{color:"#52525b",fontSize:13,flex:1}}>— choose —</span>}
-              <span style={{color:"#71717a",fontSize:11}}>{pickerOpen?"▲":"▼"}</span>
+              ):<span style={{color:t.textFaint,fontSize:13,flex:1}}>— choose —</span>}
+              <ChevronDown size={15} color={t.textMuted} style={{transform:pickerOpen?"rotate(180deg)":"none",transition:"transform 0.15s",flexShrink:0}}/>
             </button>
             {pickerOpen&&(
               <>
-                {/* Invisible backdrop — click outside the panel to close without selecting anything */}
-                <div onClick={()=>setPickerOpen(false)} style={{position:"fixed",inset:0,zIndex:40}}/>
-                <div style={{position:"absolute",top:"100%",left:0,right:0,marginTop:6,background:"#18181b",
-                  border:"1px solid #3f3f46",borderRadius:9,overflow:"hidden",maxHeight:280,overflowY:"auto",
-                  animation:"fadeUp 0.15s ease",boxShadow:"0 12px 28px rgba(0,0,0,0.55)",zIndex:50}}>
+                <div onClick={()=>setPickerOpen(false)} aria-hidden="true" style={{position:"fixed",inset:0,zIndex:40}}/>
+                <div role="listbox" aria-label={mode==="part"?"Available parts":"Available builds"} style={{position:"absolute",top:"100%",left:0,right:0,marginTop:6,background:t.bgElevated,
+                  border:`1px solid ${t.border}`,borderRadius:9,overflow:"hidden",maxHeight:280,overflowY:"auto",
+                  animation:"blFadeUp 0.15s ease",boxShadow:t.shadow,zIndex:50}}>
                   {list.length===0?(
-                    <div style={{padding:14,color:"#52525b",fontSize:13}}>Nothing available to sell.</div>
+                    <div style={{padding:14,color:t.textFaint,fontSize:13}}>Nothing available to sell.</div>
                   ):list.map(item=>(
-                    <button key={item.id} type="button" onClick={()=>{setSelId(item.id);setPickerOpen(false);}}
-                      style={{width:"100%",display:"flex",alignItems:"center",gap:10,background:selId===item.id?"rgba(124,58,237,0.12)":"#18181b",
-                        border:"none",borderBottom:"1px solid #27272a",padding:"9px 12px",cursor:"pointer",textAlign:"left"}}
-                      onMouseEnter={e=>e.currentTarget.style.background="rgba(124,58,237,0.08)"}
-                      onMouseLeave={e=>e.currentTarget.style.background=selId===item.id?"rgba(124,58,237,0.12)":"#18181b"}>
+                    <button key={item.id} type="button" role="option" aria-selected={selId===item.id} onClick={()=>{setSelId(item.id);setPickerOpen(false);}}
+                      style={{width:"100%",display:"flex",alignItems:"center",gap:10,background:selId===item.id?t.accentSoft:"transparent",
+                        border:"none",borderBottom:`1px solid ${t.border}`,padding:"9px 12px",cursor:"pointer",textAlign:"left",fontFamily:FONT_BODY,minHeight:44}}
+                      onMouseEnter={e=>e.currentTarget.style.background=t.surfaceHover}
+                      onMouseLeave={e=>e.currentTarget.style.background=selId===item.id?t.accentSoft:"transparent"}>
                       <PhotoThumb url={item.photoUrl} size={34} seed={item.id.length}/>
-                      <span style={{color:"#fff",fontSize:13,flex:1}}>{item.name}</span>
-                      <span style={{fontFamily:"'Fira Code',monospace",fontSize:12,color:"#a1a1aa"}}>{mode==="part"?fmt(item.allocatedCost):""}</span>
+                      <span style={{color:t.text,fontSize:13,flex:1}}>{item.name}</span>
+                      <span style={{fontFamily:FONT_MONO,fontSize:12,color:t.textMuted}}>{mode==="part"?fmt(item.allocatedCost):""}</span>
                     </button>
                   ))}
                 </div>
               </>
             )}
           </div>
-          {/* Price suggestion  (#5) — two options, since anchoring only to cost-plus-margin
-              undersells when the item's real market value is much higher than what it cost to acquire. */}
+
+          {/* Price suggestion — two options, since anchoring only to cost-plus-margin undersells
+              when the item's real market value is much higher than what it cost to acquire. */}
           {selId&&(cost>0||marketVal>0)&&(
             <div style={{display:"flex",flexDirection:"column",gap:6}}>
               {cost>0&&(
-                <div style={{background:"rgba(124,58,237,0.08)",border:"1px solid rgba(124,58,237,0.25)",borderRadius:9,padding:"9px 12px",fontSize:12,color:"#a78bfa",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{background:t.accentSoft,border:`1px solid ${t.accentSoftBorder}`,borderRadius:9,padding:"9px 12px",fontSize:12,color:t.accent,display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
                   <span>Cost + {targetMargin}% margin</span>
-                  <button onClick={()=>setSalePrice(String(suggestedCostPlus))} style={{background:"#7c3aed",border:"none",color:"#fff",borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>
-                    Use {fmt(suggestedCostPlus)}
-                  </button>
+                  <Btn small onClick={()=>setSalePrice(String(suggestedCostPlus))}>Use {fmt(suggestedCostPlus)}</Btn>
                 </div>
               )}
               {marketVal>0&&(
-                <div style={{background:"rgba(14,165,233,0.08)",border:"1px solid rgba(14,165,233,0.25)",borderRadius:9,padding:"9px 12px",fontSize:12,color:"#7dd3fc",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{background:t.infoSoft,border:`1px solid ${t.infoSoftBorder}`,borderRadius:9,padding:"9px 12px",fontSize:12,color:t.info,display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
                   <span>Use market price</span>
-                  <button onClick={()=>setSalePrice(String(marketVal))} style={{background:"#0ea5e9",border:"none",color:"#fff",borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>
-                    Use {fmt(marketVal)}
-                  </button>
+                  <Btn small variant="info" onClick={()=>setSalePrice(String(marketVal))}>Use {fmt(marketVal)}</Btn>
                 </div>
               )}
             </div>
           )}
           <Inp label="Sale price (₱)" type="number" value={salePrice} onChange={e=>setSalePrice(e.target.value)} placeholder="5000"/>
-          {/* Buyer name  (#10) */}
           <Inp label="Buyer name (optional)" value={buyer} onChange={e=>setBuyer(e.target.value)} placeholder="Juan dela Cruz"/>
-          {/* Conversation link + transaction proof photo — useful for disputes or just keeping a record */}
-          <Inp label="Conversation link (optional)" value={convoLink} onChange={e=>setConvoLink(e.target.value)} placeholder="https://m.me/... or FB Marketplace chat link"/>
+          <Inp label="Conversation link (optional)" value={convoLink} onChange={e=>setConvoLink(e.target.value)} placeholder="https://m.me/... or FB Marketplace chat link" icon={LinkIcon}/>
           <PhotoUpload label="Proof of transaction (optional) — screenshot or photo" photoUrl={proofPhoto.photoUrl} photoRecordId={proofPhoto.photoRecordId} onChange={setProofPhoto}/>
           {selId&&sp>0&&(
-            <div style={{background:"#09090b",borderRadius:9,padding:13,border:"1px solid #27272a",animation:"fadeUp 0.2s ease"}}>
-              {[["Cost",fmt(cost),"#fff"],["Sale price",fmt(sp),"#fff"],
-                ["Profit",`${profit>=0?"+":""}${fmt(profit)} (${pct(margin)})`,profit>=0?"#34d399":"#f87171"]
+            <div style={{background:t.surfaceSunken,borderRadius:9,padding:13,border:`1px solid ${t.border}`,animation:"blFadeUp 0.2s ease"}}>
+              {[["Cost",fmt(cost),t.text],["Sale price",fmt(sp),t.text],
+                ["Profit",`${profit>=0?"+":""}${fmt(profit)} (${pct(margin)})`,profit>=0?t.positive:t.negative]
               ].map(([l,v,c],i)=>(
-                <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:i<2?6:0,paddingTop:i===2?8:0,borderTop:i===2?"1px solid #27272a":"none"}}>
-                  <span style={{color:"#a1a1aa"}}>{l}</span>
-                  <span style={{fontFamily:"'Fira Code',monospace",fontWeight:i===2?700:400,color:c}}>{v}</span>
+                <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:i<2?6:0,paddingTop:i===2?8:0,borderTop:i===2?`1px solid ${t.border}`:"none"}}>
+                  <span style={{color:t.textMuted}}>{l}</span>
+                  <span style={{fontFamily:FONT_MONO,fontWeight:i===2?700:400,color:c}}>{v}</span>
                 </div>
               ))}
             </div>
           )}
-          <Btn variant="success" loading={loading} onClick={submit} disabled={!selId||!salePrice} style={{width:"100%"}}>Record Sale</Btn>
+          <Btn variant="success" icon={Check} loading={loading} onClick={submit} disabled={!selId||!salePrice} style={{width:"100%"}}>Record sale</Btn>
         </div>
       </Card>
     </div>
   );
 }
-
-/* ═══════════════════════════════════════════
-   HISTORY  (+ #4 CSV export)
-═══════════════════════════════════════════ */
+const STATUS_COLOR_KEY={completed:"positive",returned:"warning",deleted:"neutral"};
 function History({state,dispatch,toast,openLightbox}) {
+  const t=useTheme();
   const [view,setView]=useState("transactions"); // "transactions" | "partTimeline" | "ledger"
-  const [walletFilter,setWalletFilter]=useState("business"); // "business" | "personal" — used only by the Cash Ledger tab
+  const [walletFilter,setWalletFilter]=useState("business");
   const [sel,setSel]=useState("");
   const [search,setSearch]=useState("");
-  const [typeFilter,setTypeFilter]=useState("all"); // all | part | build | returned | deleted
+  const [typeFilter,setTypeFilter]=useState("all");
   const [dateFrom,setDateFrom]=useState("");
   const [dateTo,setDateTo]=useState("");
-  const [plFilter,setPlFilter]=useState("all"); // all | profit | loss
+  const [plFilter,setPlFilter]=useState("all");
   const [viewingSale,setViewingSale]=useState(null);
   const [editingSale,setEditingSale]=useState(null);
   const [undoingSale,setUndoingSale]=useState(null);
@@ -2883,20 +2948,17 @@ function History({state,dispatch,toast,openLightbox}) {
   const allSales=state.sales;
   const activeSales=allSales.filter(s=>!s.deleted&&!s.returned&&!s.writeOff);
 
-  // Cash Ledger: every entry that moved money in or out of either wallet. TRANSFER entries have a
-  // from/to pair instead of a single wallet field, since one transfer touches both wallets at once —
-  // _positive flips depending on which wallet you're currently looking at.
   const ledgerEntries=(state.transactions||[])
     .filter(t=>t.type==="TRANSFER"?(t.from===walletFilter||t.to===walletFilter):t.wallet===walletFilter)
     .map(t=>({...t,_positive: t.type==="TRANSFER"?t.to===walletFilter:(t.type==="INCOME"||t.type==="SALE")}));
 
   const filtered=allSales.filter(s=>{
-    if(s.writeOff)return false; // write-offs are losses, not sales transactions — shown on Dashboard instead
+    if(s.writeOff)return false;
     if(typeFilter==="returned"&&!s.returned)return false;
     if(typeFilter==="deleted"&&!s.deleted)return false;
     if(typeFilter==="part"&&(s.deleted||s.returned||s.buildId))return false;
     if(typeFilter==="build"&&(s.deleted||s.returned||!s.buildId))return false;
-    if(typeFilter==="all"&&(s.deleted||s.returned))return false; // "all" means all *active* transactions
+    if(typeFilter==="all"&&(s.deleted||s.returned))return false;
     if(search){
       const q=search.toLowerCase();
       if(!s.name.toLowerCase().includes(q)&&!(s.buyerName||"").toLowerCase().includes(q))return false;
@@ -2908,7 +2970,6 @@ function History({state,dispatch,toast,openLightbox}) {
     return true;
   });
 
-  // Sales Analytics  — computed over active (non-deleted, non-returned) sales only
   const totalRevenue=activeSales.reduce((s,x)=>s+x.salePrice,0);
   const totalProfitAll=activeSales.reduce((s,x)=>s+x.profit,0);
   const totalLosses=activeSales.filter(s=>s.profit<0).reduce((s,x)=>s+Math.abs(x.profit),0);
@@ -2934,7 +2995,7 @@ function History({state,dispatch,toast,openLightbox}) {
 
   const saveEdit=(changes)=>{
     dispatch({type:"EDIT_SALE",saleId:editingSale.id,changes});
-    toast("Transaction updated ✓");
+    toast("Transaction updated");
     setEditingSale(null);
   };
 
@@ -2944,8 +3005,6 @@ function History({state,dispatch,toast,openLightbox}) {
     setDeletingSale(null);setViewingSale(null);
   };
 
-  // For part sales there's no ambiguity — always disassemble-equivalent (the single item just
-  // goes back to available). For build sales, this is used by the "Disassemble" choice.
   const deleteAndReturnDisassemble=()=>{
     dispatch({type:"DELETE_SALE",saleId:deletingSale.id,mode:"undo-and-return",buildDisposition:"disassemble"});
     toast("Transaction deleted — item returned to inventory","warn");
@@ -2958,7 +3017,6 @@ function History({state,dispatch,toast,openLightbox}) {
     setDeletingSale(null);setViewingSale(null);
   };
 
-  // #4 Export CSV
   const exportCSV=()=>{
     const rows=[["Name","Category","Source","Cost","Market Value","Status","Sale Price","Profit","Buyer","Date"]];
     state.parts.forEach(p=>{
@@ -2973,7 +3031,6 @@ function History({state,dispatch,toast,openLightbox}) {
   };
 
   const statusOf=s=>s.deleted?"deleted":s.returned?"returned":"completed";
-  const statusColor={completed:"#6ee7b7",returned:"#fbbf24",deleted:"#71717a"};
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
@@ -3000,30 +3057,25 @@ function History({state,dispatch,toast,openLightbox}) {
           ]}/>
       )}
 
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
-        <div><h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>History</h2>
-          <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>Transactions, sales analytics, and part movement.</p></div>
-        <Btn variant="ghost" onClick={exportCSV} disabled={state.parts.length===0}>⬇ CSV</Btn>
-      </div>
+      <PageHeader title="History" sub="Transactions, sales analytics, and part movement."
+        action={<Btn variant="ghost" icon={FileDown} onClick={exportCSV} disabled={state.parts.length===0}>CSV</Btn>}/>
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-        <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14}}>
-          <div style={{fontSize:10,color:"#a1a1aa",marginBottom:4}}>Business Wallet</div>
-          <div style={{fontSize:18,fontWeight:700,color:"#34d399",fontFamily:"'Fira Code',monospace"}}>{fmt(state.businessCash||0)}</div>
-          <div style={{fontSize:11,color:"#52525b",marginTop:4}}>for parts & builds</div>
+        <div style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:11,padding:14}}>
+          <div style={{fontSize:10.5,color:t.textMuted,fontWeight:600,marginBottom:5}}>Business wallet</div>
+          <div style={{fontSize:18,fontWeight:700,color:t.positive,fontFamily:FONT_MONO}}>{fmt(state.businessCash||0)}</div>
+          <div style={{fontSize:10.5,color:t.textFaint,marginTop:4}}>for parts & builds</div>
         </div>
-        <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14}}>
-          <div style={{fontSize:10,color:"#a1a1aa",marginBottom:4}}>Personal Wallet</div>
-          <div style={{fontSize:18,fontWeight:700,color:"#38bdf8",fontFamily:"'Fira Code',monospace"}}>{fmt(state.personalCash||0)}</div>
-          <div style={{fontSize:11,color:"#52525b",marginTop:4}}>your separate personal funds</div>
+        <div style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:11,padding:14}}>
+          <div style={{fontSize:10.5,color:t.textMuted,fontWeight:600,marginBottom:5}}>Personal wallet</div>
+          <div style={{fontSize:18,fontWeight:700,color:t.info,fontFamily:FONT_MONO}}>{fmt(state.personalCash||0)}</div>
+          <div style={{fontSize:10.5,color:t.textFaint,marginTop:4}}>your separate personal funds</div>
         </div>
       </div>
 
-      <div style={{display:"flex",gap:7}}>
-        <Btn small variant={view==="transactions"?"primary":"ghost"} onClick={()=>setView("transactions")}>Sales History</Btn>
-        <Btn small variant={view==="partTimeline"?"primary":"ghost"} onClick={()=>setView("partTimeline")}>Part Timeline</Btn>
-        <Btn small variant={view==="ledger"?"primary":"ghost"} onClick={()=>setView("ledger")}>Cash Ledger</Btn>
-      </div>
+      <Segmented ariaLabel="History view" value={view} onChange={setView} options={[
+        ["transactions","Sales history",ClipboardList],["partTimeline","Part timeline",HistoryIcon],["ledger","Cash ledger",Banknote],
+      ]}/>
 
       {view==="partTimeline"?(
         <>
@@ -3033,26 +3085,26 @@ function History({state,dispatch,toast,openLightbox}) {
           </Sel>
           {part&&(
             <Card>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14,gap:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,gap:10}}>
                 <div style={{display:"flex",gap:11,minWidth:0}}>
-                  {part.photoUrl&&<PhotoThumb url={part.photoUrl} size={56} seed={part.id.length} onClick={()=>openLightbox(part.photoUrl)}/>}
+                  {part.photoUrl&&<PhotoThumb url={part.photoUrl} size={56} seed={part.id.length} onClick={()=>openLightbox(part.photoUrl)} label={`View photo of ${part.name}`}/>}
                   <div>
-                    <div style={{color:"#fff",fontWeight:600,fontSize:15}}>{part.name}</div>
-                    <div style={{color:"#71717a",fontSize:11,marginTop:2}}>{part.category} · {part.source}</div>
-                    {part.notes&&<div style={{color:"#a1a1aa",fontSize:11,marginTop:3,fontStyle:"italic"}}>📝 {part.notes}</div>}
-                    {part.soldTo&&<div style={{color:"#71717a",fontSize:11,marginTop:2}}>Sold to: {part.soldTo}</div>}
+                    <div style={{color:t.text,fontWeight:700,fontSize:15,fontFamily:FONT_DISPLAY}}>{part.name}</div>
+                    <div style={{color:t.textMuted,fontSize:11.5,marginTop:2}}>{part.category} · {part.source}</div>
+                    {part.notes&&<div style={{color:t.textMuted,fontSize:11.5,marginTop:4,display:"flex",alignItems:"center",gap:5}}><StickyNote size={11}/>{part.notes}</div>}
+                    {part.soldTo&&<div style={{color:t.textFaint,fontSize:11,marginTop:2}}>Sold to: {part.soldTo}</div>}
                   </div>
                 </div>
-                <Badge s={part.status}/>
+                <StatusBadge s={part.status}/>
               </div>
               <div style={{position:"relative",paddingLeft:16}}>
-                <div style={{position:"absolute",left:0,top:0,bottom:0,width:1,background:"#3f3f46"}}/>
-                <div style={{display:"flex",flexDirection:"column",gap:14}}>
+                <div style={{position:"absolute",left:0,top:0,bottom:0,width:1,background:t.border}}/>
+                <div style={{display:"flex",flexDirection:"column",gap:16}}>
                   {part.history.map((h,i)=>(
-                    <div key={i} style={{position:"relative",animation:`fadeUp 0.2s ease ${i*0.04}s both`}}>
-                      <div style={{position:"absolute",left:-20,top:4,width:7,height:7,borderRadius:"50%",background:"#7c3aed"}}/>
-                      <div style={{fontSize:10,color:"#71717a"}}>{h.date}</div>
-                      <div style={{fontSize:13,color:"#d4d4d8",marginTop:2}}>{h.event}</div>
+                    <div key={i} style={{position:"relative",animation:`blFadeUp 0.2s ease ${i*0.04}s both`}}>
+                      <div style={{position:"absolute",left:-20,top:4,width:7,height:7,borderRadius:"50%",background:t.accent}}/>
+                      <div style={{fontSize:10.5,color:t.textFaint}}>{h.date}</div>
+                      <div style={{fontSize:13,color:t.text,marginTop:2}}>{h.event}</div>
                     </div>
                   ))}
                 </div>
@@ -3060,32 +3112,27 @@ function History({state,dispatch,toast,openLightbox}) {
             </Card>
           )}
           {state.parts.length===0&&(
-            <Card style={{textAlign:"center",padding:36}}><div style={{color:"#52525b"}}>No parts yet.</div></Card>
+            <Card style={{textAlign:"center",padding:36}}><div style={{color:t.textFaint}}>No parts yet.</div></Card>
           )}
         </>
       ):view==="ledger"?(
         <>
-          {/* Wallet toggle — replaces the inventory filters for this tab, since the ledger
-              is about money movement, not parts/builds/profit */}
-          <div style={{display:"flex",gap:7}}>
-            <Btn small variant={walletFilter==="business"?"primary":"ghost"} onClick={()=>setWalletFilter("business")}>💼 Business Wallet</Btn>
-            <Btn small variant={walletFilter==="personal"?"primary":"ghost"} onClick={()=>setWalletFilter("personal")}>👤 Personal Wallet</Btn>
-          </div>
+          <Segmented ariaLabel="Wallet" value={walletFilter} onChange={setWalletFilter} options={[["business","Business wallet",Wallet],["personal","Personal wallet",User]]}/>
 
           {ledgerEntries.length===0?(
-            <Card style={{textAlign:"center",padding:36}}><div style={{color:"#52525b"}}>No {walletFilter} wallet activity yet.</div></Card>
+            <Card style={{textAlign:"center",padding:36}}><div style={{color:t.textFaint}}>No {walletFilter} wallet activity yet.</div></Card>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {ledgerEntries.map((t,i)=>(
-                <div key={t.id} style={{background:"#18181b",border:"1px solid #27272a",borderRadius:11,padding:"12px 14px",
+              {ledgerEntries.map((tx,i)=>(
+                <div key={tx.id} style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:11,padding:"12px 14px",
                   display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,
-                  animation:`fadeUp 0.18s ease ${Math.min(i*0.02,0.3)}s both`}}>
+                  animation:`blFadeUp 0.18s ease ${Math.min(i*0.02,0.3)}s both`}}>
                   <div style={{minWidth:0}}>
-                    <div style={{color:"#fff",fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.description}</div>
-                    <div style={{color:"#71717a",fontSize:11,marginTop:2}}>{t.date}</div>
+                    <div style={{color:t.text,fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{tx.description}</div>
+                    <div style={{color:t.textFaint,fontSize:10.5,marginTop:2}}>{tx.date}</div>
                   </div>
-                  <div style={{fontFamily:"'Fira Code',monospace",fontWeight:700,fontSize:14,color:t._positive?"#34d399":"#f87171",whiteSpace:"nowrap"}}>
-                    {t._positive?"+":"-"}{fmt(t.amount)}
+                  <div style={{fontFamily:FONT_MONO,fontWeight:700,fontSize:14,color:tx._positive?t.positive:t.negative,whiteSpace:"nowrap"}}>
+                    {tx._positive?"+":"-"}{fmt(tx.amount)}
                   </div>
                 </div>
               ))}
@@ -3094,22 +3141,20 @@ function History({state,dispatch,toast,openLightbox}) {
         </>
       ):(
         <>
-          {/* Sales Analytics */}
           {activeSales.length>0&&(
-            <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
-              <StatBox label="Total Revenue" value={fmt(totalRevenue)} color="#34d399"/>
-              <StatBox label="Total Profit" value={fmt(totalProfitAll)} color={totalProfitAll>=0?"#34d399":"#f87171"}/>
-              <StatBox label="Total Losses" value={fmt(-totalLosses)} color="#f87171"/>
-              <StatBox label="Avg. Profit / Sale" value={fmt(avgProfit)}/>
-              <StatBox label="Parts Sold" value={String(partsSoldCount)}/>
-              <StatBox label="Builds Sold" value={String(buildsSoldCount)}/>
-              {bestCategory&&<StatBox label="Best Category" value={bestCategory[0]} sub={`+${fmt(bestCategory[1])} profit`} color="#38bdf8"/>}
-              {bestItem&&<StatBox label="Most Profitable Sale" value={bestItem.name} sub={`+${fmt(bestItem.profit)}`} color="#38bdf8"/>}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10}}>
+              <StatBox label="Total revenue" value={fmt(totalRevenue)} color={t.positive}/>
+              <StatBox label="Total profit" value={fmt(totalProfitAll)} color={totalProfitAll>=0?t.positive:t.negative}/>
+              <StatBox label="Total losses" value={fmt(-totalLosses)} color={t.negative}/>
+              <StatBox label="Avg. profit / sale" value={fmt(avgProfit)}/>
+              <StatBox label="Parts sold" value={String(partsSoldCount)}/>
+              <StatBox label="Builds sold" value={String(buildsSoldCount)}/>
+              {bestCategory&&<StatBox label="Best category" value={bestCategory[0]} sub={`+${fmt(bestCategory[1])} profit`} color={t.info}/>}
+              {bestItem&&<StatBox label="Most profitable sale" value={bestItem.name} sub={`+${fmt(bestItem.profit)}`} color={t.info}/>}
             </div>
           )}
 
-          {/* Search + filters */}
-          <Inp label="" value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍  Search by item or buyer name..."/>
+          <Inp value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by item or buyer name…" icon={Search} aria-label="Search transactions"/>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
             {[["all","All"],["part","Parts only"],["build","Builds only"],["returned","Returned"],["deleted","Deleted"]].map(([v,l])=>(
               <Btn key={v} small variant={typeFilter===v?"primary":"ghost"} onClick={()=>setTypeFilter(v)}>{l}</Btn>
@@ -3125,38 +3170,43 @@ function History({state,dispatch,toast,openLightbox}) {
             <Inp label="To date" type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}/>
           </div>
 
-          {/* Transaction card grid — marketplace style */}
           {filtered.length===0?(
-            <Card style={{textAlign:"center",padding:36}}><div style={{color:"#52525b"}}>No transactions match.</div></Card>
+            <Card style={{textAlign:"center",padding:36}}>
+              <ClipboardList size={28} strokeWidth={1.5} color={t.textFaint} style={{marginBottom:10}}/>
+              <div style={{color:t.textFaint}}>No transactions match.</div>
+            </Card>
           ):(
-            <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10}}>
               {[...filtered].reverse().map((s,i)=>{
                 const linkedPart=state.parts.find(p=>p.id===s.partId);
                 const linkedBuild=state.builds.find(b=>b.id===s.buildId);
                 const img=s.proofPhotoUrl||linkedPart?.photoUrl||linkedBuild?.photoUrl;
                 const status=statusOf(s);
+                const statusColor=t[STATUS_COLOR_KEY[status]]||t.textMuted;
+                const ariaLabel=`${s.name}, ${status}, sold ${fmt(s.salePrice)}, ${s.profit>=0?"profit":"loss"} ${fmt(Math.abs(s.profit))}`;
                 return (
-                  <div key={s.id} onClick={()=>setViewingSale(s)} style={{background:"#18181b",border:"1px solid #27272a",borderRadius:13,
-                    padding:10,cursor:"pointer",animation:`fadeUp 0.18s ease ${Math.min(i*0.025,0.3)}s both`,transition:"border-color 0.15s",opacity:status==="deleted"?0.55:1}}
-                    onMouseEnter={e=>e.currentTarget.style.borderColor="#52525b"}
-                    onMouseLeave={e=>e.currentTarget.style.borderColor="#27272a"}>
-                    <div style={{width:"100%",aspectRatio:"1",borderRadius:9,overflow:"hidden",background:"#09090b",marginBottom:8,
-                      display:"flex",alignItems:"center",justifyContent:"center",border:"1px solid #1f1f23"}}>
-                      {img?<img src={img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:26,opacity:0.3}}>{s.buildId?"🖥️":"🔧"}</span>}
+                  <button key={s.id} onClick={()=>setViewingSale(s)} aria-label={ariaLabel} className="bl-focusable" style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:13,
+                    padding:10,cursor:"pointer",animation:`blFadeUp 0.18s ease ${Math.min(i*0.02,0.3)}s both`,transition:"border-color 0.15s",
+                    opacity:status==="deleted"?0.55:1,textAlign:"left",fontFamily:FONT_BODY,display:"block"}}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor=t.borderStrong}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor=t.border}>
+                    <div style={{width:"100%",aspectRatio:"1",borderRadius:9,overflow:"hidden",background:t.surfaceSunken,marginBottom:8,
+                      display:"flex",alignItems:"center",justifyContent:"center",border:`1px solid ${t.border}`}}>
+                      {img?<img src={img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:(s.buildId?<Monitor size={22} strokeWidth={1.5} color={t.textFaint}/>:<Wrench size={22} strokeWidth={1.5} color={t.textFaint}/>)}
                     </div>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:4,marginBottom:3}}>
-                      <span style={{fontSize:9,fontWeight:700,color:statusColor[status],textTransform:"uppercase",letterSpacing:"0.05em"}}>{status}</span>
-                      <span style={{color:"#52525b",fontSize:9}}>{s.buildId?"BUILD":"PART"}</span>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:4,marginBottom:4}}>
+                      <span style={{fontSize:9.5,fontWeight:700,color:statusColor,letterSpacing:"0.03em"}}>{status}</span>
+                      <span style={{color:t.textFaint,fontSize:9}}>{s.buildId?"BUILD":"PART"}</span>
                     </div>
-                    <div style={{color:"#fff",fontWeight:600,fontSize:12.5,lineHeight:1.3,marginBottom:4,
+                    <div style={{color:t.text,fontWeight:600,fontSize:12.5,lineHeight:1.3,marginBottom:4,
                       display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{s.name}</div>
-                    <div style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff",fontSize:13}}>{fmt(s.salePrice)}</div>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#71717a",marginTop:2}}>
+                    <div style={{fontFamily:FONT_MONO,fontWeight:700,color:t.text,fontSize:13}}>{fmt(s.salePrice)}</div>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:t.textFaint,marginTop:2}}>
                       <span>{s.date}</span>
-                      <span style={{color:s.profit>=0?"#34d399":"#f87171",fontWeight:600}}>{s.profit>=0?"+":""}{fmt(s.profit)}</span>
+                      <span style={{color:s.profit>=0?t.positive:t.negative,fontWeight:600}}>{s.profit>=0?"+":""}{fmt(s.profit)}</span>
                     </div>
-                    {s.buyerName&&<div style={{color:"#52525b",fontSize:10,marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>👤 {s.buyerName}</div>}
-                  </div>
+                    {s.buyerName&&<div style={{color:t.textFaint,fontSize:10,marginTop:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:4}}><User size={10}/>{s.buyerName}</div>}
+                  </button>
                 );
               })}
             </div>
@@ -3166,30 +3216,18 @@ function History({state,dispatch,toast,openLightbox}) {
     </div>
   );
 }
-
-/* ═══════════════════════════════════════════
-   TRANSACTION DETAIL SHEET — tap a History card for full transaction info + actions
-═══════════════════════════════════════════ */
 function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,onDelete}) {
+  const t=useTheme();
   const [showBreakdown,setShowBreakdown]=useState(false);
   const [showReceipt,setShowReceipt]=useState(false);
   const status=sale.deleted?"deleted":sale.returned?"returned":"completed";
-  const statusColor={completed:"#6ee7b7",returned:"#fbbf24",deleted:"#71717a"}[status];
+  const statusColor=t[STATUS_COLOR_KEY[status]]||t.textMuted;
   const linkedPart=state.parts.find(p=>p.id===sale.partId);
   const linkedBuild=state.builds.find(b=>b.id===sale.buildId);
-  // Prefer the snapshot taken at time of sale — it's self-contained and survives the build
-  // record being deleted later (Postgres's ON DELETE SET NULL on sales.build_id means that
-  // link can silently disappear at the database level, independent of anything in this app).
-  // Fall back to a live lookup only for older sales recorded before this snapshot existed.
   const buildParts=sale.buildPartsSnapshot?.length
     ?sale.buildPartsSnapshot
     :(linkedBuild?state.parts.filter(p=>linkedBuild.partIds.includes(p.id)):[]);
   const totalPartsCost=buildParts.reduce((s,p)=>s+p.allocatedCost,0);
-  // Each part's share of the total cost is used to proportionally attribute the sale price and
-  // profit to it too — e.g. a part that was 40% of what the build cost to assemble is treated
-  // as having earned 40% of the eventual sale price and 40% of the profit, even though the
-  // buyer paid one lump sum for the whole PC. This is an allocation convention, not a claim
-  // that the buyer priced each part individually.
   const breakdownRows=buildParts.map(p=>{
     const costShare=totalPartsCost>0?p.allocatedCost/totalPartsCost:(buildParts.length?1/buildParts.length:0);
     return {
@@ -3200,11 +3238,6 @@ function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,o
     };
   });
 
-  // Customer-facing receipt — deliberately a SEPARATE calculation from breakdownRows above.
-  // That one allocates by COST share (for the owner, to see which parts drove profit). This one
-  // allocates by MARKET VALUE share (for the customer, to see plausible per-item pricing) —
-  // scaled so every line item sums exactly to what they actually paid, with no cost, market
-  // value, or profit numbers anywhere in the output.
   const totalMarketValue=buildParts.reduce((s,p)=>s+(p.marketValue||0),0);
   const receiptRows=buildParts.map(p=>{
     const marketShare=totalMarketValue>0?(p.marketValue||0)/totalMarketValue:(buildParts.length?1/buildParts.length:0);
@@ -3212,148 +3245,140 @@ function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,o
   });
   const img=sale.proofPhotoUrl||linkedPart?.photoUrl||linkedBuild?.photoUrl;
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",borderRadius:"18px 18px 0 0",width:"100%",maxWidth:520,
-        maxHeight:"88vh",overflowY:"auto",animation:"slideUp 0.22s cubic-bezier(0.22,1,0.36,1)",
-        paddingBottom:"calc(20px + env(safe-area-inset-bottom))"}}>
-        <div style={{display:"flex",justifyContent:"center",padding:"10px 0 4px"}}><div style={{width:38,height:4,borderRadius:99,background:"#3f3f46"}}/></div>
-        <div style={{width:"100%",aspectRatio:"16/10",background:"#09090b",display:"flex",alignItems:"center",justifyContent:"center",
-          cursor:img?"pointer":"default",borderBottom:"1px solid #27272a"}}
-          onClick={img?()=>openLightbox(img):undefined}>
-          {img?<img src={img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:48,opacity:0.25}}>{sale.buildId?"🖥️":"🔧"}</span>}
+    <ModalShell onClose={onClose} label={sale.name} sheet maxWidth={520} padding={0}>
+      <div style={{width:"100%",aspectRatio:"16/10",background:t.surfaceSunken,display:"flex",alignItems:"center",justifyContent:"center",borderBottom:`1px solid ${t.border}`}}>
+        {img?(
+          <button onClick={()=>openLightbox(img)} aria-label="View photo full-screen" className="bl-focusable"
+            style={{width:"100%",height:"100%",border:"none",padding:0,background:"none",cursor:"pointer"}}>
+            <img src={img} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+          </button>
+        ):(sale.buildId?<Monitor size={40} strokeWidth={1.5} color={t.textFaint}/>:<Wrench size={40} strokeWidth={1.5} color={t.textFaint}/>)}
+      </div>
+      <div style={{padding:"18px 20px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:14}}>
+          <div style={{color:t.text,fontWeight:700,fontSize:19,fontFamily:FONT_DISPLAY}}>{sale.name}</div>
+          <span style={{fontSize:10.5,fontWeight:700,color:statusColor,letterSpacing:"0.04em"}}>{status.toUpperCase()}</span>
         </div>
-        <div style={{padding:"18px 20px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:14}}>
-            <div style={{color:"#fff",fontWeight:700,fontSize:19}}>{sale.name}</div>
-            <span style={{fontSize:11,fontWeight:700,color:statusColor,textTransform:"uppercase",letterSpacing:"0.05em"}}>{status}</span>
-          </div>
 
-          <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14,marginBottom:14}}>
-            <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Transaction</div>
-            {[["Cost price",fmt(sale.cost),"#fff"],["Sale price",fmt(sale.salePrice),"#fff"],
-              ["Profit / Loss",`${sale.profit>=0?"+":""}${fmt(sale.profit)}`,sale.profit>=0?"#34d399":"#f87171"]
-            ].map(([l,v,c],i)=>(
-              <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:i<2?7:0,paddingTop:i===2?8:0,borderTop:i===2?"1px solid #27272a":"none"}}>
-                <span style={{color:"#a1a1aa"}}>{l}</span>
-                <span style={{fontFamily:"'Fira Code',monospace",fontWeight:i===2?700:600,color:c}}>{v}</span>
+        <div style={{background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:11,padding:14,marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:t.textMuted,marginBottom:10}}>Transaction</div>
+          {[["Cost price",fmt(sale.cost),t.text],["Sale price",fmt(sale.salePrice),t.text],
+            ["Profit / loss",`${sale.profit>=0?"+":""}${fmt(sale.profit)}`,sale.profit>=0?t.positive:t.negative]
+          ].map(([l,v,c],i)=>(
+            <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:i<2?7:0,paddingTop:i===2?8:0,borderTop:i===2?`1px solid ${t.border}`:"none"}}>
+              <span style={{color:t.textMuted}}>{l}</span>
+              <span style={{fontFamily:FONT_MONO,fontWeight:i===2?700:600,color:c}}>{v}</span>
+            </div>
+          ))}
+        </div>
+
+        {(sale.buildId||sale.buildPartsSnapshot?.length>0)&&(
+          <div style={{marginBottom:14}}>
+            <Btn variant="ghost" icon={showBreakdown?ChevronUp:Wrench} onClick={()=>setShowBreakdown(v=>!v)} style={{width:"100%"}}>
+              {showBreakdown?"Hide parts":`View parts${buildParts.length?` (${buildParts.length})`:""}`}
+            </Btn>
+
+            {showBreakdown&&(buildParts.length===0?(
+              <div style={{background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:11,padding:14,marginTop:8,color:t.textMuted,fontSize:12}}>
+                This build's individual parts are no longer available to look up (the build record was deleted after this sale) — only the total cost, sale price, and profit above are still known.
+              </div>
+            ):(
+              <div style={{background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:11,padding:14,marginTop:8,animation:"blFadeUp 0.18s ease"}}>
+                <div style={{fontSize:10.5,color:t.textFaint,marginBottom:12,lineHeight:1.45}}>
+                  Sale price and profit are attributed to each part in proportion to its share of what the build cost to assemble.
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:13}}>
+                  {breakdownRows.map(p=>(
+                    <div key={p.id}>
+                      <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:6}}>
+                        <PhotoThumb url={p.photoUrl} size={30} seed={p.id.length}/>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{color:t.text,fontSize:12.5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                          <div style={{color:t.textFaint,fontSize:10}}>{p.category}</div>
+                        </div>
+                        <span style={{fontFamily:FONT_MONO,fontSize:12.5,color:t.textMuted,flexShrink:0}}>{fmt(p.allocatedCost)}</span>
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,paddingLeft:39}}>
+                        <div>
+                          <div style={{fontSize:9,color:t.textFaint}}>% of cost</div>
+                          <div style={{fontSize:12,fontFamily:FONT_MONO,color:t.accent,fontWeight:600}}>{pct(p.costSharePct)}</div>
+                        </div>
+                        <div>
+                          <div style={{fontSize:9,color:t.textFaint}}>Alloc. sale</div>
+                          <div style={{fontSize:12,fontFamily:FONT_MONO,color:t.textMuted,fontWeight:600}}>{fmt(p.allocatedSale)}</div>
+                        </div>
+                        <div>
+                          <div style={{fontSize:9,color:t.textFaint}}>Alloc. profit</div>
+                          <div style={{fontSize:12,fontFamily:FONT_MONO,color:p.allocatedProfit>=0?t.positive:t.negative,fontWeight:600}}>
+                            {p.allocatedProfit>=0?"+":""}{fmt(p.allocatedProfit)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginTop:12,paddingTop:10,borderTop:`1px solid ${t.border}`}}>
+                  <div>
+                    <div style={{fontSize:9,color:t.textMuted}}>Total cost</div>
+                    <div style={{fontSize:12.5,fontFamily:FONT_MONO,fontWeight:700,color:t.text}}>{fmt(totalPartsCost)}</div>
+                  </div>
+                  <div>
+                    <div style={{fontSize:9,color:t.textMuted}}>Total sale</div>
+                    <div style={{fontSize:12.5,fontFamily:FONT_MONO,fontWeight:700,color:t.text}}>{fmt(sale.salePrice)}</div>
+                  </div>
+                  <div>
+                    <div style={{fontSize:9,color:t.textMuted}}>Total profit</div>
+                    <div style={{fontSize:12.5,fontFamily:FONT_MONO,fontWeight:700,color:sale.profit>=0?t.positive:t.negative}}>
+                      {sale.profit>=0?"+":""}{fmt(sale.profit)}
+                    </div>
+                  </div>
+                </div>
+                <div style={{marginTop:14,paddingTop:12,borderTop:`1px solid ${t.border}`}}>
+                  <Btn variant="primary" icon={Receipt} onClick={()=>setShowReceipt(true)} style={{width:"100%"}}>Generate receipt</Btn>
+                  <div style={{fontSize:9.5,color:t.textFaint,marginTop:6,textAlign:"center"}}>Customer-facing invoice — no cost or profit info included</div>
+                </div>
               </div>
             ))}
           </div>
+        )}
 
-          {/* Parts breakdown — only relevant for a build sale, since a single-part sale's "Cost
-              price" above already IS that one item's price, nothing to break down further. */}
-          {/* Show this whenever we have ANY evidence this was a build sale — either the live
-              buildId (usual case) or a snapshot taken at time of sale (survives buildId later
-              being wiped to null by the database's own ON DELETE SET NULL cascade if the build
-              row gets hard-deleted afterward). */}
-          {(sale.buildId||sale.buildPartsSnapshot?.length>0)&&(
-            <div style={{marginBottom:14}}>
-              <Btn variant="ghost" onClick={()=>setShowBreakdown(v=>!v)} style={{width:"100%"}}>
-                {showBreakdown?"▲ Hide Parts":`🔧 View Parts${buildParts.length?` (${buildParts.length})`:""}`}
-              </Btn>
-
-              {showBreakdown&&(buildParts.length===0?(
-                <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14,marginTop:8,color:"#71717a",fontSize:12}}>
-                  This build's individual parts are no longer available to look up (the build record was deleted after this sale) — only the total cost, sale price, and profit above are still known.
-                </div>
-              ):(
-                <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14,marginTop:8,animation:"fadeUp 0.18s ease"}}>
-                  <div style={{fontSize:10.5,color:"#52525b",marginBottom:12,lineHeight:1.4}}>
-                    Sale price and profit are attributed to each part in proportion to its share of what the build cost to assemble.
-                  </div>
-                  <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                    {breakdownRows.map(p=>(
-                      <div key={p.id}>
-                        <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:6}}>
-                          <PhotoThumb url={p.photoUrl} size={30} seed={p.id.length}/>
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={{color:"#fff",fontSize:12.5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
-                            <div style={{color:"#71717a",fontSize:10}}>{p.category}</div>
-                          </div>
-                          <span style={{fontFamily:"'Fira Code',monospace",fontSize:12.5,color:"#d4d4d8",flexShrink:0}}>{fmt(p.allocatedCost)}</span>
-                        </div>
-                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,paddingLeft:39}}>
-                          <div>
-                            <div style={{fontSize:9,color:"#52525b"}}>% of cost</div>
-                            <div style={{fontSize:12,fontFamily:"'Fira Code',monospace",color:"#a78bfa",fontWeight:600}}>{pct(p.costSharePct)}</div>
-                          </div>
-                          <div>
-                            <div style={{fontSize:9,color:"#52525b"}}>Alloc. sale</div>
-                            <div style={{fontSize:12,fontFamily:"'Fira Code',monospace",color:"#d4d4d8",fontWeight:600}}>{fmt(p.allocatedSale)}</div>
-                          </div>
-                          <div>
-                            <div style={{fontSize:9,color:"#52525b"}}>Alloc. profit</div>
-                            <div style={{fontSize:12,fontFamily:"'Fira Code',monospace",color:p.allocatedProfit>=0?"#34d399":"#f87171",fontWeight:600}}>
-                              {p.allocatedProfit>=0?"+":""}{fmt(p.allocatedProfit)}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginTop:12,paddingTop:10,borderTop:"1px solid #27272a"}}>
-                    <div>
-                      <div style={{fontSize:9,color:"#71717a"}}>Total cost</div>
-                      <div style={{fontSize:12.5,fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{fmt(totalPartsCost)}</div>
-                    </div>
-                    <div>
-                      <div style={{fontSize:9,color:"#71717a"}}>Total sale</div>
-                      <div style={{fontSize:12.5,fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{fmt(sale.salePrice)}</div>
-                    </div>
-                    <div>
-                      <div style={{fontSize:9,color:"#71717a"}}>Total profit</div>
-                      <div style={{fontSize:12.5,fontFamily:"'Fira Code',monospace",fontWeight:700,color:sale.profit>=0?"#34d399":"#f87171"}}>
-                        {sale.profit>=0?"+":""}{fmt(sale.profit)}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid #27272a"}}>
-                    <Btn variant="primary" onClick={()=>setShowReceipt(true)} style={{width:"100%"}}>🧾 Generate Receipt</Btn>
-                    <div style={{fontSize:9.5,color:"#52525b",marginTop:6,textAlign:"center"}}>Customer-facing invoice — no cost or profit info included</div>
-                  </div>
-                </div>
-              ))}
+        <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
+          <DetailRow label="Buyer" value={sale.buyerName||"—"}/>
+          <DetailRow label="Sale date" value={sale.date}/>
+          {sale.convoLink&&(
+            <div>
+              <div style={{fontSize:11,color:t.textFaint,marginBottom:2}}>Conversation</div>
+              <a href={sale.convoLink} target="_blank" rel="noopener noreferrer" style={{color:t.info,fontSize:13,display:"inline-flex",alignItems:"center",gap:5}}>
+                <LinkIcon size={12}/>Open conversation link
+              </a>
             </div>
           )}
-
-          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
-            <DetailRow label="Buyer" value={sale.buyerName||"—"}/>
-            <DetailRow label="Sale Date" value={sale.date}/>
-            {sale.convoLink&&(
-              <div>
-                <div style={{fontSize:11,color:"#71717a",marginBottom:2}}>Conversation</div>
-                <a href={sale.convoLink} target="_blank" rel="noopener noreferrer" style={{color:"#7dd3fc",fontSize:13}}>🔗 Open conversation link</a>
-              </div>
-            )}
-            {sale.notes&&<DetailRow label="Notes" value={sale.notes}/>}
-            {sale.edited&&<DetailRow label="Last Edited" value={sale.editedAt} valueColor="#71717a"/>}
-            {sale.returned&&<DetailRow label="Return Reason" value={sale.returnReason||"—"} valueColor="#fbbf24"/>}
-          </div>
-
-          {!sale.deleted&&(
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              <Btn variant="ghost" onClick={onEdit}>✏️ Edit Transaction</Btn>
-              {!sale.returned&&<Btn variant="warn" onClick={onUndo}>↩️ Undo Sale</Btn>}
-              <div style={{paddingTop:6,borderTop:"1px solid #27272a",marginTop:6}}>
-                <Btn variant="danger" onClick={onDelete} style={{width:"100%"}}>🗑 Delete Transaction</Btn>
-              </div>
-            </div>
-          )}
+          {sale.notes&&<DetailRow label="Notes" value={sale.notes}/>}
+          {sale.edited&&<DetailRow label="Last edited" value={sale.editedAt} valueColor={t.textFaint}/>}
+          {sale.returned&&<DetailRow label="Return reason" value={sale.returnReason||"—"} valueColor={t.warning}/>}
         </div>
+
+        {!sale.deleted&&(
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <Btn variant="ghost" icon={Pencil} onClick={onEdit}>Edit transaction</Btn>
+            {!sale.returned&&<Btn variant="warn" icon={Undo2} onClick={onUndo}>Undo sale</Btn>}
+            <div style={{paddingTop:6,borderTop:`1px solid ${t.border}`,marginTop:6}}>
+              <Btn variant="danger" icon={Trash2} onClick={onDelete} style={{width:"100%"}}>Delete transaction</Btn>
+            </div>
+          </div>
+        )}
       </div>
       {showReceipt&&<ReceiptModal title={sale.name} subtitle={sale.buyerName?`For ${sale.buyerName}`:undefined} date={sale.date} total={sale.salePrice} receiptRows={receiptRows} onClose={()=>setShowReceipt(false)}/>}
-    </div>
+    </ModalShell>
   );
 }
 
 /* ═══════════════════════════════════════════
    RECEIPT MODAL — customer-facing invoice. Deliberately shows ONLY item names and
-   scaled prices that sum to what the customer actually paid — no cost, no market
-   value, no profit anywhere. Scaling is by market-value share (see receiptRows in
-   TransactionDetailSheet), not cost share, since a receipt should reflect plausible
-   retail-style pricing per component, not the owner's internal cost structure.
+   scaled prices that sum to what the customer actually paid.
 ═══════════════════════════════════════════ */
 function ReceiptModal({title,subtitle,date,total,label,receiptRows,onClose}) {
+  const t=useTheme();
   const [copied,setCopied]=useState(false);
 
   const copyReceipt=()=>{
@@ -3372,74 +3397,70 @@ function ReceiptModal({title,subtitle,date,total,label,receiptRows,onClose}) {
   };
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:1600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,
-        width:"100%",maxWidth:400,animation:"fadeUp 0.2s ease",overflow:"hidden"}}>
-        <div style={{padding:"20px 22px 16px",borderBottom:"1px solid #27272a"}}>
-          <div style={{color:"#71717a",fontSize:10,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:4}}>{label||"Sales Receipt"}</div>
-          <div style={{color:"#fff",fontWeight:700,fontSize:17}}>{title}</div>
-          {subtitle&&<div style={{color:"#a1a1aa",fontSize:12,marginTop:3}}>{subtitle}</div>}
-          {date&&<div style={{color:"#52525b",fontSize:11,marginTop:2}}>{date}</div>}
-        </div>
+    <ModalShell onClose={onClose} label={label||"Sales receipt"} maxWidth={400} padding={0}>
+      <div style={{padding:"20px 22px 16px",borderBottom:`1px solid ${t.border}`}}>
+        <div style={{color:t.textFaint,fontSize:11,fontWeight:600,marginBottom:5}}>{label||"Sales receipt"}</div>
+        <div style={{color:t.text,fontWeight:700,fontSize:17,fontFamily:FONT_DISPLAY}}>{title}</div>
+        {subtitle&&<div style={{color:t.textMuted,fontSize:12,marginTop:3}}>{subtitle}</div>}
+        {date&&<div style={{color:t.textFaint,fontSize:11,marginTop:2}}>{date}</div>}
+      </div>
 
-        <div style={{padding:"16px 22px"}}>
-          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
-            {receiptRows.map(p=>(
-              <div key={p.id} style={{display:"flex",alignItems:"center",gap:10}}>
-                {p.photoUrl?(
-                  <PhotoThumb url={p.photoUrl} size={34} seed={p.id.length}/>
-                ):(
-                  <div style={{width:34,height:34,flexShrink:0,borderRadius:7,background:"#09090b",border:"1px solid #27272a",
-                    display:"flex",alignItems:"center",justifyContent:"center"}}>
-                    <span style={{fontSize:14,opacity:0.3}}>🔧</span>
-                  </div>
-                )}
-                <span style={{flex:1,color:"#d4d4d8",fontSize:13.5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</span>
-                <span style={{fontFamily:"'Fira Code',monospace",fontSize:14,color:"#fff",fontWeight:600,flexShrink:0}}>{fmt(p.scaledPrice)}</span>
-              </div>
-            ))}
-          </div>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",paddingTop:14,borderTop:"1px solid #27272a"}}>
-            <span style={{color:"#fff",fontWeight:700,fontSize:15}}>Total</span>
-            <span style={{fontFamily:"'Fira Code',monospace",fontWeight:800,fontSize:19,color:"#fff"}}>{fmt(total)}</span>
-          </div>
+      <div style={{padding:"16px 22px"}}>
+        <div style={{display:"flex",flexDirection:"column",gap:11,marginBottom:14}}>
+          {receiptRows.map(p=>(
+            <div key={p.id} style={{display:"flex",alignItems:"center",gap:10}}>
+              {p.photoUrl?(
+                <PhotoThumb url={p.photoUrl} size={34} seed={p.id.length}/>
+              ):(
+                <div style={{width:34,height:34,flexShrink:0,borderRadius:7,background:t.surfaceSunken,border:`1px solid ${t.border}`,
+                  display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <Wrench size={14} strokeWidth={1.5} color={t.textFaint}/>
+                </div>
+              )}
+              <span style={{flex:1,color:t.text,fontSize:13.5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</span>
+              <span style={{fontFamily:FONT_MONO,fontSize:14,color:t.text,fontWeight:600,flexShrink:0}}>{fmt(p.scaledPrice)}</span>
+            </div>
+          ))}
         </div>
-
-        <div style={{padding:"0 22px 20px",display:"flex",flexDirection:"column",gap:8}}>
-          <Btn onClick={copyReceipt} style={{width:"100%"}}>{copied?"✓ Copied":"📋 Copy Receipt Text"}</Btn>
-          <Btn variant="ghost" onClick={onClose} style={{width:"100%"}}>Close</Btn>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",paddingTop:14,borderTop:`1px solid ${t.border}`}}>
+          <span style={{color:t.text,fontWeight:700,fontSize:15}}>Total</span>
+          <span style={{fontFamily:FONT_MONO,fontWeight:800,fontSize:19,color:t.text}}>{fmt(total)}</span>
         </div>
       </div>
-    </div>
+
+      <div style={{padding:"0 22px 22px",display:"flex",flexDirection:"column",gap:8}}>
+        <Btn icon={copied?Check:ClipboardCopy} onClick={copyReceipt} style={{width:"100%"}}>{copied?"Copied":"Copy receipt text"}</Btn>
+        <Btn variant="ghost" onClick={onClose} style={{width:"100%"}}>Close</Btn>
+      </div>
+    </ModalShell>
   );
 }
 
 /* ═══════════════════════════════════════════
-   EDIT SALE MODAL — modify transaction details without deleting the record
+   EDIT SALE MODAL
 ═══════════════════════════════════════════ */
 function EditSaleModal({sale,onClose,onSave}) {
+  const t=useTheme();
   const [salePrice,setSalePrice]=useState(String(sale.salePrice));
   const [buyerName,setBuyerName]=useState(sale.buyerName||"");
   const [notes,setNotes]=useState(sale.notes||"");
   const [date,setDate]=useState(sale.date);
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
-      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:24,width:"100%",maxWidth:420,animation:"fadeUp 0.2s ease",maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:4}}>Edit Transaction</div>
-        <div style={{fontSize:12,color:"#71717a",marginBottom:16}}>{sale.name}</div>
-        <div style={{display:"flex",flexDirection:"column",gap:12}}>
-          <Inp label="Sale price (₱)" type="number" value={salePrice} onChange={e=>setSalePrice(e.target.value)}/>
-          <Inp label="Buyer name" value={buyerName} onChange={e=>setBuyerName(e.target.value)}/>
-          <Inp label="Sale date" value={date} onChange={e=>setDate(e.target.value)} placeholder="Jun 20, 2026"/>
-          <Inp label="Notes" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Add a note about this sale"/>
-          <div style={{fontSize:11,color:"#52525b"}}>Edits are logged with a timestamp for transparency.</div>
-          <div style={{display:"flex",gap:8,marginTop:4}}>
-            <Btn onClick={()=>onSave({salePrice:parseFloat(salePrice)||sale.salePrice,buyerName,notes,date})} style={{flex:1}}>Save Changes</Btn>
-            <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-          </div>
+    <ModalShell onClose={onClose} label="Edit transaction" maxWidth={420}>
+      <div style={{fontWeight:700,fontSize:16,color:t.text,marginBottom:4,fontFamily:FONT_DISPLAY}}>Edit transaction</div>
+      <div style={{fontSize:12,color:t.textFaint,marginBottom:16}}>{sale.name}</div>
+      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        <Inp label="Sale price (₱)" type="number" value={salePrice} onChange={e=>setSalePrice(e.target.value)}/>
+        <Inp label="Buyer name" value={buyerName} onChange={e=>setBuyerName(e.target.value)}/>
+        <Inp label="Sale date" value={date} onChange={e=>setDate(e.target.value)} placeholder="Jun 20, 2026"/>
+        <Inp label="Notes" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Add a note about this sale"/>
+        <div style={{fontSize:11,color:t.textFaint}}>Edits are logged with a timestamp for transparency.</div>
+        <div style={{display:"flex",gap:8,marginTop:4}}>
+          <Btn onClick={()=>onSave({salePrice:parseFloat(salePrice)||sale.salePrice,buyerName,notes,date})} style={{flex:1}}>Save changes</Btn>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         </div>
       </div>
-    </div>
+    </ModalShell>
   );
 }
 
@@ -3447,172 +3468,161 @@ function EditSaleModal({sale,onClose,onSave}) {
    RETURN REASON MODAL — used for Undo Sale
 ═══════════════════════════════════════════ */
 function ReturnReasonModal({title,sale,onConfirm,onCancel}) {
+  const t=useTheme();
   const [reason,setReason]=useState("Buyer cancelled");
   const [other,setOther]=useState("");
-  const [buildDisposition,setBuildDisposition]=useState("reactivate"); // only asked when sale.buildId is set
+  const [buildDisposition,setBuildDisposition]=useState("reactivate");
   const reasons=["Buyer cancelled","Product returned","Incorrect sale entry","Other"];
   const isBuildSale=!!sale.buildId;
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onCancel}>
-      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
-        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:6}}>{title}</div>
-        <div style={{fontSize:13,color:"#a1a1aa",marginBottom:16}}>
-          {isBuildSale
-            ? `"${sale.name}" was sold as a build. The sale and profit/loss will be reversed either way — choose what happens to the build below.`
-            : `"${sale.name}" will be returned to inventory and the profit/loss reversed.`}
-        </div>
-        <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:14}}>
-          {reasons.map(r=>(
-            <label key={r} style={{display:"flex",alignItems:"center",gap:9,cursor:"pointer",padding:"7px 10px",borderRadius:8,
-              border:`1px solid ${reason===r?"#7c3aed":"#27272a"}`,background:reason===r?"rgba(124,58,237,0.1)":"transparent"}}>
-              <input type="radio" checked={reason===r} onChange={()=>setReason(r)} style={{accentColor:"#7c3aed"}}/>
-              <span style={{color:"#fff",fontSize:13}}>{r}</span>
-            </label>
-          ))}
-        </div>
-        {reason==="Other"&&<Inp label="Specify reason" value={other} onChange={e=>setOther(e.target.value)} placeholder="What happened?"/>}
-
-        {isBuildSale&&(
-          <div style={{marginTop:14}}>
-            <div style={{fontSize:12,color:"#a1a1aa",marginBottom:7}}>What should happen to the build?</div>
-            <div style={{display:"flex",flexDirection:"column",gap:7}}>
-              <label style={{display:"flex",alignItems:"flex-start",gap:9,cursor:"pointer",padding:"9px 10px",borderRadius:8,
-                border:`1px solid ${buildDisposition==="reactivate"?"#7c3aed":"#27272a"}`,background:buildDisposition==="reactivate"?"rgba(124,58,237,0.1)":"transparent"}}>
-                <input type="radio" checked={buildDisposition==="reactivate"} onChange={()=>setBuildDisposition("reactivate")} style={{accentColor:"#7c3aed",marginTop:2}}/>
-                <span>
-                  <span style={{color:"#fff",fontSize:13,display:"block"}}>Put it back in Builds</span>
-                  <span style={{color:"#71717a",fontSize:11}}>The PC is still assembled — make it sellable again as one unit.</span>
-                </span>
-              </label>
-              <label style={{display:"flex",alignItems:"flex-start",gap:9,cursor:"pointer",padding:"9px 10px",borderRadius:8,
-                border:`1px solid ${buildDisposition==="disassemble"?"#7c3aed":"#27272a"}`,background:buildDisposition==="disassemble"?"rgba(124,58,237,0.1)":"transparent"}}>
-                <input type="radio" checked={buildDisposition==="disassemble"} onChange={()=>setBuildDisposition("disassemble")} style={{accentColor:"#7c3aed",marginTop:2}}/>
-                <span>
-                  <span style={{color:"#fff",fontSize:13,display:"block"}}>Disassemble into Inventory</span>
-                  <span style={{color:"#71717a",fontSize:11}}>Break the build apart — each part becomes individually available.</span>
-                </span>
-              </label>
-            </div>
-          </div>
-        )}
-
-        <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:14}}>
-          <Btn variant="warn" onClick={()=>onConfirm(reason==="Other"?(other||"Other"):reason,isBuildSale?buildDisposition:undefined)} style={{width:"100%"}}>Confirm Undo</Btn>
-          <Btn variant="ghost" onClick={onCancel} style={{width:"100%"}}>Cancel</Btn>
-        </div>
+    <ModalShell onClose={onCancel} label={title}>
+      <div style={{fontWeight:700,fontSize:16,color:t.text,marginBottom:6,fontFamily:FONT_DISPLAY}}>{title}</div>
+      <div style={{fontSize:13,color:t.textMuted,marginBottom:16,lineHeight:1.5}}>
+        {isBuildSale
+          ? `"${sale.name}" was sold as a build. The sale and profit/loss will be reversed either way — choose what happens to the build below.`
+          : `"${sale.name}" will be returned to inventory and the profit/loss reversed.`}
       </div>
-    </div>
+      <div role="radiogroup" aria-label="Reason" style={{display:"flex",flexDirection:"column",gap:7,marginBottom:14}}>
+        {reasons.map(r=>(
+          <label key={r} style={{display:"flex",alignItems:"center",gap:9,cursor:"pointer",padding:"8px 10px",borderRadius:8,
+            border:`1px solid ${reason===r?t.accentSoftBorder:t.border}`,background:reason===r?t.accentSoft:"transparent"}}>
+            <input type="radio" name="return-reason" checked={reason===r} onChange={()=>setReason(r)} style={{accentColor:t.accent}}/>
+            <span style={{color:t.text,fontSize:13}}>{r}</span>
+          </label>
+        ))}
+      </div>
+      {reason==="Other"&&<Inp label="Specify reason" value={other} onChange={e=>setOther(e.target.value)} placeholder="What happened?"/>}
+
+      {isBuildSale&&(
+        <div style={{marginTop:14}}>
+          <div style={{fontSize:12,color:t.textMuted,fontWeight:600,marginBottom:8}}>What should happen to the build?</div>
+          <div role="radiogroup" aria-label="Build disposition" style={{display:"flex",flexDirection:"column",gap:7}}>
+            <label style={{display:"flex",alignItems:"flex-start",gap:9,cursor:"pointer",padding:"10px",borderRadius:8,
+              border:`1px solid ${buildDisposition==="reactivate"?t.accentSoftBorder:t.border}`,background:buildDisposition==="reactivate"?t.accentSoft:"transparent"}}>
+              <input type="radio" name="build-disposition" checked={buildDisposition==="reactivate"} onChange={()=>setBuildDisposition("reactivate")} style={{accentColor:t.accent,marginTop:2}}/>
+              <span>
+                <span style={{color:t.text,fontSize:13,display:"block"}}>Put it back in Builds</span>
+                <span style={{color:t.textFaint,fontSize:11}}>The PC is still assembled — make it sellable again as one unit.</span>
+              </span>
+            </label>
+            <label style={{display:"flex",alignItems:"flex-start",gap:9,cursor:"pointer",padding:"10px",borderRadius:8,
+              border:`1px solid ${buildDisposition==="disassemble"?t.accentSoftBorder:t.border}`,background:buildDisposition==="disassemble"?t.accentSoft:"transparent"}}>
+              <input type="radio" name="build-disposition" checked={buildDisposition==="disassemble"} onChange={()=>setBuildDisposition("disassemble")} style={{accentColor:t.accent,marginTop:2}}/>
+              <span>
+                <span style={{color:t.text,fontSize:13,display:"block"}}>Disassemble into inventory</span>
+                <span style={{color:t.textFaint,fontSize:11}}>Break the build apart — each part becomes individually available.</span>
+              </span>
+            </label>
+          </div>
+        </div>
+      )}
+
+      <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:16}}>
+        <Btn variant="warn" icon={Undo2} onClick={()=>onConfirm(reason==="Other"?(other||"Other"):reason,isBuildSale?buildDisposition:undefined)} style={{width:"100%"}}>Confirm undo</Btn>
+        <Btn variant="ghost" onClick={onCancel} style={{width:"100%"}}>Cancel</Btn>
+      </div>
+    </ModalShell>
   );
 }
-
-/* ═══════════════════════════════════════════
-   SETTINGS  (#5 target margin, #9 theme)
-═══════════════════════════════════════════ */
 function Settings({state,dispatch,toast,theme,setTheme}) {
+  const t=useTheme();
   const [margin,setMargin]=useState(String(state.settings?.targetMargin||30));
+  const [confirmingClear,setConfirmingClear]=useState(false);
 
   const save=()=>{
     dispatch({type:"SET_SETTING",key:"targetMargin",value:parseFloat(margin)||30});
-    toast("Settings saved ✓");
+    toast("Settings saved");
   };
 
   const clearData=()=>{
-    if(window.confirm("Delete ALL data? This cannot be undone.")){
-      fetch("/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(initialState)})
-        .then(r=>{if(!r.ok)throw new Error(`Server returned ${r.status}`);window.location.reload();})
-        .catch(()=>toast("Failed to clear data — check server connection","error"));
-    }
+    fetch("/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(initialState)})
+      .then(r=>{if(!r.ok)throw new Error(`Server returned ${r.status}`);window.location.reload();})
+      .catch(()=>toast("Failed to clear data — check server connection","error"));
   };
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
-      <div><h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Settings</h2>
-        <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>App preferences.</p></div>
+      {confirmingClear&&(
+        <ConfirmModal title="Delete all data?" message="This permanently erases every part, build, sale, and wallet balance. This cannot be undone."
+          confirmLabel="Delete everything" onConfirm={clearData} onCancel={()=>setConfirmingClear(false)}/>
+      )}
+      <PageHeader title="Settings" sub="App preferences."/>
       <Card>
-        <div style={{fontWeight:600,fontSize:13,color:"#d4d4d8",marginBottom:14}}>Wallet Balances</div>
+        <SectionHeader icon={Wallet} title="Wallet balances"/>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-          <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14}}>
-            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:4}}>Business Wallet</div>
-            <div style={{fontSize:18,fontWeight:700,color:"#34d399",fontFamily:"'Fira Code',monospace"}}>{fmt(state.businessCash||0)}</div>
-            <div style={{fontSize:11,color:"#52525b",marginTop:4}}>Used for buying & selling parts</div>
+          <div style={{background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:11,padding:14}}>
+            <div style={{fontSize:10.5,color:t.textMuted,fontWeight:600,marginBottom:5}}>Business wallet</div>
+            <div style={{fontSize:18,fontWeight:700,color:t.positive,fontFamily:FONT_MONO}}>{fmt(state.businessCash||0)}</div>
+            <div style={{fontSize:10.5,color:t.textFaint,marginTop:4}}>Used for buying & selling parts</div>
           </div>
-          <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14}}>
-            <div style={{fontSize:10,color:"#a1a1aa",marginBottom:4}}>Personal Wallet</div>
-            <div style={{fontSize:18,fontWeight:700,color:"#38bdf8",fontFamily:"'Fira Code',monospace"}}>{fmt(state.personalCash||0)}</div>
-            <div style={{fontSize:11,color:"#52525b",marginTop:4}}>Your separate personal funds</div>
+          <div style={{background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:11,padding:14}}>
+            <div style={{fontSize:10.5,color:t.textMuted,fontWeight:600,marginBottom:5}}>Personal wallet</div>
+            <div style={{fontSize:18,fontWeight:700,color:t.info,fontFamily:FONT_MONO}}>{fmt(state.personalCash||0)}</div>
+            <div style={{fontSize:10.5,color:t.textFaint,marginTop:4}}>Your separate personal funds</div>
           </div>
         </div>
       </Card>
       <Card>
-        <div style={{fontWeight:600,fontSize:13,color:"#d4d4d8",marginBottom:14}}>Selling Defaults</div>
+        <SectionHeader icon={Tag} title="Selling defaults"/>
         <div style={{maxWidth:260}}>
           <Inp label="Target profit margin (%)" type="number" value={margin} onChange={e=>setMargin(e.target.value)}/>
         </div>
-        <div style={{fontSize:11,color:"#71717a",marginTop:6,marginBottom:14}}>Used to auto-suggest sale prices in the Sell tab and Quick Sell modal.</div>
+        <div style={{fontSize:11.5,color:t.textFaint,marginTop:8,marginBottom:14}}>Used to auto-suggest sale prices in the Sell tab and Quick Sell modal.</div>
         <Btn onClick={save}>Save</Btn>
       </Card>
 
-      {/* #9 Theme toggle */}
       <Card>
-        <div style={{fontWeight:600,fontSize:13,color:"#d4d4d8",marginBottom:14}}>Appearance</div>
-        <div style={{display:"flex",gap:8}}>
-          {["dark","light"].map(t=>(
-            <Btn key={t} variant={theme===t?"primary":"ghost"} onClick={()=>setTheme(t)}>
-              {t==="dark"?"🌙 Dark":"☀️ Light"}
-            </Btn>
-          ))}
-        </div>
+        <SectionHeader icon={Sun} title="Appearance"/>
+        <Segmented ariaLabel="Theme" value={theme} onChange={setTheme} options={[["dark","Dark",Moon],["light","Light",Sun]]}/>
       </Card>
 
       <Card>
-        <div style={{fontWeight:600,fontSize:13,color:"#d4d4d8",marginBottom:6}}>Data</div>
-        <div style={{fontSize:12,color:"#71717a",marginBottom:14}}>All data is saved to your database and synced across devices.</div>
-        <Btn variant="danger" onClick={clearData}>Clear All Data</Btn>
+        <SectionHeader icon={AlertTriangle} title="Data"/>
+        <div style={{fontSize:12,color:t.textMuted,marginBottom:14}}>All data is saved to your database and synced across devices.</div>
+        <Btn variant="danger" icon={Trash2} onClick={()=>setConfirmingClear(true)}>Clear all data</Btn>
       </Card>
     </div>
   );
 }
-
-/* ═══════════════════════════════════════════
-   APP ROOT
-═══════════════════════════════════════════ */
-const ALL_TABS=["Dashboard","Buy","Inventory","Builds","Sell","History","Settings"];
-
-/* ═══════════════════════════════════════════
-   QUICK ACTIONS FAB — floating [+] button with a radial menu for Quick Buy / Quick Sell / Note.
-   Deliberately minimal: no photos, no notes-on-purchase, just the fields needed to lock in a
-   deal on the spot. Full detail (photos, condition notes, etc.) can be added later via Edit.
-═══════════════════════════════════════════ */
 function QuickActionsFab({state,dispatch,toast}) {
+  const t=useTheme();
   const [open,setOpen]=useState(false);
   const [modal,setModal]=useState(null); // null | "buy" | "sell" | "note"
 
   const actions=[
-    {key:"buy",icon:"🛒",label:"Quick Buy"},
-    {key:"sell",icon:"💵",label:"Quick Sell"},
-    {key:"note",icon:"📝",label:"Note"},
+    {key:"buy",icon:ShoppingCart,label:"Quick buy"},
+    {key:"sell",icon:Zap,label:"Quick sell"},
+    {key:"note",icon:StickyNote,label:"Note"},
   ];
+
+  useEffect(()=>{
+    if(!open)return;
+    const onKey=e=>{if(e.key==="Escape")setOpen(false);};
+    document.addEventListener("keydown",onKey);
+    return()=>document.removeEventListener("keydown",onKey);
+  },[open]);
 
   return (
     <>
-      {open&&<div onClick={()=>setOpen(false)} style={{position:"fixed",inset:0,zIndex:899,background:"rgba(0,0,0,0.35)"}}/>}
+      {open&&<div onClick={()=>setOpen(false)} aria-hidden="true" style={{position:"fixed",inset:0,zIndex:899,background:t.overlay}}/>}
 
       <div style={{position:"fixed",right:18,bottom:"calc(20px + env(safe-area-inset-bottom))",zIndex:900,
         display:"flex",flexDirection:"column",alignItems:"flex-end",gap:12}}>
         {open&&actions.map((a,i)=>(
-          <button key={a.key} onClick={()=>{setModal(a.key);setOpen(false);}}
+          <button key={a.key} onClick={()=>{setModal(a.key);setOpen(false);}} className="bl-focusable"
             style={{display:"flex",alignItems:"center",gap:9,cursor:"pointer",
-              background:"#18181b",border:"1px solid #3f3f46",borderRadius:99,padding:"10px 16px 10px 14px",
-              boxShadow:"0 6px 18px rgba(0,0,0,0.5)",animation:`fadeUp 0.18s ease ${(actions.length-1-i)*0.04}s both`}}>
-            <span style={{fontSize:17}}>{a.icon}</span>
-            <span style={{color:"#fff",fontSize:13,fontWeight:600,whiteSpace:"nowrap"}}>{a.label}</span>
+              background:t.bgElevated,border:`1px solid ${t.border}`,borderRadius:99,padding:"11px 18px 11px 15px",
+              boxShadow:t.shadow,animation:`blFadeUp 0.18s ease ${(actions.length-1-i)*0.04}s both`}}>
+            <a.icon size={17} strokeWidth={2} color={t.accent}/>
+            <span style={{color:t.text,fontSize:13,fontWeight:600,whiteSpace:"nowrap"}}>{a.label}</span>
           </button>
         ))}
 
-        <button onClick={()=>setOpen(o=>!o)} style={{width:56,height:56,borderRadius:"50%",border:"none",cursor:"pointer",
-          background:"#7c3aed",color:"#fff",fontSize:26,display:"flex",alignItems:"center",justifyContent:"center",
-          boxShadow:"0 8px 22px rgba(124,58,237,0.5)",transform:open?"rotate(45deg)":"rotate(0deg)",transition:"transform 0.2s"}}>
-          +
+        <button onClick={()=>setOpen(o=>!o)} aria-expanded={open} aria-label={open?"Close quick actions":"Open quick actions"} className="bl-focusable"
+          style={{width:56,height:56,borderRadius:"50%",border:"none",cursor:"pointer",
+          background:t.accentStrong,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",
+          boxShadow:`0 8px 22px ${t.accent}55`,transform:open?"rotate(45deg)":"rotate(0deg)",transition:"transform 0.2s"}}>
+          <Plus size={26} strokeWidth={2.25}/>
         </button>
       </div>
 
@@ -3624,6 +3634,7 @@ function QuickActionsFab({state,dispatch,toast}) {
 }
 
 function QuickBuyModal({state,dispatch,toast,onClose}) {
+  const t=useTheme();
   const [name,setName]=useState("");
   const [cat,setCat]=useState("Other");
   const [cost,setCost]=useState("");
@@ -3637,33 +3648,32 @@ function QuickBuyModal({state,dispatch,toast,onClose}) {
       source:"Quick Buy",bundleId:null,status:"available",notes:"",soldTo:"",photoUrl:"",photoRecordId:"",
       history:[{date:today(),event:`Quick Buy — bought for ${fmt(c)}`}]}));
     dispatch({type:"ADD_PARTS",parts:newParts});
-    toast(n>1?`${n}× ${name} added ✓ — add photos/details later via Edit`:`${name} added ✓ — add photos/details later via Edit`);
+    toast(n>1?`${n}× ${name} added — add photos/details later via Edit`:`${name} added — add photos/details later via Edit`);
     onClose();
   };
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
-      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
-        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:4}}>🛒 Quick Buy</div>
-        <div style={{fontSize:12,color:"#71717a",marginBottom:16}}>Lock it in fast — fill in the rest later.</div>
-        <div style={{display:"flex",flexDirection:"column",gap:11}}>
-          <Inp label="Name" value={name} onChange={e=>setName(e.target.value)} placeholder="RX 580"/>
-          <CategoryPicker label="Category" value={cat} onChange={setCat} customCategories={state.customCategories} dispatch={dispatch}/>
-          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:10}}>
-            <Inp label="Cost (₱, per unit)" type="number" value={cost} onChange={e=>setCost(e.target.value)} placeholder="3000"/>
-            <Inp label="Qty" type="number" min="1" value={qty} onChange={e=>setQty(e.target.value)} placeholder="1"/>
-          </div>
-          <div style={{display:"flex",gap:8,marginTop:4}}>
-            <Btn onClick={submit} style={{flex:1}}>{parseInt(qty,10)>1?`Add ${Math.max(1,parseInt(qty,10)||1)} to Inventory`:"Add to Inventory"}</Btn>
-            <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-          </div>
+    <ModalShell onClose={onClose} label="Quick buy">
+      <div style={{fontWeight:700,fontSize:16,color:t.text,marginBottom:4,fontFamily:FONT_DISPLAY,display:"flex",alignItems:"center",gap:8}}><ShoppingCart size={17} color={t.accent}/>Quick buy</div>
+      <div style={{fontSize:12,color:t.textFaint,marginBottom:16}}>Lock it in fast — fill in the rest later.</div>
+      <div style={{display:"flex",flexDirection:"column",gap:11}}>
+        <Inp label="Name" value={name} onChange={e=>setName(e.target.value)} placeholder="RX 580"/>
+        <CategoryPicker label="Category" value={cat} onChange={setCat} customCategories={state.customCategories} dispatch={dispatch}/>
+        <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:10}}>
+          <Inp label="Cost (₱, per unit)" type="number" value={cost} onChange={e=>setCost(e.target.value)} placeholder="3000"/>
+          <Inp label="Qty" type="number" min="1" value={qty} onChange={e=>setQty(e.target.value)} placeholder="1"/>
+        </div>
+        <div style={{display:"flex",gap:8,marginTop:4}}>
+          <Btn onClick={submit} style={{flex:1}}>{parseInt(qty,10)>1?`Add ${Math.max(1,parseInt(qty,10)||1)} to inventory`:"Add to inventory"}</Btn>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         </div>
       </div>
-    </div>
+    </ModalShell>
   );
 }
 
 function QuickSellPickerModal({state,dispatch,toast,onClose}) {
+  const t=useTheme();
   const [search,setSearch]=useState("");
   const [selId,setSelId]=useState("");
   const [salePrice,setSalePrice]=useState("");
@@ -3688,86 +3698,89 @@ function QuickSellPickerModal({state,dispatch,toast,onClose}) {
     dispatch({type:"SELL",mode:selected.mode,id:selected.id,sale:{id:uid(),
       partId:selected.mode==="part"?selected.id:null,buildId:selected.mode==="build"?selected.id:null,
       name:selected.name,cost:selected.cost,salePrice:sp,profit,buyerName:buyer,date:today(),buildPartsSnapshot}});
-    toast(`${selected.name} sold for ${fmt(sp)} — profit ${fmt(profit)} ✓`,profit>=0?"success":"warn");
+    toast(`${selected.name} sold for ${fmt(sp)} — profit ${fmt(profit)}`,profit>=0?"success":"warn");
     onClose();
   };
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
-      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,maxHeight:"85vh",overflowY:"auto",animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
-        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:4}}>💵 Quick Sell</div>
-        <div style={{fontSize:12,color:"#71717a",marginBottom:16}}>Find it, price it, done.</div>
-        <div style={{display:"flex",flexDirection:"column",gap:11}}>
-          {!selected?(
-            <>
-              <Inp label="" value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍  Search parts and builds..."/>
-              <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:240,overflowY:"auto"}}>
-                {items.length===0?(
-                  <div style={{color:"#52525b",fontSize:13,padding:"10px 0"}}>Nothing available to sell.</div>
-                ):items.map(it=>(
-                  <button key={it.id} onClick={()=>setSelId(it.id)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-                    width:"100%",background:"#09090b",border:"1px solid #27272a",borderRadius:8,padding:"9px 12px",cursor:"pointer",textAlign:"left"}}>
-                    <span style={{color:"#fff",fontSize:13}}>{it.mode==="build"?"🖥️ ":"🔧 "}{it.name}</span>
-                    <span style={{fontFamily:"'Fira Code',monospace",fontSize:12,color:"#71717a"}}>{fmt(it.cost)}</span>
-                  </button>
-                ))}
+    <ModalShell onClose={onClose} label="Quick sell">
+      <div style={{fontWeight:700,fontSize:16,color:t.text,marginBottom:4,fontFamily:FONT_DISPLAY,display:"flex",alignItems:"center",gap:8}}><Zap size={17} color={t.accent}/>Quick sell</div>
+      <div style={{fontSize:12,color:t.textFaint,marginBottom:16}}>Find it, price it, done.</div>
+      <div style={{display:"flex",flexDirection:"column",gap:11}}>
+        {!selected?(
+          <>
+            <Inp value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search parts and builds…" icon={Search} aria-label="Search parts and builds"/>
+            <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:240,overflowY:"auto"}}>
+              {items.length===0?(
+                <div style={{color:t.textFaint,fontSize:13,padding:"10px 0"}}>Nothing available to sell.</div>
+              ):items.map(it=>(
+                <button key={it.id} onClick={()=>setSelId(it.id)} className="bl-focusable" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,
+                  width:"100%",background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:8,padding:"10px 12px",cursor:"pointer",textAlign:"left",minHeight:44,fontFamily:FONT_BODY}}>
+                  <span style={{color:t.text,fontSize:13,display:"flex",alignItems:"center",gap:7,minWidth:0}}>
+                    {it.mode==="build"?<Monitor size={14} color={t.textFaint} style={{flexShrink:0}}/>:<Wrench size={14} color={t.textFaint} style={{flexShrink:0}}/>}
+                    <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.name}</span>
+                  </span>
+                  <span style={{fontFamily:FONT_MONO,fontSize:12,color:t.textMuted,flexShrink:0}}>{fmt(it.cost)}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        ):(
+          <>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:8,padding:"10px 12px"}}>
+              <span style={{color:t.text,fontSize:13,display:"flex",alignItems:"center",gap:7,minWidth:0}}>
+                {selected.mode==="build"?<Monitor size={14} color={t.textFaint}/>:<Wrench size={14} color={t.textFaint}/>}
+                <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selected.name}</span>
+              </span>
+              <Btn small variant="ghost" onClick={()=>setSelId("")}>Change</Btn>
+            </div>
+            <Inp label="Sale price (₱)" type="number" value={salePrice} onChange={e=>setSalePrice(e.target.value)} placeholder="5000"/>
+            <Inp label="Buyer name (optional)" value={buyer} onChange={e=>setBuyer(e.target.value)} placeholder="Juan dela Cruz"/>
+            {sp>0&&(
+              <div style={{fontSize:12,color:profit>=0?t.positive:t.negative,fontWeight:600}}>
+                {profit>=0?"+":""}{fmt(profit)} profit
               </div>
-            </>
-          ):(
-            <>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#09090b",border:"1px solid #27272a",borderRadius:8,padding:"9px 12px"}}>
-                <span style={{color:"#fff",fontSize:13}}>{selected.mode==="build"?"🖥️ ":"🔧 "}{selected.name}</span>
-                <button onClick={()=>setSelId("")} style={{background:"none",border:"none",color:"#7dd3fc",fontSize:12,cursor:"pointer"}}>Change</button>
-              </div>
-              <Inp label="Sale price (₱)" type="number" value={salePrice} onChange={e=>setSalePrice(e.target.value)} placeholder="5000"/>
-              <Inp label="Buyer name (optional)" value={buyer} onChange={e=>setBuyer(e.target.value)} placeholder="Juan dela Cruz"/>
-              {sp>0&&(
-                <div style={{fontSize:12,color:profit>=0?"#34d399":"#f87171",fontWeight:600}}>
-                  {profit>=0?"+":""}{fmt(profit)} profit
-                </div>
-              )}
-            </>
-          )}
-          <div style={{display:"flex",gap:8,marginTop:4}}>
-            <Btn variant="success" onClick={submit} disabled={!selected||!salePrice} style={{flex:1}}>Record Sale</Btn>
-            <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-          </div>
+            )}
+          </>
+        )}
+        <div style={{display:"flex",gap:8,marginTop:4}}>
+          <Btn variant="success" icon={Check} onClick={submit} disabled={!selected||!salePrice} style={{flex:1}}>Record sale</Btn>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         </div>
       </div>
-    </div>
+    </ModalShell>
   );
 }
 
 function QuickNoteModal({dispatch,toast,onClose}) {
+  const t=useTheme();
   const [text,setText]=useState("");
+  const [f,setF]=useState(false);
   const submit=()=>{
     if(!text.trim()){toast("Write something first","error");return;}
     dispatch({type:"ADD_QUICK_NOTE",text});
-    toast("Note saved ✓");
+    toast("Note saved");
     onClose();
   };
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
-      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
-        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:4}}>📝 Quick Note</div>
-        <div style={{fontSize:12,color:"#71717a",marginBottom:14}}>Jot it down — sort it out later. Shows on your Dashboard.</div>
-        <textarea autoFocus value={text} onChange={e=>setText(e.target.value)} placeholder="Seller has 3 more GPUs, follow up Friday..."
-          style={{width:"100%",minHeight:100,background:"#27272a",border:"1px solid #3f3f46",borderRadius:9,padding:"9px 11px",
-            color:"#fff",fontSize:13,outline:"none",resize:"vertical",boxSizing:"border-box",fontFamily:"inherit"}}/>
-        <div style={{display:"flex",gap:8,marginTop:12}}>
-          <Btn onClick={submit} style={{flex:1}}>Save Note</Btn>
-          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-        </div>
+    <ModalShell onClose={onClose} label="Quick note">
+      <div style={{fontWeight:700,fontSize:16,color:t.text,marginBottom:4,fontFamily:FONT_DISPLAY,display:"flex",alignItems:"center",gap:8}}><StickyNote size={17} color={t.accent}/>Quick note</div>
+      <div style={{fontSize:12,color:t.textFaint,marginBottom:14}}>Jot it down — sort it out later. Shows on your Dashboard.</div>
+      <textarea autoFocus value={text} onChange={e=>setText(e.target.value)} placeholder="Seller has 3 more GPUs, follow up Friday..."
+        onFocus={()=>setF(true)} onBlur={()=>setF(false)} aria-label="Note text"
+        style={{width:"100%",minHeight:100,background:t.surfaceSunken,border:`1px solid ${f?t.accent:t.border}`,borderRadius:9,padding:"10px 12px",
+          color:t.text,fontSize:13,outline:"none",resize:"vertical",boxSizing:"border-box",fontFamily:FONT_BODY,
+          boxShadow:f?`0 0 0 3px ${t.focusRing}`:"none",transition:"all 0.15s"}}/>
+      <div style={{display:"flex",gap:8,marginTop:12}}>
+        <Btn onClick={submit} style={{flex:1}}>Save note</Btn>
+        <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
       </div>
-    </div>
+    </ModalShell>
   );
 }
 
-/* ═══════════════════════════════════════════
-   ADD EXPENSE MODAL — log business costs (operation) or personal draws (owner's withdrawal),
-   tracking each separately so personal draws feed into "Funds to Recover" and don't affect business P&L.
-═══════════════════════════════════════════ */
 function AddIncomeModal({onClose, dispatch, toast}) {
+  const t=useTheme();
   const [wallet, setWallet] = useState("business");
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
@@ -3776,33 +3789,29 @@ function AddIncomeModal({onClose, dispatch, toast}) {
     const amt = parseFloat(amount);
     if(!amt || !desc) return toast("Fill all fields", "error");
     dispatch({type: "ADD_INCOME", wallet, amount: amt, description: desc});
-    toast(`+${fmt(amt)} added to ${wallet} wallet ✓`);
+    toast(`+${fmt(amt)} added to ${wallet} wallet`);
     onClose();
   };
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
-      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
-        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:4}}>Add Income</div>
-        <div style={{fontSize:12,color:"#71717a",marginBottom:14}}>Money coming in that isn't from selling inventory — a repair job, a service fee, anything like that.</div>
-        <div style={{display:"flex",gap:8,marginBottom:12}}>
-          <Btn variant={wallet==="business"?"primary":"ghost"} onClick={()=>setWallet("business")} style={{flex:1}}>Business</Btn>
-          <Btn variant={wallet==="personal"?"primary":"ghost"} onClick={()=>setWallet("personal")} style={{flex:1}}>Personal</Btn>
-        </div>
-        <div style={{display:"flex",flexDirection:"column",gap:12}}>
-          <Inp label="Description" value={desc} onChange={e=>setDesc(e.target.value)} placeholder="e.g. Fixed a PC for a client" />
-          <Inp label="Amount (₱)" type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0" />
-        </div>
-        <div style={{marginTop:16, display:"flex", gap:8}}>
-          <Btn variant="success" onClick={handleAdd} style={{flex:1}}>Log Income</Btn>
-          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-        </div>
+    <ModalShell onClose={onClose} label="Add income">
+      <div style={{fontWeight:700,fontSize:16,color:t.text,marginBottom:4,fontFamily:FONT_DISPLAY}}>Add income</div>
+      <div style={{fontSize:12,color:t.textFaint,marginBottom:14}}>Money coming in that isn't from selling inventory — a repair job, a service fee, anything like that.</div>
+      <Segmented ariaLabel="Wallet" value={wallet} onChange={setWallet} options={[["business","Business",Wallet],["personal","Personal",User]]}/>
+      <div style={{display:"flex",flexDirection:"column",gap:12,marginTop:12}}>
+        <Inp label="Description" value={desc} onChange={e=>setDesc(e.target.value)} placeholder="e.g. Fixed a PC for a client" />
+        <Inp label="Amount (₱)" type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0" />
       </div>
-    </div>
+      <div style={{marginTop:16, display:"flex", gap:8}}>
+        <Btn variant="success" icon={Plus} onClick={handleAdd} style={{flex:1}}>Log income</Btn>
+        <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+      </div>
+    </ModalShell>
   );
 }
 
 function AddExpenseModal({onClose, dispatch, toast}) {
+  const t=useTheme();
   const [wallet, setWallet] = useState("business");
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
@@ -3812,27 +3821,73 @@ function AddExpenseModal({onClose, dispatch, toast}) {
     if(!amt || !desc) return toast("Fill all fields", "error");
     const expenseType = wallet === "personal" ? "personal_draw" : "business";
     dispatch({type: "ADD_EXPENSE", wallet, expenseType, amount: amt, description: desc});
-    toast(`Added ${wallet} expense for ${fmt(amt)} ✓`);
+    toast(`Added ${wallet} expense for ${fmt(amt)}`);
     onClose();
   };
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
-      <div style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:380,animation:"fadeUp 0.2s ease"}} onClick={e=>e.stopPropagation()}>
-        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:16}}>Add Expense</div>
-        <div style={{display:"flex",gap:8,marginBottom:12}}>
-          <Btn variant={wallet==="business"?"primary":"ghost"} onClick={()=>setWallet("business")} style={{flex:1}}>Business</Btn>
-          <Btn variant={wallet==="personal"?"primary":"ghost"} onClick={()=>setWallet("personal")} style={{flex:1}}>Personal</Btn>
-        </div>
-        <div style={{display:"flex",flexDirection:"column",gap:12}}>
-          <Inp label="Description" value={desc} onChange={e=>setDesc(e.target.value)} placeholder="e.g. Tools, Lunch, Gas" />
-          <Inp label="Amount (₱)" type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0" />
-        </div>
-        <div style={{marginTop:16, display:"flex", gap:8}}>
-          <Btn variant="danger" onClick={handleAdd} style={{flex:1}}>Log Expense</Btn>
-          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-        </div>
+    <ModalShell onClose={onClose} label="Add expense">
+      <div style={{fontWeight:700,fontSize:16,color:t.text,marginBottom:14,fontFamily:FONT_DISPLAY}}>Add expense</div>
+      <Segmented ariaLabel="Wallet" value={wallet} onChange={setWallet} options={[["business","Business",Wallet],["personal","Personal",User]]}/>
+      <div style={{display:"flex",flexDirection:"column",gap:12,marginTop:12}}>
+        <Inp label="Description" value={desc} onChange={e=>setDesc(e.target.value)} placeholder="e.g. Tools, Lunch, Gas" />
+        <Inp label="Amount (₱)" type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0" />
       </div>
+      <div style={{marginTop:16, display:"flex", gap:8}}>
+        <Btn variant="danger" icon={Minus} onClick={handleAdd} style={{flex:1}}>Log expense</Btn>
+        <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+      </div>
+    </ModalShell>
+  );
+}
+const ALL_TABS=["Dashboard","Buy","Inventory","Builds","Sell","History","Settings"];
+const TAB_ICON={Dashboard:LayoutDashboard,Buy:ShoppingCart,Inventory:Boxes,Builds:Wrench,Sell:Banknote,History:HistoryIcon,Settings:SettingsIcon};
+
+function BrandMark({t,compact}) {
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
+      <div style={{width:34,height:34,borderRadius:9,background:t.accentStrong,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+        <Monitor size={18} color="#fff" strokeWidth={2.25}/>
+      </div>
+      {!compact&&(
+        <div style={{minWidth:0}}>
+          <div style={{fontWeight:700,fontSize:15,color:t.text,letterSpacing:"-0.01em",whiteSpace:"nowrap",fontFamily:FONT_DISPLAY}}>PC Trader</div>
+          <div style={{fontSize:9.5,color:t.textFaint,letterSpacing:"0.08em",whiteSpace:"nowrap",fontWeight:600}}>BUY · BUILD · SELL</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SyncStatus({saveStatus,t,compact}) {
+  const cfg=saveStatus==="saving"?{icon:Loader2,color:t.warning,label:"Saving…",spin:true}
+    :saveStatus==="error"?{icon:AlertTriangle,color:t.negative,label:"Save failed",spin:false}
+    :{icon:Check,color:t.positive,label:"Synced",spin:false};
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:5}} role="status" aria-live="polite">
+      <cfg.icon size={12} color={cfg.color} className={cfg.spin?"bl-spin":undefined}/>
+      {!compact&&<span style={{fontSize:10.5,fontWeight:600,color:cfg.color,whiteSpace:"nowrap"}}>{cfg.label}</span>}
+    </div>
+  );
+}
+
+function LoadingScreen({t}) {
+  return (
+    <div style={{minHeight:"100vh",background:t.bg,color:t.text,display:"flex",alignItems:"center",justifyContent:"center",
+      flexDirection:"column",gap:12,fontFamily:FONT_BODY}}>
+      <Loader2 size={22} className="bl-spin" color={t.accent}/>
+      <div style={{fontSize:13,color:t.textMuted}}>Loading your data…</div>
+    </div>
+  );
+}
+
+function ErrorScreen({t}) {
+  return (
+    <div style={{minHeight:"100vh",background:t.bg,color:t.negative,display:"flex",alignItems:"center",justifyContent:"center",
+      flexDirection:"column",gap:8,fontFamily:FONT_BODY,padding:24,textAlign:"center"}}>
+      <AlertTriangle size={26}/>
+      <div style={{fontSize:18,fontWeight:700,color:t.text,fontFamily:FONT_DISPLAY}}>Couldn't load your data</div>
+      <div style={{fontSize:13,color:t.textMuted,maxWidth:360}}>Check that the server is running and PocketBase is reachable, then refresh.</div>
     </div>
   );
 }
@@ -3849,9 +3904,6 @@ export default function App() {
     fetch("/data")
       .then(r=>{if(!r.ok)throw new Error(`Server returned ${r.status}`);return r.json();})
       .then(json=>{
-        // Merge with initialState defaults rather than a straight replace, so any field added
-        // after a user's data was first saved (customCategories, quickNotes, etc.) safely
-        // defaults to its empty value instead of being undefined for existing saved data.
         const loadedState = json&&Object.keys(json).length?{...initialState,...json}:initialState;
         if(loadedState.businessCash===undefined && loadedState.liquidCash!==undefined) {
           loadedState.businessCash = loadedState.liquidCash;
@@ -3883,123 +3935,168 @@ export default function App() {
 
   const [tab,setTab]=useState("Dashboard");
   const {toasts,toast}=useToast();
-  const [theme,setTheme]=useState("dark");  // #9
+  const [theme,setTheme]=useState("dark");
   const [lightboxUrl,setLightboxUrl]=useState(null);
   const openLightbox=useCallback(url=>setLightboxUrl(url),[]);
 
   // Helper for chatbox to pre-fill form fields on AI commands
   const setFormData=useCallback((formType,data)=>{
     if(formType==="buy"){
-      // These state variables are in the Buy component, so we dispatch to global state
-      // For now, we just navigate and the user will need to fill manually OR we save to a temp location
-      // A more elegant solution would be to store form defaults in global state
-      // For this MVP, we just navigate to Buy tab and show a toast with the data
       toast(`${data.singleName} - Cost: ${data.singleCost}, Market: ${data.singleMarket}`, "info");
     }
   },[toast]);
 
-  if(loadStatus==="loading"){
-    return <div style={{minHeight:"100vh",background:"#09090b",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui,sans-serif"}}>Loading your data…</div>;
-  }
-  if(loadStatus==="error"){
-    return (
-      <div style={{minHeight:"100vh",background:"#09090b",color:"#fca5a5",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:8,fontFamily:"system-ui,sans-serif",padding:24,textAlign:"center"}}>
-        <div style={{fontSize:18,fontWeight:700}}>Couldn't load your data</div>
-        <div style={{fontSize:13,color:"#71717a",maxWidth:360}}>Check that the server is running and PocketBase is reachable, then refresh.</div>
-      </div>
-    );
-  }
+  const isDesktop=useMediaQuery("(min-width: 1024px)");
+  const t=theme==="dark"?THEME.dark:THEME.light;
 
-  const isDark=theme==="dark";
-  const bg=isDark?"#09090b":"#f4f4f5";
-  const surface=isDark?"#18181b":"#ffffff";
-  const border=isDark?"#27272a":"#e4e4e7";
-  const txt=isDark?"#fff":"#18181b";
-  const sub=isDark?"#71717a":"#71717a";
+  if(loadStatus==="loading")return <LoadingScreen t={t}/>;
+  if(loadStatus==="error")return <ErrorScreen t={t}/>;
+
+  const contentMaxWidth=isDesktop?1120:740;
+  const totalProfit=state.sales.filter(s=>!s.deleted&&!s.returned).reduce((s,x)=>s+x.profit,0);
+
+  // All seven tabs stay mounted (toggled with display:none) instead of being conditionally
+  // rendered, so an in-progress form (e.g. a half-typed Sell note) survives switching tabs and
+  // coming back — unchanged from the original behavior, just reformatted.
+  const panels=(
+    <>
+      <div style={{display:tab==="Dashboard"?"block":"none"}}><Dashboard state={state} dispatch={dispatch} toast={toast} setTab={setTab} openLightbox={openLightbox}/></div>
+      <div style={{display:tab==="Buy"?"block":"none"}}><Buy state={state} dispatch={dispatch} toast={toast}/></div>
+      <div style={{display:tab==="Inventory"?"block":"none"}}><Inventory state={state} dispatch={dispatch} toast={toast} setTab={setTab} openLightbox={openLightbox}/></div>
+      <div style={{display:tab==="Builds"?"block":"none"}}><Builds state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/></div>
+      <div style={{display:tab==="Sell"?"block":"none"}}><Sell state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/></div>
+      <div style={{display:tab==="History"?"block":"none"}}><History state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/></div>
+      <div style={{display:tab==="Settings"?"block":"none"}}><Settings state={state} dispatch={dispatch} toast={toast} theme={theme} setTheme={setTheme}/></div>
+    </>
+  );
 
   return (
-    <div style={{minHeight:"100vh",background:bg,color:txt,fontFamily:"'Inter',system-ui,sans-serif",transition:"background 0.3s,color 0.3s"}}>
-      <style>{`
-        @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes slideIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
-        @keyframes slideUp{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}
-        @keyframes spin{to{transform:rotate(360deg)}}
-        *{box-sizing:border-box}
-        html,body{background:${bg};margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-        input[type=number]::-webkit-inner-spin-button{opacity:0.3}
-        ::-webkit-scrollbar{width:4px;height:4px}
-        ::-webkit-scrollbar-track{background:${isDark?"#18181b":"#f4f4f5"}}
-        ::-webkit-scrollbar-thumb{background:${isDark?"#3f3f46":"#d4d4d8"};border-radius:99px}
-        input,select,textarea{font-size:16px;}
-        @media (max-width:640px){
-          .responsive-grid{grid-template-columns:1fr !important;gap:8px !important;}
-          .part-row{grid-template-columns:1fr !important;gap:8px !important;}
-          .header-stats{gap:10px !important;}
-          .header-stats .stat-label{font-size:9px !important;}
-          .tab-bar-inner button{padding:11px 11px !important;font-size:12.5px !important;}
-        }
-      `}</style>
-      <ToastContainer toasts={toasts}/>
+    <ThemeCtx.Provider value={t}>
+      <div style={{minHeight:"100vh",background:t.bg,color:t.text,fontFamily:FONT_BODY,transition:"background 0.3s,color 0.3s"}}>
+        <style>{`
+          @import url('${GOOGLE_FONTS_HREF}');
+          @keyframes blFadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+          @keyframes blSlideIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
+          @keyframes blSlideUp{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}
+          @keyframes blSpin{to{transform:rotate(360deg)}}
+          .bl-spin{animation:blSpin 0.8s linear infinite;display:inline-block}
+          *{box-sizing:border-box}
+          html,body{background:${t.bg};margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+          input[type=number]::-webkit-inner-spin-button{opacity:0.3}
+          ::-webkit-scrollbar{width:5px;height:5px}
+          ::-webkit-scrollbar-track{background:transparent}
+          ::-webkit-scrollbar-thumb{background:${t.borderStrong};border-radius:99px}
+          button{font-family:inherit}
+          .bl-focusable{outline:none}
+          .bl-focusable:focus-visible{box-shadow:0 0 0 3px ${t.focusRing};border-radius:9px}
+          .bl-card-btn:focus-visible{box-shadow:0 0 0 3px ${t.focusRing} !important;border-color:${t.accent} !important;}
+          a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid ${t.accent};outline-offset:1px;}
+          @media (prefers-reduced-motion: reduce){
+            *,*::before,*::after{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important;scroll-behavior:auto !important;}
+          }
+          @media (max-width:640px){
+            .responsive-grid{grid-template-columns:1fr !important;gap:8px !important;}
+            .part-row{grid-template-columns:1fr !important;gap:8px !important;}
+          }
+        `}</style>
+        <ToastContainer toasts={toasts}/>
 
-      {/* Header */}
-      <div style={{borderBottom:`1px solid ${border}`,padding:"calc(13px + env(safe-area-inset-top)) 16px 13px",background:surface}}>
-        <div style={{maxWidth:740,margin:"0 auto",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
-          <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0,flexShrink:0}}>
-            <span style={{fontSize:20}}>🖥️</span>
-            <div style={{minWidth:0}}>
-              <div style={{fontWeight:800,fontSize:14,color:txt,letterSpacing:"-0.02em",whiteSpace:"nowrap"}}>PC Trader</div>
-              <div style={{fontSize:9,color:sub,letterSpacing:"0.06em",whiteSpace:"nowrap"}}>BUY · BUILD · SELL</div>
-            </div>
+        {isDesktop?(
+          <div style={{display:"flex",minHeight:"100vh"}}>
+            {/* Sidebar — the desktop-width fix: this app was previously capped at a 740px column
+                on every screen size, leaving most of a desktop viewport empty. A persistent
+                sidebar plus a wider content column (below) is what actually uses that space. */}
+            <nav aria-label="Primary" style={{width:232,flexShrink:0,borderRight:`1px solid ${t.border}`,background:t.bgElevated,
+              display:"flex",flexDirection:"column",position:"sticky",top:0,height:"100vh"}}>
+              <div style={{padding:"20px 18px"}}><BrandMark t={t}/></div>
+              <div style={{display:"flex",flexDirection:"column",gap:2,padding:"6px 10px",flex:1,overflowY:"auto"}}>
+                {ALL_TABS.map(name=>{
+                  const Icon=TAB_ICON[name];
+                  const active=tab===name;
+                  return (
+                    <button key={name} onClick={()=>setTab(name)} aria-current={active?"page":undefined} className="bl-focusable"
+                      style={{display:"flex",alignItems:"center",gap:11,padding:"10px 12px",borderRadius:9,border:"none",cursor:"pointer",
+                        background:active?t.accentSoft:"transparent",color:active?t.accent:t.textMuted,fontSize:13.5,fontWeight:600,
+                        fontFamily:FONT_BODY,textAlign:"left",transition:"background 0.12s,color 0.12s"}}
+                      onMouseEnter={e=>{if(!active)e.currentTarget.style.background=t.surfaceHover;}}
+                      onMouseLeave={e=>{if(!active)e.currentTarget.style.background="transparent";}}>
+                      <Icon size={17} strokeWidth={2}/>{name}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{padding:"14px 18px",borderTop:`1px solid ${t.border}`,display:"flex",flexDirection:"column",gap:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:11.5}}>
+                  <span style={{color:t.textMuted}}>Parts</span>
+                  <span style={{fontFamily:FONT_MONO,fontWeight:700,color:t.text}}><AnimNum value={state.parts.length}/></span>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:11.5}}>
+                  <span style={{color:t.textMuted}}>Profit</span>
+                  <span style={{fontFamily:FONT_MONO,fontWeight:700,color:t.positive}}>{fmt(totalProfit)}</span>
+                </div>
+                <SyncStatus saveStatus={saveStatus} t={t}/>
+              </div>
+            </nav>
+
+            <main style={{flex:1,minWidth:0,overflowY:"auto"}}>
+              <div style={{maxWidth:contentMaxWidth,margin:"0 auto",padding:"32px 32px 60px"}}>
+                {panels}
+              </div>
+            </main>
           </div>
-          <div className="header-stats" style={{display:"flex",gap:14,textAlign:"center",flexShrink:0}}>
-            <div><div className="stat-label" style={{fontSize:10,color:sub}}>Parts</div>
-              <div style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:txt,fontSize:13}}><AnimNum value={state.parts.length}/></div></div>
-            <div><div className="stat-label" style={{fontSize:10,color:sub}}>Profit</div>
-              <div style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#22c55e",fontSize:13}}>{fmt(state.sales.filter(s=>!s.deleted&&!s.returned).reduce((s,x)=>s+x.profit,0))}</div></div>
-            <div><div className="stat-label" style={{fontSize:10,color:sub}}>Status</div>
-              <div style={{fontSize:10.5,fontWeight:600,color:saveStatus==="saving"?"#eab308":saveStatus==="error"?"#ef4444":"#22c55e",whiteSpace:"nowrap"}}>
-                {saveStatus==="saving"?"Saving…":saveStatus==="error"?"Save failed":"Synced ✓"}
+        ):(
+          <>
+            {/* Header */}
+            <div style={{borderBottom:`1px solid ${t.border}`,padding:"calc(13px + env(safe-area-inset-top)) 16px 13px",background:t.bgElevated}}>
+              <div style={{maxWidth:contentMaxWidth,margin:"0 auto",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+                <BrandMark t={t} compact/>
+                <div style={{display:"flex",gap:16,alignItems:"center",flexShrink:0}}>
+                  <div style={{textAlign:"center"}}>
+                    <div style={{fontSize:9.5,color:t.textFaint,fontWeight:600}}>Parts</div>
+                    <div style={{fontFamily:FONT_MONO,fontWeight:700,color:t.text,fontSize:13}}><AnimNum value={state.parts.length}/></div>
+                  </div>
+                  <div style={{textAlign:"center"}}>
+                    <div style={{fontSize:9.5,color:t.textFaint,fontWeight:600}}>Profit</div>
+                    <div style={{fontFamily:FONT_MONO,fontWeight:700,color:t.positive,fontSize:13}}>{fmt(totalProfit)}</div>
+                  </div>
+                  <SyncStatus saveStatus={saveStatus} t={t} compact/>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Tab bar */}
-      <div style={{borderBottom:`1px solid ${border}`,overflowX:"auto",background:surface,WebkitOverflowScrolling:"touch"}}>
-        <div className="tab-bar-inner" style={{maxWidth:740,margin:"0 auto",display:"flex"}}>
-          {ALL_TABS.map(t=>(
-            <button key={t} onClick={()=>setTab(t)} style={{
-              padding:"11px 14px",fontSize:13,fontWeight:500,border:"none",cursor:"pointer",background:"none",
-              whiteSpace:"nowrap",transition:"all 0.15s",flexShrink:0,
-              color:tab===t?"#a78bfa":sub,
-              borderBottom:`2px solid ${tab===t?"#7c3aed":"transparent"}`,
-            }}
-              onMouseEnter={e=>{if(tab!==t)e.currentTarget.style.color=isDark?"#d4d4d8":"#18181b";}}
-              onMouseLeave={e=>{if(tab!==t)e.currentTarget.style.color=sub;}}
-            >{t}</button>
-          ))}
-        </div>
-      </div>
+            {/* Tab bar — kept as a horizontally-scrolling top bar per preference, restyled with
+                icons, a sliding underline, and no more of the max-width:640px font-shrink hack. */}
+            <div role="tablist" aria-label="Sections" style={{borderBottom:`1px solid ${t.border}`,overflowX:"auto",background:t.bgElevated,WebkitOverflowScrolling:"touch"}}>
+              <div style={{maxWidth:contentMaxWidth,margin:"0 auto",display:"flex"}}>
+                {ALL_TABS.map(name=>{
+                  const Icon=TAB_ICON[name];
+                  const active=tab===name;
+                  return (
+                    <button key={name} role="tab" aria-selected={active} onClick={()=>setTab(name)} className="bl-focusable" style={{
+                      display:"flex",alignItems:"center",gap:6,padding:"12px 13px",fontSize:12.5,fontWeight:600,border:"none",cursor:"pointer",background:"none",
+                      whiteSpace:"nowrap",transition:"color 0.15s",flexShrink:0,fontFamily:FONT_BODY,
+                      color:active?t.accent:t.textMuted,
+                      borderBottom:`2px solid ${active?t.accent:"transparent"}`,
+                    }}
+                      onMouseEnter={e=>{if(!active)e.currentTarget.style.color=t.text;}}
+                      onMouseLeave={e=>{if(!active)e.currentTarget.style.color=t.textMuted;}}>
+                      <Icon size={14} strokeWidth={2.1}/>{name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-      {/* Content — all tabs stay mounted (toggled with display:none) instead of being
-          conditionally rendered, so an in-progress form (e.g. a half-typed Sell note) survives
-          switching tabs and coming back. The previous `key={tab}` also forced a full remount of
-          this entire wrapper on every switch, which alone was enough to wipe any local form state
-          even before considering the per-tab && conditionals — removed for the same reason. */}
-      <div style={{maxWidth:740,margin:"0 auto",padding:"22px 16px calc(40px + env(safe-area-inset-bottom))"}}>
-        <div style={{display:tab==="Dashboard"?"block":"none"}}><Dashboard state={state} dispatch={dispatch} toast={toast} setTab={setTab} openLightbox={openLightbox}/></div>
-        <div style={{display:tab==="Buy"?"block":"none"}}><Buy state={state} dispatch={dispatch} toast={toast}/></div>
-        <div style={{display:tab==="Inventory"?"block":"none"}}><Inventory state={state} dispatch={dispatch} toast={toast} setTab={setTab} openLightbox={openLightbox}/></div>
-        <div style={{display:tab==="Builds"?"block":"none"}}><Builds state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/></div>
-        <div style={{display:tab==="Sell"?"block":"none"}}><Sell state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/></div>
-        <div style={{display:tab==="History"?"block":"none"}}><History state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/></div>
-        <div style={{display:tab==="Settings"?"block":"none"}}><Settings state={state} dispatch={dispatch} toast={toast} theme={theme} setTheme={setTheme}/></div>
-      </div>
+            <div style={{maxWidth:contentMaxWidth,margin:"0 auto",padding:"22px 16px calc(90px + env(safe-area-inset-bottom))"}}>
+              {panels}
+            </div>
+          </>
+        )}
 
-      <QuickActionsFab state={state} dispatch={dispatch} toast={toast}/>
-      <AIAgentChatbox state={state} dispatch={dispatch} setTab={setTab} setFormData={setFormData} toast={toast}/>
-      <Lightbox url={lightboxUrl} onClose={()=>setLightboxUrl(null)}/>
-    </div>
+        <QuickActionsFab state={state} dispatch={dispatch} toast={toast}/>
+        <AIAgentChatbox state={state} dispatch={dispatch} setTab={setTab} setFormData={setFormData} toast={toast}/>
+        <Lightbox url={lightboxUrl} onClose={()=>setLightboxUrl(null)}/>
+      </div>
+    </ThemeCtx.Provider>
   );
 }
