@@ -400,31 +400,31 @@ function reducer(state, action) {
 const THEME = {
   dark: {
     mode:"dark",
-    bg:"#0E0E0F", bgElevated:"#171615",
-    surface:"#171615", surfaceSunken:"#0A0A0A", surfaceHover:"#201F1D",
-    border:"#2C2A26", borderStrong:"#3D3A34",
-    text:"#F2F0EC", textMuted:"#A8A296", textFaint:"#7A7568",
-    accent:"#E8A33D", accentStrong:"#B8791F", accentContrast:"#181206", accentSoft:"rgba(232,163,61,0.14)", accentSoftBorder:"rgba(232,163,61,0.4)",
-    info:"#5FAFC9", infoStrong:"#227087", infoSoft:"rgba(95,175,201,0.13)", infoSoftBorder:"rgba(95,175,201,0.36)",
+    bg:"#15161A", bgElevated:"#1B1C21",
+    surface:"#1C1D22", surfaceSunken:"#0F1013", surfaceHover:"#232429",
+    border:"#2C2E35", borderStrong:"#3B3D46",
+    text:"#F4F4F3", textMuted:"#A8A9B3", textFaint:"#7B7D87",
+    accent:"#CE7C3E", accentStrong:"#A85B22", accentSoft:"rgba(206,124,62,0.14)", accentSoftBorder:"rgba(206,124,62,0.38)",
+    info:"#4FC2CC", infoStrong:"#1D8A96", infoSoft:"rgba(79,194,204,0.13)", infoSoftBorder:"rgba(79,194,204,0.36)",
     positive:"#3FC088", positiveStrong:"#167A4D", positiveSoft:"rgba(63,192,136,0.13)", positiveSoftBorder:"rgba(63,192,136,0.36)",
     negative:"#F0716F", negativeStrong:"#C33F3D", negativeSoft:"rgba(240,113,111,0.13)", negativeSoftBorder:"rgba(240,113,111,0.36)",
-    warning:"#D8813F", warningSoft:"rgba(216,129,63,0.13)", warningSoftBorder:"rgba(216,129,63,0.36)",
-    overlay:"rgba(5,5,5,0.75)", focusRing:"rgba(232,163,61,0.45)",
-    shadow:"0 12px 32px rgba(0,0,0,0.5)", shadowSm:"0 2px 10px rgba(0,0,0,0.4)",
+    warning:"#E3B24A", warningSoft:"rgba(227,178,74,0.13)", warningSoftBorder:"rgba(227,178,74,0.36)",
+    overlay:"rgba(9,9,11,0.72)", focusRing:"rgba(206,124,62,0.45)",
+    shadow:"0 12px 32px rgba(0,0,0,0.45)", shadowSm:"0 2px 10px rgba(0,0,0,0.35)",
   },
   light: {
     mode:"light",
-    bg:"#EBD698", bgElevated:"#FFFFFF",
-    surface:"#FFFFFF", surfaceSunken:"#F2E9D3", surfaceHover:"#F7F1E3",
-    border:"#D9C48F", borderStrong:"#C2A968",
-    text:"#1A1A1A", textMuted:"#5C5344", textFaint:"#6B6248",
-    accent:"#000000", accentStrong:"#000000", accentContrast:"#FFFFFF", accentSoft:"rgba(0,0,0,0.06)", accentSoftBorder:"rgba(0,0,0,0.22)",
-    info:"#35566B", infoStrong:"#294453", infoSoft:"rgba(53,86,107,0.08)", infoSoftBorder:"rgba(53,86,107,0.28)",
-    positive:"#1F7A4D", positiveStrong:"#17603C", positiveSoft:"rgba(31,122,77,0.08)", positiveSoftBorder:"rgba(31,122,77,0.28)",
-    negative:"#B12B28", negativeStrong:"#8F211F", negativeSoft:"rgba(177,43,40,0.08)", negativeSoftBorder:"rgba(177,43,40,0.3)",
-    warning:"#8C6A1F", warningSoft:"rgba(140,106,31,0.08)", warningSoftBorder:"rgba(140,106,31,0.28)",
-    overlay:"rgba(20,16,10,0.5)", focusRing:"rgba(0,0,0,0.35)",
-    shadow:"0 12px 32px rgba(40,30,10,0.14)", shadowSm:"0 2px 10px rgba(40,30,10,0.09)",
+    bg:"#F5F6F8", bgElevated:"#FFFFFF",
+    surface:"#FFFFFF", surfaceSunken:"#EEF0F3", surfaceHover:"#F0F1F4",
+    border:"#E2E4E9", borderStrong:"#CBCED6",
+    text:"#1B1C21", textMuted:"#52545E", textFaint:"#82848F",
+    accent:"#9A5220", accentStrong:"#8A481B", accentSoft:"rgba(154,82,32,0.08)", accentSoftBorder:"rgba(154,82,32,0.28)",
+    info:"#127680", infoStrong:"#0F636C", infoSoft:"rgba(18,118,128,0.08)", infoSoftBorder:"rgba(18,118,128,0.28)",
+    positive:"#187A4C", positiveStrong:"#136A41", positiveSoft:"rgba(24,122,76,0.08)", positiveSoftBorder:"rgba(24,122,76,0.28)",
+    negative:"#C93A3A", negativeStrong:"#B02F2F", negativeSoft:"rgba(201,58,58,0.08)", negativeSoftBorder:"rgba(201,58,58,0.28)",
+    warning:"#8A5A0A", warningSoft:"rgba(138,90,10,0.08)", warningSoftBorder:"rgba(138,90,10,0.28)",
+    overlay:"rgba(20,21,25,0.5)", focusRing:"rgba(154,82,32,0.35)",
+    shadow:"0 12px 32px rgba(20,21,25,0.12)", shadowSm:"0 2px 10px rgba(20,21,25,0.08)",
   },
 };
 const STATUS_TONE = { available:"positive", in_build:"info", sold:"neutral", defective:"negative" };
@@ -759,7 +759,7 @@ function Btn({children,variant="primary",onClick,disabled=false,loading=false,sm
   const t=useTheme();
   const [pressed,setPressed]=useState(false);
   const VC={
-    primary:{bg:t.accentStrong,hov:t.accent,txt:t.accentContrast,bdr:"transparent"},
+    primary:{bg:t.accentStrong,hov:t.accent,txt:"#fff",bdr:"transparent"},
     ghost:{bg:t.surfaceHover,hov:t.borderStrong,txt:t.text,bdr:t.border},
     danger:{bg:t.negativeSoft,hov:`${t.negative}33`,txt:t.negative,bdr:t.negativeSoftBorder},
     success:{bg:t.positiveStrong,hov:t.positive,txt:"#fff",bdr:"transparent"},
@@ -983,7 +983,7 @@ function Segmented({options,value,onChange,ariaLabel}) {
       {options.map(([k,l,Icon])=>(
         <button key={k} role="tab" aria-selected={value===k} onClick={()=>onChange(k)} className="bl-focusable" style={{
           padding:"9px 16px",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",border:"none",fontFamily:FONT_BODY,
-          background:value===k?t.accentStrong:"transparent", color:value===k?t.accentContrast:t.textMuted,
+          background:value===k?t.accentStrong:"transparent", color:value===k?"#fff":t.textMuted,
           display:"inline-flex",alignItems:"center",gap:7,transition:"all 0.15s"}}>
           {Icon&&<Icon size={14} strokeWidth={2.25}/>}{l}
         </button>
@@ -1010,7 +1010,7 @@ function PeriodSwitch({period,setPeriod}) {
       {opts.map(([k,l])=>(
         <button key={k} role="tab" aria-selected={period===k} onClick={()=>setPeriod(k)} className="bl-focusable" style={{
           padding:"6px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",border:"none",fontFamily:FONT_BODY,
-          background:period===k?t.accentStrong:"transparent", color:period===k?t.accentContrast:t.textMuted,
+          background:period===k?t.accentStrong:"transparent", color:period===k?"#fff":t.textMuted,
           transition:"all 0.15s"}}>{l}</button>
       ))}
     </div>
@@ -2302,7 +2302,7 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
                     <Wrench size={24} strokeWidth={1.5} color={t.textFaint}/>
                   )}
                   {count>1&&(
-                    <div style={{position:"absolute",top:6,right:6,background:t.accentStrong,color:t.accentContrast,fontSize:11,fontWeight:800,
+                    <div style={{position:"absolute",top:6,right:6,background:t.accentStrong,color:"#fff",fontSize:11,fontWeight:800,
                       padding:"3px 8px",borderRadius:99,boxShadow:t.shadowSm}}>×{count}</div>
                   )}
                 </div>
@@ -2370,7 +2370,7 @@ function CategoryPartPicker({avail,categoriesPresent,activeCat,setActiveCat,sear
                     border:`1.5px solid ${checked?t.accent:t.border}`,background:checked?t.accentSoft:t.surfaceSunken,
                     transition:"all 0.12s",position:"relative",textAlign:"left",fontFamily:FONT_BODY}}>
                     {checked&&<div aria-hidden="true" style={{position:"absolute",top:6,right:6,width:18,height:18,borderRadius:"50%",
-                      background:t.accentStrong,color:t.accentContrast,display:"flex",alignItems:"center",justifyContent:"center"}}><Check size={11} strokeWidth={3} color={t.accentContrast}/></div>}
+                      background:t.accentStrong,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}><Check size={11} strokeWidth={3}/></div>}
                     <div style={{width:"100%",aspectRatio:"1",borderRadius:8,overflow:"hidden",background:t.surface,marginBottom:6,
                       display:"flex",alignItems:"center",justifyContent:"center"}}>
                       {p.photoUrl?<img src={p.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<Wrench size={18} strokeWidth={1.5} color={t.textFaint}/>}
@@ -3620,7 +3620,7 @@ function QuickActionsFab({state,dispatch,toast}) {
 
         <button onClick={()=>setOpen(o=>!o)} aria-expanded={open} aria-label={open?"Close quick actions":"Open quick actions"} className="bl-focusable"
           style={{width:56,height:56,borderRadius:"50%",border:"none",cursor:"pointer",
-          background:t.accentStrong,color:t.accentContrast,display:"flex",alignItems:"center",justifyContent:"center",
+          background:t.accentStrong,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",
           boxShadow:`0 8px 22px ${t.accent}55`,transform:open?"rotate(45deg)":"rotate(0deg)",transition:"transform 0.2s"}}>
           <Plus size={26} strokeWidth={2.25}/>
         </button>
@@ -3847,7 +3847,7 @@ function BrandMark({t,compact}) {
   return (
     <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
       <div style={{width:34,height:34,borderRadius:9,background:t.accentStrong,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-        <Monitor size={18} color={t.accentContrast} strokeWidth={2.25}/>
+        <Monitor size={18} color="#fff" strokeWidth={2.25}/>
       </div>
       {!compact&&(
         <div style={{minWidth:0}}>
