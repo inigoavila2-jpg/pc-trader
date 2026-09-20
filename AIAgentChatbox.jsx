@@ -645,7 +645,7 @@ For business strategy questions, offer thoughtful advice that considers pricing,
               // Snapshot components now — this is what keeps the Parts Breakdown working even if
               // the build record itself gets deleted later (Postgres nulls sales.build_id via
               // ON DELETE SET NULL when that happens, independent of anything in this app).
-              const buildPartsSnapshot = buildParts.map(p => ({ id: p.id, name: p.name, category: p.category, allocatedCost: p.allocatedCost, photoUrl: p.photoUrl }));
+              const buildPartsSnapshot = buildParts.map(p => ({ id: p.id, name: p.name, category: p.category, allocatedCost: p.allocatedCost, marketValue: p.marketValue, photoUrl: p.photoUrl }));
               const sale = { id: cbUid(), buildId: build.id, name: build.name, cost, salePrice, profit, buyerName: buyerName || '', date: cbToday(), buildPartsSnapshot };
               dispatch({ type: 'SELL', mode: 'build', id: build.id, sale });
               toast?.(`${build.name} sold for ${cbFmt(salePrice)} ✓`, 'success');
@@ -875,7 +875,7 @@ For business strategy questions, offer thoughtful advice that considers pricing,
 
   if (historyError) {
     return (
-      <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 5000 }}>
+      <div style={{ position: 'fixed', bottom: 'calc(78px + env(safe-area-inset-bottom))', right: 20, zIndex: 5000 }}>
         <div style={{ background: '#ef4444', color: '#fff', padding: 12, borderRadius: 8, fontSize: 12, maxWidth: 280 }}>
           Chat error: {historyError}
         </div>
@@ -891,7 +891,7 @@ For business strategy questions, offer thoughtful advice that considers pricing,
       <button
         onClick={() => setOpen(!open)}
         style={{
-          position: 'fixed', bottom: 20, right: 20, width: 56, height: 56, borderRadius: '50%',
+          position: 'fixed', bottom: 'calc(78px + env(safe-area-inset-bottom))', right: 20, width: 56, height: 56, borderRadius: '50%',
           background: '#7c3aed', border: 'none', cursor: 'pointer', display: 'flex',
           alignItems: 'center', justifyContent: 'center', fontSize: 24,
           boxShadow: '0 8px 24px rgba(124,58,237,0.4)', zIndex: 4999,

@@ -432,7 +432,7 @@ const SC = {
 };
 function Badge({s}) {
   const c=SC[s]||{};
-  return <span style={{background:c.bg,border:`1px solid ${c.border}`,color:c.color,fontSize:10,padding:"2px 7px",borderRadius:6,fontFamily:"monospace",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:600,whiteSpace:"nowrap"}}>{s.replace("_"," ")}</span>;
+  return <span style={{background:c.bg,border:`1px solid ${c.border}`,color:c.color,fontSize:10,padding:"2px 7px",borderRadius:6,fontFamily:"'Fira Code',monospace",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:600,whiteSpace:"nowrap"}}>{s.replace("_"," ")}</span>;
 }
 
 /* ═══════════════════════════════════════════
@@ -609,7 +609,9 @@ function ConfirmModal({title,message,confirmLabel="Delete",danger=true,onConfirm
 function Card({children,style={}}) {
   const [v,setV]=useState(false);
   useEffect(()=>{const t=setTimeout(()=>setV(true),30);return()=>clearTimeout(t);},[]);
-  return <div style={{background:"#18181b",border:"1px solid #27272a",borderRadius:14,padding:18,transition:"opacity 0.25s,transform 0.25s",opacity:v?1:0,transform:v?"translateY(0)":"translateY(8px)",...style}}>{children}</div>;
+  return <div style={{background:"#18181b",border:"1px solid #27272a",borderRadius:16,padding:18,
+    transition:"opacity 0.3s cubic-bezier(0.22,1,0.36,1),transform 0.3s cubic-bezier(0.22,1,0.36,1)",
+    opacity:v?1:0,transform:v?"translateY(0)":"translateY(8px)",...style}}>{children}</div>;
 }
 
 function Btn({children,variant="primary",onClick,disabled=false,loading=false,small=false,style={}}) {
@@ -622,15 +624,28 @@ function Btn({children,variant="primary",onClick,disabled=false,loading=false,sm
     warn:{bg:"rgba(120,53,15,0.5)",hov:"#92400e",txt:"#fcd34d",bdr:"#f59e0b"},
   };
   const c=VC[variant]||VC.primary;
+  // Fires the instant a finger touches down, not after the tap completes — this is what makes a
+  // button feel "native" on a phone instead of laggy. Danger actions get a distinct haptic buzz
+  // on press, so your thumb feels the difference before something irreversible happens.
+  const pressStart=()=>{
+    if(disabled||loading)return;
+    setPressed(true);
+    if(variant==="danger")navigator.vibrate?.(15);
+  };
+  const pressEnd=()=>setPressed(false);
   return (
     <button
-      onClick={()=>{if(!disabled&&!loading){setPressed(true);setTimeout(()=>setPressed(false),100);onClick&&onClick();}}}
+      onClick={()=>{if(!disabled&&!loading){onClick&&onClick();}}}
+      onTouchStart={pressStart} onTouchEnd={pressEnd} onTouchCancel={pressEnd}
+      onMouseDown={pressStart} onMouseUp={pressEnd}
       disabled={disabled||loading}
       onMouseEnter={e=>{if(!disabled)e.currentTarget.style.background=c.hov;}}
-      onMouseLeave={e=>{e.currentTarget.style.background=c.bg;}}
-      style={{background:c.bg,color:disabled?"#52525b":c.txt,border:`1px solid ${c.bdr}`,borderRadius:9,
+      onMouseLeave={e=>{e.currentTarget.style.background=c.bg;pressEnd();}}
+      style={{background:c.bg,color:disabled?"#52525b":c.txt,border:`1px solid ${c.bdr}`,borderRadius:10,
         padding:small?"5px 10px":"8px 16px",fontSize:small?11:13,fontWeight:600,cursor:disabled?"not-allowed":"pointer",
-        transition:"all 0.1s",transform:pressed?"scale(0.95)":"scale(1)",opacity:disabled?0.5:1,
+        touchAction:"manipulation",WebkitTapHighlightColor:"transparent",
+        transition:"background 0.18s cubic-bezier(0.22,1,0.36,1),transform 0.12s cubic-bezier(0.22,1,0.36,1),opacity 0.18s ease",
+        transform:pressed?"scale(0.95)":"scale(1)",opacity:disabled?0.5:1,
         display:"inline-flex",alignItems:"center",gap:5,...style}}>
       {loading&&<span style={{animation:"spin 0.6s linear infinite",display:"inline-block"}}>⟳</span>}
       {children}
@@ -654,9 +669,9 @@ function Inp({label,error,...props}) {
       {label}
       <input {...props} onChange={handleChange} min={props.type==="number"?(props.min??0):props.min}
         onFocus={e=>{setF(true);props.onFocus?.(e);}} onBlur={e=>{setF(false);props.onBlur?.(e);}}
-        style={{background:"#27272a",border:`1px solid ${error?"#ef4444":f?"#7c3aed":"#3f3f46"}`,borderRadius:9,
+        style={{background:"#27272a",border:`1px solid ${error?"#ef4444":f?"#7c3aed":"#3f3f46"}`,borderRadius:10,
           padding:"8px 11px",color:"#fff",fontSize:13,outline:"none",
-          boxShadow:f?"0 0 0 3px rgba(124,58,237,0.15)":"none",transition:"all 0.15s",width:"100%",boxSizing:"border-box",...(props.style||{})}} />
+          boxShadow:f?"0 0 0 3px rgba(124,58,237,0.15)":"none",transition:"border-color 0.18s ease,box-shadow 0.18s ease",width:"100%",boxSizing:"border-box",...(props.style||{})}} />
       {error&&<span style={{color:"#f87171",fontSize:11}}>{error}</span>}
     </label>
   );
@@ -668,9 +683,9 @@ function Sel({label,children,style,...props}) {
     <label style={{display:"flex",flexDirection:"column",gap:4,fontSize:12,color:"#a1a1aa"}}>
       {label}
       <select {...props} onFocus={()=>setF(true)} onBlur={()=>setF(false)}
-        style={{background:"#27272a",border:`1px solid ${f?"#7c3aed":"#3f3f46"}`,borderRadius:9,
+        style={{background:"#27272a",border:`1px solid ${f?"#7c3aed":"#3f3f46"}`,borderRadius:10,
           padding:"8px 11px",color:"#fff",fontSize:13,outline:"none",
-          boxShadow:f?"0 0 0 3px rgba(124,58,237,0.15)":"none",transition:"all 0.15s",width:"100%",boxSizing:"border-box",...style}}>
+          boxShadow:f?"0 0 0 3px rgba(124,58,237,0.15)":"none",transition:"border-color 0.18s ease,box-shadow 0.18s ease",width:"100%",boxSizing:"border-box",...style}}>
         {children}
       </select>
     </label>
@@ -742,7 +757,7 @@ function StatBox({label,value,sub,color}) {
   return (
     <Card>
       <div style={{fontSize:10,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:5}}>{label}</div>
-      <div style={{fontSize:21,fontWeight:700,fontFamily:"monospace",color:color||"#fff"}}>{value}</div>
+      <div style={{fontSize:21,fontWeight:700,fontFamily:"'Fira Code',monospace",color:color||"#fff"}}>{value}</div>
       {sub&&<div style={{fontSize:11,color:"#71717a",marginTop:3}}>{sub}</div>}
     </Card>
   );
@@ -757,7 +772,7 @@ function DealBar({score}) {
     <div>
       <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
         <span style={{fontSize:12,color:"#a1a1aa"}}>Deal score</span>
-        <span style={{fontSize:12,fontWeight:700,color:col,fontFamily:"monospace"}}>{score.toFixed(3)} — {lbl}</span>
+        <span style={{fontSize:12,fontWeight:700,color:col,fontFamily:"'Fira Code',monospace"}}>{score.toFixed(3)} — {lbl}</span>
       </div>
       <div style={{height:5,background:"#3f3f46",borderRadius:99}}>
         <div style={{height:"100%",width:`${w}%`,background:col,borderRadius:99,transition:"width 0.6s cubic-bezier(0.34,1.2,0.64,1)"}}/>
@@ -790,7 +805,7 @@ function QuickSellModal({part,onClose,onConfirm,targetMargin}) {
                 ["Margin",pct(m),profit>=0?"#34d399":"#f87171"]].map(([l,v,c])=>(
                 <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:4}}>
                   <span style={{color:"#a1a1aa"}}>{l}</span>
-                  <span style={{fontFamily:"monospace",fontWeight:700,color:c}}>{v}</span>
+                  <span style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:c}}>{v}</span>
                 </div>
               ))}
             </div>
@@ -891,7 +906,7 @@ function HeroNumber({children,color}) {
     <span style={{
       background: color || "linear-gradient(135deg,#ffffff 0%,#a1a1aa 100%)",
       WebkitBackgroundClip:"text", backgroundClip:"text", color:"transparent",
-      fontFamily:"monospace", fontWeight:800, letterSpacing:"-0.02em",
+      fontFamily:"'Fira Code',monospace", fontWeight:800, letterSpacing:"-0.02em",
     }}>{children}</span>
   );
 }
@@ -916,7 +931,7 @@ function KPICard({label,value,question,color,accent}) {
   return (
     <div style={{background:"#111113",border:`1px solid ${accent||"#27272a"}`,borderRadius:14,padding:"16px 18px",minWidth:0}}>
       <div style={{fontSize:10,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.09em",marginBottom:8,fontWeight:600}}>{label}</div>
-      <div style={{fontSize:22,fontWeight:800,fontFamily:"monospace",color:color||"#fff",letterSpacing:"-0.01em",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{value}</div>
+      <div style={{fontSize:22,fontWeight:800,fontFamily:"'Fira Code',monospace",color:color||"#fff",letterSpacing:"-0.01em",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{value}</div>
       {question&&<div style={{fontSize:10.5,color:"#52525b",marginTop:6,lineHeight:1.4}}>{question}</div>}
     </div>
   );
@@ -937,7 +952,7 @@ function CapitalFlowDiagram({invested,inventoryVal,recovered,profit}) {
         <Fragment key={s.label}>
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,minWidth:92,flexShrink:0}}>
             <div style={{width:10,height:10,borderRadius:"50%",background:s.color,boxShadow:`0 0 0 3px ${s.color}22`}}/>
-            <div style={{fontSize:14,fontWeight:800,fontFamily:"monospace",color:"#fff"}}>{fmt(s.value)}</div>
+            <div style={{fontSize:14,fontWeight:800,fontFamily:"'Fira Code',monospace",color:"#fff"}}>{fmt(s.value)}</div>
             <div style={{fontSize:11,color:"#d4d4d8",fontWeight:600,textAlign:"center"}}>{s.label}</div>
             <div style={{fontSize:9,color:"#52525b",textAlign:"center"}}>{s.sub}</div>
           </div>
@@ -1260,7 +1275,7 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
               <div style={{display:"flex",justifyContent:"space-around",alignItems:"flex-end",height:150,marginBottom:8}}>
                 {bars.map(b=>(
                   <div key={b.label} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,width:"30%"}}>
-                    <div style={{fontSize:12,fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(b.value)}</div>
+                    <div style={{fontSize:12,fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{fmt(b.value)}</div>
                     <div style={{width:"100%",maxWidth:64,height:barH(b.value),background:b.color,borderRadius:"6px 6px 2px 2px",
                       transition:"height 0.6s cubic-bezier(0.34,1.2,0.64,1)"}}/>
                   </div>
@@ -1289,22 +1304,22 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
         <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:2}}>Cash Flow</div>
         <div style={{fontSize:11,color:"#52525b",marginBottom:16}}>Capital cycle, {periodLabel}</div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:12,marginBottom:18}}>
-          <div><div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Money Invested</div><div style={{fontSize:15,fontWeight:700,color:"#38bdf8",fontFamily:"monospace"}}>{fmt(invested)}</div></div>
-          <div><div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Money Recovered</div><div style={{fontSize:15,fontWeight:700,color:"#34d399",fontFamily:"monospace"}}>{fmt(recovered)}</div></div>
-          <div><div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Net Profit</div><div style={{fontSize:15,fontWeight:700,color:totalProfit>=0?"#34d399":"#f87171",fontFamily:"monospace"}}>{totalProfit>=0?"+":""}{fmt(totalProfit)}</div></div>
-          <div><div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Cash Position</div><div style={{fontSize:15,fontWeight:700,color:"#fff",fontFamily:"monospace"}}>{fmt(cashOnHand)}</div></div>
+          <div><div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Money Invested</div><div style={{fontSize:15,fontWeight:700,color:"#38bdf8",fontFamily:"'Fira Code',monospace"}}>{fmt(invested)}</div></div>
+          <div><div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Money Recovered</div><div style={{fontSize:15,fontWeight:700,color:"#34d399",fontFamily:"'Fira Code',monospace"}}>{fmt(recovered)}</div></div>
+          <div><div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Net Profit</div><div style={{fontSize:15,fontWeight:700,color:totalProfit>=0?"#34d399":"#f87171",fontFamily:"'Fira Code',monospace"}}>{totalProfit>=0?"+":""}{fmt(totalProfit)}</div></div>
+          <div><div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Cash Position</div><div style={{fontSize:15,fontWeight:700,color:"#fff",fontFamily:"'Fira Code',monospace"}}>{fmt(cashOnHand)}</div></div>
         </div>
         <CapitalFlowDiagram invested={invested} inventoryVal={inventoryMarketValue} recovered={recovered} profit={totalProfit}/>
 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:18,paddingTop:16,borderTop:"1px solid #1f1f23"}}>
           <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:9,padding:11}}>
             <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Personal Wallet</div>
-            <div style={{fontSize:15,fontWeight:700,color:"#a78bfa",fontFamily:"monospace"}}>{fmt(personalCash)}</div>
+            <div style={{fontSize:15,fontWeight:700,color:"#a78bfa",fontFamily:"'Fira Code',monospace"}}>{fmt(personalCash)}</div>
             <div style={{fontSize:9,color:"#52525b",marginTop:2}}>owner's pocket money — not business capital</div>
           </div>
           <div style={{background:fundsToRecover>0?"rgba(245,158,11,0.08)":"#09090b",border:`1px solid ${fundsToRecover>0?"rgba(245,158,11,0.25)":"#27272a"}`,borderRadius:9,padding:11}}>
             <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Funds to Recover</div>
-            <div style={{fontSize:15,fontWeight:700,color:fundsToRecover>0?"#fbbf24":"#71717a",fontFamily:"monospace"}}>{fmt(fundsToRecover)}</div>
+            <div style={{fontSize:15,fontWeight:700,color:fundsToRecover>0?"#fbbf24":"#71717a",fontFamily:"'Fira Code',monospace"}}>{fmt(fundsToRecover)}</div>
             <div style={{fontSize:9,color:"#52525b",marginTop:2}}>lifetime personal draws from the business</div>
           </div>
         </div>
@@ -1335,7 +1350,7 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
             ["Cash Conversion",avgDaysToSell!==null?`~${avgDaysToSell}d`:"—","#a78bfa","≈ days to sell — cash purchases, cash sales"],
           ].map(([l,v,c,sub])=>(
             <div key={l}>
-              <div style={{fontSize:19,fontWeight:800,fontFamily:"monospace",color:c}}>{v}</div>
+              <div style={{fontSize:19,fontWeight:800,fontFamily:"'Fira Code',monospace",color:c}}>{v}</div>
               <div style={{fontSize:10,color:"#d4d4d8",fontWeight:600,marginTop:3}}>{l}</div>
               <div style={{fontSize:9.5,color:"#52525b",marginTop:2,lineHeight:1.35}}>{sub}</div>
             </div>
@@ -1349,7 +1364,7 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
         )}
         {writeOffCount>0&&(
           <div style={{fontSize:11,color:"#71717a",marginTop:14,paddingTop:12,borderTop:"1px solid #1f1f23"}}>
-            {writeOffCount} write-off{writeOffCount===1?"":"s"} recorded · <span style={{color:"#f87171",fontFamily:"monospace"}}>{fmt(-writeOffLoss)}</span> lifetime loss
+            {writeOffCount} write-off{writeOffCount===1?"":"s"} recorded · <span style={{color:"#f87171",fontFamily:"'Fira Code',monospace"}}>{fmt(-writeOffLoss)}</span> lifetime loss
           </div>
         )}
       </Card>
@@ -1358,7 +1373,7 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
       <Card>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:2}}>
           <div style={{fontSize:11,color:"#71717a",textTransform:"uppercase",letterSpacing:"0.1em"}}>Profit Analytics</div>
-          <div style={{fontSize:11,color:totalProfit>=0?"#34d399":"#f87171",fontFamily:"monospace"}}>{totalProfit>=0?"+":""}{fmt(totalProfit)} {periodLabel}</div>
+          <div style={{fontSize:11,color:totalProfit>=0?"#34d399":"#f87171",fontFamily:"'Fira Code',monospace"}}>{totalProfit>=0?"+":""}{fmt(totalProfit)} {periodLabel}</div>
         </div>
         <div style={{fontSize:11,color:"#52525b",marginBottom:12}}>Running profit across {sales.length} sale{sales.length===1?"":"s"} in the selected period</div>
         {cumPoints.length>1
@@ -1368,22 +1383,22 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginTop:20,paddingTop:16,borderTop:"1px solid #1f1f23"}}>
           <div>
             <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Monthly Profit</div>
-            <div style={{fontSize:16,fontWeight:700,color:thisMonthProfit>=0?"#34d399":"#f87171",fontFamily:"monospace"}}>{thisMonthProfit>=0?"+":""}{fmt(thisMonthProfit)}</div>
+            <div style={{fontSize:16,fontWeight:700,color:thisMonthProfit>=0?"#34d399":"#f87171",fontFamily:"'Fira Code',monospace"}}>{thisMonthProfit>=0?"+":""}{fmt(thisMonthProfit)}</div>
             <div style={{fontSize:9,color:"#52525b",marginTop:2}}>current calendar month, always</div>
           </div>
           <div>
             <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Best Month Ever</div>
-            <div style={{fontSize:16,fontWeight:700,color:"#34d399",fontFamily:"monospace"}}>{bestMonth?fmt(bestMonth.profit):"—"}</div>
+            <div style={{fontSize:16,fontWeight:700,color:"#34d399",fontFamily:"'Fira Code',monospace"}}>{bestMonth?fmt(bestMonth.profit):"—"}</div>
             <div style={{fontSize:9,color:"#52525b",marginTop:2}}>{bestMonth?bestMonth.label:"not enough data yet"}</div>
           </div>
           <div>
             <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Avg. Profit / Sale</div>
-            <div style={{fontSize:16,fontWeight:700,color:avgProfitPerSale>=0?"#34d399":"#f87171",fontFamily:"monospace"}}>{sales.length?`${avgProfitPerSale>=0?"+":""}${fmt(Math.round(avgProfitPerSale))}`:"—"}</div>
+            <div style={{fontSize:16,fontWeight:700,color:avgProfitPerSale>=0?"#34d399":"#f87171",fontFamily:"'Fira Code',monospace"}}>{sales.length?`${avgProfitPerSale>=0?"+":""}${fmt(Math.round(avgProfitPerSale))}`:"—"}</div>
             <div style={{fontSize:9,color:"#52525b",marginTop:2}}>{periodLabel}</div>
           </div>
           <div>
             <div style={{fontSize:10,color:"#a1a1aa",marginBottom:2}}>Highest Profit Sale</div>
-            <div style={{fontSize:16,fontWeight:700,color:"#34d399",fontFamily:"monospace"}}>{highestProfitSale?`+${fmt(highestProfitSale.profit)}`:"—"}</div>
+            <div style={{fontSize:16,fontWeight:700,color:"#34d399",fontFamily:"'Fira Code',monospace"}}>{highestProfitSale?`+${fmt(highestProfitSale.profit)}`:"—"}</div>
             <div style={{fontSize:9,color:"#52525b",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{highestProfitSale?highestProfitSale.name:periodLabel}</div>
           </div>
         </div>
@@ -1402,7 +1417,7 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
                 <div key={cat}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
                     <span style={{fontSize:12,color:"#d4d4d8"}}>{cat} <span style={{color:"#52525b"}}>({v.count} sold)</span></span>
-                    <span style={{fontSize:12,fontFamily:"monospace",fontWeight:700,color:positive?"#34d399":"#f87171"}}>{positive?"+":""}{fmt(v.profit)}</span>
+                    <span style={{fontSize:12,fontFamily:"'Fira Code',monospace",fontWeight:700,color:positive?"#34d399":"#f87171"}}>{positive?"+":""}{fmt(v.profit)}</span>
                   </div>
                   <div style={{height:5,background:"#1f1f23",borderRadius:99}}>
                     <div style={{height:"100%",width:`${w}%`,background:positive?"#34d399":"#f87171",borderRadius:99,transition:"width 0.7s cubic-bezier(0.34,1.2,0.64,1)"}}/>
@@ -1459,11 +1474,11 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
                 {sortedTx.map(r=>(
                   <tr key={r.id} style={{borderBottom:"1px solid #1a1a1d"}}>
                     <td style={{padding:"9px 10px",color:"#d4d4d8",maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name}</td>
-                    <td style={{padding:"9px 10px",textAlign:"right",color:"#a1a1aa",fontFamily:"monospace"}}>{fmt(r.cost)}</td>
-                    <td style={{padding:"9px 10px",textAlign:"right",color:"#d4d4d8",fontFamily:"monospace"}}>{fmt(r.salePrice)}</td>
-                    <td style={{padding:"9px 10px",textAlign:"right",color:r.profit>=0?"#34d399":"#f87171",fontFamily:"monospace",fontWeight:700}}>{r.profit>=0?"+":""}{fmt(r.profit)}</td>
-                    <td style={{padding:"9px 10px",textAlign:"right",color:r.roi>=0?"#34d399":"#f87171",fontFamily:"monospace"}}>{pct(r.roi)}</td>
-                    <td style={{padding:"9px 10px",textAlign:"right",color:"#71717a",fontFamily:"monospace"}}>{r.days!==null?`${r.days}d`:"—"}</td>
+                    <td style={{padding:"9px 10px",textAlign:"right",color:"#a1a1aa",fontFamily:"'Fira Code',monospace"}}>{fmt(r.cost)}</td>
+                    <td style={{padding:"9px 10px",textAlign:"right",color:"#d4d4d8",fontFamily:"'Fira Code',monospace"}}>{fmt(r.salePrice)}</td>
+                    <td style={{padding:"9px 10px",textAlign:"right",color:r.profit>=0?"#34d399":"#f87171",fontFamily:"'Fira Code',monospace",fontWeight:700}}>{r.profit>=0?"+":""}{fmt(r.profit)}</td>
+                    <td style={{padding:"9px 10px",textAlign:"right",color:r.roi>=0?"#34d399":"#f87171",fontFamily:"'Fira Code',monospace"}}>{pct(r.roi)}</td>
+                    <td style={{padding:"9px 10px",textAlign:"right",color:"#71717a",fontFamily:"'Fira Code',monospace"}}>{r.days!==null?`${r.days}d`:"—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1495,7 +1510,7 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
                   <div key={b.id}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
                       <span style={{fontSize:13,color:"#d4d4d8",fontWeight:500}}>{b.name}</span>
-                      <span style={{fontSize:12,color:"#71717a",fontFamily:"monospace"}}>{fmt(b.recoveredAmt)} / {fmt(b.purchasePrice)}</span>
+                      <span style={{fontSize:12,color:"#71717a",fontFamily:"'Fira Code',monospace"}}>{fmt(b.recoveredAmt)} / {fmt(b.purchasePrice)}</span>
                     </div>
                     <div style={{height:5,background:"#1f1f23",borderRadius:99}}>
                       <div style={{height:"100%",width:`${recPct}%`,background:recPct>=100?"#34d399":"#7c3aed",borderRadius:99,transition:"width 0.8s ease"}}/>
@@ -1676,10 +1691,10 @@ function Buy({state,dispatch,toast}) {
           {dealScore!==null&&(
             <div style={{marginTop:14,background:"#09090b",borderRadius:10,padding:14,border:"1px solid #27272a"}}>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:6}}>
-                <span style={{color:"#a1a1aa"}}>Market value</span><span style={{fontFamily:"monospace",color:"#fff"}}>{fmt(totalMarket)}</span>
+                <span style={{color:"#a1a1aa"}}>Market value</span><span style={{fontFamily:"'Fira Code',monospace",color:"#fff"}}>{fmt(totalMarket)}</span>
               </div>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:10}}>
-                <span style={{color:"#a1a1aa"}}>You pay</span><span style={{fontFamily:"monospace",color:"#fff"}}>{fmt(paid)}</span>
+                <span style={{color:"#a1a1aa"}}>You pay</span><span style={{fontFamily:"'Fira Code',monospace",color:"#fff"}}>{fmt(paid)}</span>
               </div>
               <DealBar score={dealScore}/>
               <div style={{marginTop:10,borderTop:"1px solid #27272a",paddingTop:8}}>
@@ -1688,7 +1703,7 @@ function Buy({state,dispatch,toast}) {
                   const share=totalMarket>0?mv/totalMarket:0;
                   return <div key={r.id} style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:3}}>
                     <span style={{color:"#71717a"}}>{r.name} ({pct(share)})</span>
-                    <span style={{fontFamily:"monospace",color:"#d4d4d8"}}>{fmt(share*paid)}</span>
+                    <span style={{fontFamily:"'Fira Code',monospace",color:"#d4d4d8"}}>{fmt(share*paid)}</span>
                   </div>;
                 })}
               </div>
@@ -1715,7 +1730,7 @@ function Buy({state,dispatch,toast}) {
             <div style={{marginTop:10,background:"#09090b",border:"1px solid #27272a",borderRadius:9,padding:"9px 12px",
               display:"flex",justifyContent:"space-between",fontSize:12}}>
               <span style={{color:"#a1a1aa"}}>{Math.max(1,parseInt(singleQty,10)||1)} units × {fmt(parseFloat(singleCost)||0)}</span>
-              <span style={{fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt((Math.max(1,parseInt(singleQty,10)||1))*(parseFloat(singleCost)||0))} total</span>
+              <span style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{fmt((Math.max(1,parseInt(singleQty,10)||1))*(parseFloat(singleCost)||0))} total</span>
             </div>
           )}
           {/* Notes field  (#3) */}
@@ -1773,7 +1788,7 @@ function PartDetailSheet({part,buildName,onClose,openLightbox,onQuickSell,onEdit
             ].map(([l,v,c],i)=>(
               <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:i<2?7:0,paddingTop:i===2?8:0,borderTop:i===2?"1px solid #27272a":"none"}}>
                 <span style={{color:"#a1a1aa"}}>{l}</span>
-                <span style={{fontFamily:"monospace",fontWeight:i===2?700:600,color:c}}>{v}</span>
+                <span style={{fontFamily:"'Fira Code',monospace",fontWeight:i===2?700:600,color:c}}>{v}</span>
               </div>
             ))}
           </div>
@@ -1857,12 +1872,12 @@ function PartGroupSheet({group,onClose,onViewUnit}) {
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
             <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:9,padding:10}}>
               <div style={{fontSize:10,color:"#a1a1aa"}}>Cost each</div>
-              <div style={{fontSize:14,fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(p.allocatedCost)}</div>
+              <div style={{fontSize:14,fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{fmt(p.allocatedCost)}</div>
               <div style={{fontSize:10,color:"#52525b",marginTop:2}}>Total {fmt(totalCost)}</div>
             </div>
             <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:9,padding:10}}>
               <div style={{fontSize:10,color:"#a1a1aa"}}>Market each</div>
-              <div style={{fontSize:14,fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(p.marketValue)}</div>
+              <div style={{fontSize:14,fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{fmt(p.marketValue)}</div>
               <div style={{fontSize:10,color:"#52525b",marginTop:2}}>Total {fmt(totalMarket)}</div>
             </div>
           </div>
@@ -1876,7 +1891,7 @@ function PartGroupSheet({group,onClose,onViewUnit}) {
                 borderRadius:9,background:"#09090b",border:"1px solid #27272a",cursor:"pointer",transition:"border-color 0.15s"}}
                 onMouseEnter={e=>{e.currentTarget.style.borderColor="#52525b";}}
                 onMouseLeave={e=>{e.currentTarget.style.borderColor="#27272a";}}>
-                <span style={{color:"#52525b",fontSize:11,fontFamily:"monospace",width:20,flexShrink:0}}>{i+1}</span>
+                <span style={{color:"#52525b",fontSize:11,fontFamily:"'Fira Code',monospace",width:20,flexShrink:0}}>{i+1}</span>
                 <PhotoThumb url={unit.photoUrl} size={28} seed={unit.id.length}/>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{color:"#d4d4d8",fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
@@ -2089,7 +2104,7 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
                         <span style={{color:"#d4d4d8",flex:1,minWidth:0}}>{p.name}</span>
                         <span style={{color:"#52525b",fontSize:10}}>{p.category}</span>
                         <Badge s={p.status}/>
-                        <span style={{fontFamily:"monospace",color:"#a1a1aa",fontSize:11}}>{fmt(p.allocatedCost)}</span>
+                        <span style={{fontFamily:"'Fira Code',monospace",color:"#a1a1aa",fontSize:11}}>{fmt(p.allocatedCost)}</span>
                       </div>
                     ))}
                   </div>
@@ -2136,7 +2151,7 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
                 </div>
                 <div style={{color:"#fff",fontWeight:600,fontSize:12.5,lineHeight:1.3,marginBottom:4,
                   display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.name}</div>
-                <div style={{fontFamily:"monospace",fontWeight:700,color:"#fff",fontSize:13}}>
+                <div style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff",fontSize:13}}>
                   {fmt(p.allocatedCost)}{count>1&&<span style={{color:"#71717a",fontWeight:500,fontSize:11}}> each</span>}
                 </div>
                 {count>1?(
@@ -2282,7 +2297,7 @@ function EditBuildPartsModal({build,state,dispatch,toast,onClose}) {
                             </div>
                             <div style={{color:"#fff",fontSize:12,fontWeight:600,lineHeight:1.3,marginBottom:3,
                               display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.name}</div>
-                            <div style={{fontFamily:"monospace",fontSize:11.5,color:"#d4d4d8"}}>{fmt(p.allocatedCost)}</div>
+                            <div style={{fontFamily:"'Fira Code',monospace",fontSize:11.5,color:"#d4d4d8"}}>{fmt(p.allocatedCost)}</div>
                           </div>
                         );
                       })}
@@ -2298,11 +2313,11 @@ function EditBuildPartsModal({build,state,dispatch,toast,onClose}) {
             <div style={{marginTop:4,paddingTop:12,borderTop:"1px solid #27272a",marginBottom:14}}>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
                 <span style={{color:"#a1a1aa"}}>Resulting part count</span>
-                <span style={{fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{keptParts.length+addedParts.length}</span>
+                <span style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{keptParts.length+addedParts.length}</span>
               </div>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}>
                 <span style={{color:"#a1a1aa"}}>Resulting total cost</span>
-                <span style={{fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(previewCost)}</span>
+                <span style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{fmt(previewCost)}</span>
               </div>
             </div>
           )}
@@ -2317,10 +2332,50 @@ function EditBuildPartsModal({build,state,dispatch,toast,onClose}) {
   );
 }
 
+function ReceiptPricePromptModal({buildName,onConfirm,onCancel}) {
+  const [price,setPrice]=useState("");
+  const submit=()=>{
+    const n=parseFloat(price);
+    if(!n||n<=0)return;
+    onConfirm(n);
+  };
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onCancel}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,padding:22,width:"100%",maxWidth:360,animation:"fadeUp 0.2s ease"}}>
+        <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:4}}>Make a Receipt</div>
+        <div style={{fontSize:12,color:"#71717a",marginBottom:16}}>
+          "{buildName}" hasn't sold yet — enter the price you're quoting, and each part will be scaled proportionally to add up to it.
+        </div>
+        <Inp label="Input Price (₱)" type="number" value={price} onChange={e=>setPrice(e.target.value)} placeholder="e.g. 32000" autoFocus/>
+        <div style={{display:"flex",gap:8,marginTop:14}}>
+          <Btn onClick={submit} disabled={!price||parseFloat(price)<=0} style={{flex:1}}>Generate</Btn>
+          <Btn variant="ghost" onClick={onCancel}>Cancel</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BuildDetailSheet({build,parts,onClose,openLightbox,onDissolve,onCopySpecs,onDelete,onEdit}) {
+  const [showReceiptPrompt,setShowReceiptPrompt]=useState(false);
+  const [buildReceipt,setBuildReceipt]=useState(null); // {rows,total} once a price has been entered
   const cost=parts.reduce((s,p)=>s+p.allocatedCost,0);
   const market=parts.reduce((s,p)=>s+p.marketValue,0);
   const potential=market-cost;
+
+  const generateBuildReceipt=(inputPrice)=>{
+    // Same weighted market-value distribution as the post-sale receipt — each part's share of
+    // the build's total market value is applied to the quoted price, so the lines always sum
+    // exactly to what was entered, without touching cost or profit anywhere in the output.
+    const totalMarket=parts.reduce((s,p)=>s+(p.marketValue||0),0);
+    const rows=parts.map(p=>{
+      const share=totalMarket>0?(p.marketValue||0)/totalMarket:(parts.length?1/parts.length:0);
+      return {...p,scaledPrice:share*inputPrice};
+    });
+    setBuildReceipt({rows,total:inputPrice});
+    setShowReceiptPrompt(false);
+  };
+
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
       <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",borderRadius:"18px 18px 0 0",width:"100%",maxWidth:520,
@@ -2354,7 +2409,7 @@ function BuildDetailSheet({build,parts,onClose,openLightbox,onDissolve,onCopySpe
             ].map(([l,v,c],i)=>(
               <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:i<2?7:0,paddingTop:i===2?8:0,borderTop:i===2?"1px solid #27272a":"none"}}>
                 <span style={{color:"#a1a1aa"}}>{l}</span>
-                <span style={{fontFamily:"monospace",fontWeight:i===2?700:600,color:c}}>{v}</span>
+                <span style={{fontFamily:"'Fira Code',monospace",fontWeight:i===2?700:600,color:c}}>{v}</span>
               </div>
             ))}
           </div>
@@ -2370,7 +2425,7 @@ function BuildDetailSheet({build,parts,onClose,openLightbox,onDissolve,onCopySpe
                     <div style={{color:"#fff",fontSize:13}}>{p.name}</div>
                     <div style={{color:"#71717a",fontSize:10}}>{p.category}</div>
                   </div>
-                  <span style={{fontFamily:"monospace",fontSize:12,color:"#d4d4d8"}}>{fmt(p.allocatedCost)}</span>
+                  <span style={{fontFamily:"'Fira Code',monospace",fontSize:12,color:"#d4d4d8"}}>{fmt(p.allocatedCost)}</span>
                 </div>
               ))}
             </div>
@@ -2384,6 +2439,7 @@ function BuildDetailSheet({build,parts,onClose,openLightbox,onDissolve,onCopySpe
           {/* Actions */}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <Btn variant="primary" onClick={onEdit} style={{width:"100%"}}>✏️ Edit Parts — Add or Remove</Btn>
+            <Btn variant="ghost" onClick={()=>setShowReceiptPrompt(true)} style={{width:"100%"}}>🧾 Make a Receipt</Btn>
             <Btn variant="ghost" onClick={onDissolve} style={{width:"100%"}}>↩️ Dissolve Build — Return Parts to Inventory</Btn>
             <Btn variant="ghost" onClick={onCopySpecs} style={{width:"100%"}}>📋 Copy Specs for Listing</Btn>
             <div style={{paddingTop:6,borderTop:"1px solid #27272a",marginTop:6}}>
@@ -2392,6 +2448,13 @@ function BuildDetailSheet({build,parts,onClose,openLightbox,onDissolve,onCopySpe
           </div>
         </div>
       </div>
+      {showReceiptPrompt&&(
+        <ReceiptPricePromptModal buildName={build.name} onCancel={()=>setShowReceiptPrompt(false)} onConfirm={generateBuildReceipt}/>
+      )}
+      {buildReceipt&&(
+        <ReceiptModal title={build.name} date={today()} total={buildReceipt.total}
+          receiptRows={buildReceipt.rows} onClose={()=>setBuildReceipt(null)}/>
+      )}
     </div>
   );
 }
@@ -2406,6 +2469,8 @@ function Builds({state,dispatch,toast,openLightbox}) {
   const [deletingBuild,setDeletingBuild]=useState(null);
   const [viewingBuild,setViewingBuild]=useState(null); // build shown in the detail sheet
   const [editingBuild,setEditingBuild]=useState(null); // build shown in the edit-parts modal
+  const [receiptPromptBuild,setReceiptPromptBuild]=useState(null); // build currently being asked "what price?"
+  const [buildReceipt,setBuildReceipt]=useState(null); // {rows,total,name} once a price has been entered
   // Domain Firewall: Builds must never see General Assets (phones, vehicles, etc.), only PC Parts.
   // This is enforced at the data-access layer here, not just hidden in the UI, so there's no path
   // for a non-PC item to end up selected into a build's partIds.
@@ -2451,6 +2516,19 @@ function Builds({state,dispatch,toast,openLightbox}) {
     );
   };
 
+  // Same weighted market-value distribution used everywhere else a receipt is generated — each
+  // part's share of the build's total market value is applied to the quoted price, so the lines
+  // always sum exactly to what was entered, with no cost or profit numbers anywhere in it.
+  const generateBuildReceipt=(build,bp,inputPrice)=>{
+    const totalMarket=bp.reduce((s,p)=>s+(p.marketValue||0),0);
+    const rows=bp.map(p=>{
+      const share=totalMarket>0?(p.marketValue||0)/totalMarket:(bp.length?1/bp.length:0);
+      return {...p,scaledPrice:share*inputPrice};
+    });
+    setBuildReceipt({rows,total:inputPrice,name:build.name});
+    setReceiptPromptBuild(null);
+  };
+
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
       {deletingBuild&&(
@@ -2474,6 +2552,14 @@ function Builds({state,dispatch,toast,openLightbox}) {
             onEdit={()=>{setEditingBuild(viewingBuild);setViewingBuild(null);}}/>
         );
       })()}
+      {receiptPromptBuild&&(
+        <ReceiptPricePromptModal buildName={receiptPromptBuild.name} onCancel={()=>setReceiptPromptBuild(null)}
+          onConfirm={(price)=>generateBuildReceipt(receiptPromptBuild,state.parts.filter(p=>receiptPromptBuild.partIds.includes(p.id)),price)}/>
+      )}
+      {buildReceipt&&(
+        <ReceiptModal title={buildReceipt.name} date={today()} total={buildReceipt.total}
+          receiptRows={buildReceipt.rows} onClose={()=>setBuildReceipt(null)}/>
+      )}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
         <div><h2 style={{color:"#fff",fontSize:20,fontWeight:700,margin:0}}>Builds</h2>
           <p style={{color:"#71717a",fontSize:13,margin:"4px 0 0"}}>Group parts into a sellable PC.</p></div>
@@ -2532,7 +2618,7 @@ function Builds({state,dispatch,toast,openLightbox}) {
                             </div>
                             <div style={{color:"#fff",fontSize:12,fontWeight:600,lineHeight:1.3,marginBottom:3,
                               display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.name}</div>
-                            <div style={{fontFamily:"monospace",fontSize:11.5,color:"#d4d4d8"}}>{fmt(p.allocatedCost)}</div>
+                            <div style={{fontFamily:"'Fira Code',monospace",fontSize:11.5,color:"#d4d4d8"}}>{fmt(p.allocatedCost)}</div>
                           </div>
                         );
                       })}
@@ -2552,16 +2638,16 @@ function Builds({state,dispatch,toast,openLightbox}) {
                   <div key={p.id} style={{display:"flex",alignItems:"center",gap:8,fontSize:12}}>
                     <PhotoThumb url={p.photoUrl} size={26} seed={p.id.length}/>
                     <span style={{color:"#d4d4d8",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</span>
-                    <span style={{fontFamily:"monospace",color:"#71717a"}}>{fmt(p.allocatedCost)}</span>
+                    <span style={{fontFamily:"'Fira Code',monospace",color:"#71717a"}}>{fmt(p.allocatedCost)}</span>
                     <button onClick={()=>toggle(p.id)} style={{background:"none",border:"none",color:"#52525b",cursor:"pointer",fontSize:14,padding:"2px 4px"}}>✕</button>
                   </div>
                 ))}
               </div>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}>
-                <span style={{color:"#a1a1aa"}}>Build cost so far</span><span style={{fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(buildCost)}</span>
+                <span style={{color:"#a1a1aa"}}>Build cost so far</span><span style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{fmt(buildCost)}</span>
               </div>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}>
-                <span style={{color:"#a1a1aa"}}>Market value</span><span style={{fontFamily:"monospace",color:"#d4d4d8"}}>{fmt(buildMarket)}</span>
+                <span style={{color:"#a1a1aa"}}>Market value</span><span style={{fontFamily:"'Fira Code',monospace",color:"#d4d4d8"}}>{fmt(buildMarket)}</span>
               </div>
             </div>
           )}
@@ -2600,9 +2686,25 @@ function Builds({state,dispatch,toast,openLightbox}) {
                     <div><div style={{color:"#fff",fontWeight:700,fontSize:15}}>{build.name}</div>
                       <div style={{color:"#71717a",fontSize:11,marginTop:2}}>{build.date} · {bp.length} parts</div></div>
                     <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(cost)}</div>
+                      <div style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{fmt(cost)}</div>
                       <div style={{fontSize:10,color:"#71717a"}}>market {fmt(market)}</div>
                     </div>
+                  </div>
+
+                  {/* Both stop propagation so tapping them doesn't also open the detail sheet
+                      underneath — these need to work as standalone quick actions right from the
+                      list, without requiring a trip into the build first. */}
+                  <div style={{display:"flex",gap:8,marginBottom:11}}>
+                    <button onClick={e=>{e.stopPropagation();setEditingBuild(build);}} style={{flex:1,
+                      background:"#27272a",border:"1px solid #3f3f46",borderRadius:9,padding:"8px 0",cursor:"pointer",
+                      color:"#d4d4d8",fontSize:12.5,fontWeight:600}}>
+                      ✏️ Edit Parts
+                    </button>
+                    <button onClick={e=>{e.stopPropagation();setReceiptPromptBuild(build);}} style={{flex:1,
+                      background:"#27272a",border:"1px solid #3f3f46",borderRadius:9,padding:"8px 0",cursor:"pointer",
+                      color:"#d4d4d8",fontSize:12.5,fontWeight:600}}>
+                      🧾 Make a Receipt
+                    </button>
                   </div>
 
                   {/* Component badge tags — core parts at a glance */}
@@ -2662,7 +2764,7 @@ function Sell({state,dispatch,toast,openLightbox}) {
     // sales.build_id wipes that link permanently; this snapshot is what still lets the
     // Parts Breakdown work even after that happens.
     const buildPartsSnapshot=mode==="build"&&tb
-      ?state.parts.filter(p=>tb.partIds.includes(p.id)).map(p=>({id:p.id,name:p.name,category:p.category,allocatedCost:p.allocatedCost,photoUrl:p.photoUrl}))
+      ?state.parts.filter(p=>tb.partIds.includes(p.id)).map(p=>({id:p.id,name:p.name,category:p.category,allocatedCost:p.allocatedCost,marketValue:p.marketValue,photoUrl:p.photoUrl}))
       :undefined;
     setTimeout(()=>{
       dispatch({type:"SELL",mode,id:selId,sale:{id:uid(),partId:mode==="part"?selId:null,buildId:mode==="build"?selId:null,name,cost,salePrice:sp,profit,buyerName:buyer,date:today(),
@@ -2696,7 +2798,7 @@ function Sell({state,dispatch,toast,openLightbox}) {
                 <>
                   <PhotoThumb url={selectedPhoto} size={34} seed={selId.length}/>
                   <span style={{color:"#fff",fontSize:13,flex:1}}>{selectedLabel}</span>
-                  <span style={{fontFamily:"monospace",fontSize:12,color:"#a1a1aa"}}>{mode==="part"?fmt(tp?.allocatedCost||0):""}</span>
+                  <span style={{fontFamily:"'Fira Code',monospace",fontSize:12,color:"#a1a1aa"}}>{mode==="part"?fmt(tp?.allocatedCost||0):""}</span>
                 </>
               ):<span style={{color:"#52525b",fontSize:13,flex:1}}>— choose —</span>}
               <span style={{color:"#71717a",fontSize:11}}>{pickerOpen?"▲":"▼"}</span>
@@ -2718,7 +2820,7 @@ function Sell({state,dispatch,toast,openLightbox}) {
                       onMouseLeave={e=>e.currentTarget.style.background=selId===item.id?"rgba(124,58,237,0.12)":"#18181b"}>
                       <PhotoThumb url={item.photoUrl} size={34} seed={item.id.length}/>
                       <span style={{color:"#fff",fontSize:13,flex:1}}>{item.name}</span>
-                      <span style={{fontFamily:"monospace",fontSize:12,color:"#a1a1aa"}}>{mode==="part"?fmt(item.allocatedCost):""}</span>
+                      <span style={{fontFamily:"'Fira Code',monospace",fontSize:12,color:"#a1a1aa"}}>{mode==="part"?fmt(item.allocatedCost):""}</span>
                     </button>
                   ))}
                 </div>
@@ -2760,7 +2862,7 @@ function Sell({state,dispatch,toast,openLightbox}) {
               ].map(([l,v,c],i)=>(
                 <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:i<2?6:0,paddingTop:i===2?8:0,borderTop:i===2?"1px solid #27272a":"none"}}>
                   <span style={{color:"#a1a1aa"}}>{l}</span>
-                  <span style={{fontFamily:"monospace",fontWeight:i===2?700:400,color:c}}>{v}</span>
+                  <span style={{fontFamily:"'Fira Code',monospace",fontWeight:i===2?700:400,color:c}}>{v}</span>
                 </div>
               ))}
             </div>
@@ -2919,12 +3021,12 @@ function History({state,dispatch,toast,openLightbox}) {
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
         <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14}}>
           <div style={{fontSize:10,color:"#a1a1aa",marginBottom:4}}>Business Wallet</div>
-          <div style={{fontSize:18,fontWeight:700,color:"#34d399",fontFamily:"monospace"}}>{fmt(state.businessCash||0)}</div>
+          <div style={{fontSize:18,fontWeight:700,color:"#34d399",fontFamily:"'Fira Code',monospace"}}>{fmt(state.businessCash||0)}</div>
           <div style={{fontSize:11,color:"#52525b",marginTop:4}}>for parts & builds</div>
         </div>
         <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14}}>
           <div style={{fontSize:10,color:"#a1a1aa",marginBottom:4}}>Personal Wallet</div>
-          <div style={{fontSize:18,fontWeight:700,color:"#38bdf8",fontFamily:"monospace"}}>{fmt(state.personalCash||0)}</div>
+          <div style={{fontSize:18,fontWeight:700,color:"#38bdf8",fontFamily:"'Fira Code',monospace"}}>{fmt(state.personalCash||0)}</div>
           <div style={{fontSize:11,color:"#52525b",marginTop:4}}>your separate personal funds</div>
         </div>
       </div>
@@ -2994,7 +3096,7 @@ function History({state,dispatch,toast,openLightbox}) {
                     <div style={{color:"#fff",fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.description}</div>
                     <div style={{color:"#71717a",fontSize:11,marginTop:2}}>{t.date}</div>
                   </div>
-                  <div style={{fontFamily:"monospace",fontWeight:700,fontSize:14,color:t._positive?"#34d399":"#f87171",whiteSpace:"nowrap"}}>
+                  <div style={{fontFamily:"'Fira Code',monospace",fontWeight:700,fontSize:14,color:t._positive?"#34d399":"#f87171",whiteSpace:"nowrap"}}>
                     {t._positive?"+":"-"}{fmt(t.amount)}
                   </div>
                 </div>
@@ -3060,7 +3162,7 @@ function History({state,dispatch,toast,openLightbox}) {
                     </div>
                     <div style={{color:"#fff",fontWeight:600,fontSize:12.5,lineHeight:1.3,marginBottom:4,
                       display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{s.name}</div>
-                    <div style={{fontFamily:"monospace",fontWeight:700,color:"#fff",fontSize:13}}>{fmt(s.salePrice)}</div>
+                    <div style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff",fontSize:13}}>{fmt(s.salePrice)}</div>
                     <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#71717a",marginTop:2}}>
                       <span>{s.date}</span>
                       <span style={{color:s.profit>=0?"#34d399":"#f87171",fontWeight:600}}>{s.profit>=0?"+":""}{fmt(s.profit)}</span>
@@ -3082,6 +3184,7 @@ function History({state,dispatch,toast,openLightbox}) {
 ═══════════════════════════════════════════ */
 function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,onDelete}) {
   const [showBreakdown,setShowBreakdown]=useState(false);
+  const [showReceipt,setShowReceipt]=useState(false);
   const status=sale.deleted?"deleted":sale.returned?"returned":"completed";
   const statusColor={completed:"#6ee7b7",returned:"#fbbf24",deleted:"#71717a"}[status];
   const linkedPart=state.parts.find(p=>p.id===sale.partId);
@@ -3108,6 +3211,17 @@ function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,o
       allocatedProfit:costShare*sale.profit,
     };
   });
+
+  // Customer-facing receipt — deliberately a SEPARATE calculation from breakdownRows above.
+  // That one allocates by COST share (for the owner, to see which parts drove profit). This one
+  // allocates by MARKET VALUE share (for the customer, to see plausible per-item pricing) —
+  // scaled so every line item sums exactly to what they actually paid, with no cost, market
+  // value, or profit numbers anywhere in the output.
+  const totalMarketValue=buildParts.reduce((s,p)=>s+(p.marketValue||0),0);
+  const receiptRows=buildParts.map(p=>{
+    const marketShare=totalMarketValue>0?(p.marketValue||0)/totalMarketValue:(buildParts.length?1/buildParts.length:0);
+    return {...p,scaledPrice:marketShare*sale.salePrice};
+  });
   const img=sale.proofPhotoUrl||linkedPart?.photoUrl||linkedBuild?.photoUrl;
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
@@ -3133,7 +3247,7 @@ function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,o
             ].map(([l,v,c],i)=>(
               <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:i<2?7:0,paddingTop:i===2?8:0,borderTop:i===2?"1px solid #27272a":"none"}}>
                 <span style={{color:"#a1a1aa"}}>{l}</span>
-                <span style={{fontFamily:"monospace",fontWeight:i===2?700:600,color:c}}>{v}</span>
+                <span style={{fontFamily:"'Fira Code',monospace",fontWeight:i===2?700:600,color:c}}>{v}</span>
               </div>
             ))}
           </div>
@@ -3168,20 +3282,20 @@ function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,o
                             <div style={{color:"#fff",fontSize:12.5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
                             <div style={{color:"#71717a",fontSize:10}}>{p.category}</div>
                           </div>
-                          <span style={{fontFamily:"monospace",fontSize:12.5,color:"#d4d4d8",flexShrink:0}}>{fmt(p.allocatedCost)}</span>
+                          <span style={{fontFamily:"'Fira Code',monospace",fontSize:12.5,color:"#d4d4d8",flexShrink:0}}>{fmt(p.allocatedCost)}</span>
                         </div>
                         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,paddingLeft:39}}>
                           <div>
                             <div style={{fontSize:9,color:"#52525b"}}>% of cost</div>
-                            <div style={{fontSize:12,fontFamily:"monospace",color:"#a78bfa",fontWeight:600}}>{pct(p.costSharePct)}</div>
+                            <div style={{fontSize:12,fontFamily:"'Fira Code',monospace",color:"#a78bfa",fontWeight:600}}>{pct(p.costSharePct)}</div>
                           </div>
                           <div>
                             <div style={{fontSize:9,color:"#52525b"}}>Alloc. sale</div>
-                            <div style={{fontSize:12,fontFamily:"monospace",color:"#d4d4d8",fontWeight:600}}>{fmt(p.allocatedSale)}</div>
+                            <div style={{fontSize:12,fontFamily:"'Fira Code',monospace",color:"#d4d4d8",fontWeight:600}}>{fmt(p.allocatedSale)}</div>
                           </div>
                           <div>
                             <div style={{fontSize:9,color:"#52525b"}}>Alloc. profit</div>
-                            <div style={{fontSize:12,fontFamily:"monospace",color:p.allocatedProfit>=0?"#34d399":"#f87171",fontWeight:600}}>
+                            <div style={{fontSize:12,fontFamily:"'Fira Code',monospace",color:p.allocatedProfit>=0?"#34d399":"#f87171",fontWeight:600}}>
                               {p.allocatedProfit>=0?"+":""}{fmt(p.allocatedProfit)}
                             </div>
                           </div>
@@ -3192,18 +3306,22 @@ function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,o
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginTop:12,paddingTop:10,borderTop:"1px solid #27272a"}}>
                     <div>
                       <div style={{fontSize:9,color:"#71717a"}}>Total cost</div>
-                      <div style={{fontSize:12.5,fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(totalPartsCost)}</div>
+                      <div style={{fontSize:12.5,fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{fmt(totalPartsCost)}</div>
                     </div>
                     <div>
                       <div style={{fontSize:9,color:"#71717a"}}>Total sale</div>
-                      <div style={{fontSize:12.5,fontFamily:"monospace",fontWeight:700,color:"#fff"}}>{fmt(sale.salePrice)}</div>
+                      <div style={{fontSize:12.5,fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#fff"}}>{fmt(sale.salePrice)}</div>
                     </div>
                     <div>
                       <div style={{fontSize:9,color:"#71717a"}}>Total profit</div>
-                      <div style={{fontSize:12.5,fontFamily:"monospace",fontWeight:700,color:sale.profit>=0?"#34d399":"#f87171"}}>
+                      <div style={{fontSize:12.5,fontFamily:"'Fira Code',monospace",fontWeight:700,color:sale.profit>=0?"#34d399":"#f87171"}}>
                         {sale.profit>=0?"+":""}{fmt(sale.profit)}
                       </div>
                     </div>
+                  </div>
+                  <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid #27272a"}}>
+                    <Btn variant="primary" onClick={()=>setShowReceipt(true)} style={{width:"100%"}}>🧾 Generate Receipt</Btn>
+                    <div style={{fontSize:9.5,color:"#52525b",marginTop:6,textAlign:"center"}}>Customer-facing invoice — no cost or profit info included</div>
                   </div>
                 </div>
               ))}
@@ -3233,6 +3351,75 @@ function TransactionDetailSheet({sale,state,openLightbox,onClose,onEdit,onUndo,o
               </div>
             </div>
           )}
+        </div>
+      </div>
+      {showReceipt&&<ReceiptModal title={sale.name} subtitle={sale.buyerName?`For ${sale.buyerName}`:undefined} date={sale.date} total={sale.salePrice} receiptRows={receiptRows} onClose={()=>setShowReceipt(false)}/>}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   RECEIPT MODAL — customer-facing invoice. Deliberately shows ONLY item names and
+   scaled prices that sum to what the customer actually paid — no cost, no market
+   value, no profit anywhere. Scaling is by market-value share (see receiptRows in
+   TransactionDetailSheet), not cost share, since a receipt should reflect plausible
+   retail-style pricing per component, not the owner's internal cost structure.
+═══════════════════════════════════════════ */
+function ReceiptModal({title,subtitle,date,total,label,receiptRows,onClose}) {
+  const [copied,setCopied]=useState(false);
+
+  const copyReceipt=()=>{
+    const lines=[
+      title,
+      "",
+      ...receiptRows.map(p=>`${p.name}: ${fmt(p.scaledPrice)}`),
+      "",
+      `Total: ${fmt(total)}`,
+    ];
+    const text=lines.join("\n");
+    navigator.clipboard?.writeText(text).then(
+      ()=>{setCopied(true);setTimeout(()=>setCopied(false),2000);},
+      ()=>{}
+    );
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:1600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#18181b",border:"1px solid #3f3f46",borderRadius:16,
+        width:"100%",maxWidth:400,animation:"fadeUp 0.2s ease",overflow:"hidden"}}>
+        <div style={{padding:"20px 22px 16px",borderBottom:"1px solid #27272a"}}>
+          <div style={{color:"#71717a",fontSize:10,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:4}}>{label||"Sales Receipt"}</div>
+          <div style={{color:"#fff",fontWeight:700,fontSize:17}}>{title}</div>
+          {subtitle&&<div style={{color:"#a1a1aa",fontSize:12,marginTop:3}}>{subtitle}</div>}
+          {date&&<div style={{color:"#52525b",fontSize:11,marginTop:2}}>{date}</div>}
+        </div>
+
+        <div style={{padding:"16px 22px"}}>
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
+            {receiptRows.map(p=>(
+              <div key={p.id} style={{display:"flex",alignItems:"center",gap:10}}>
+                {p.photoUrl?(
+                  <PhotoThumb url={p.photoUrl} size={34} seed={p.id.length}/>
+                ):(
+                  <div style={{width:34,height:34,flexShrink:0,borderRadius:7,background:"#09090b",border:"1px solid #27272a",
+                    display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    <span style={{fontSize:14,opacity:0.3}}>🔧</span>
+                  </div>
+                )}
+                <span style={{flex:1,color:"#d4d4d8",fontSize:13.5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</span>
+                <span style={{fontFamily:"'Fira Code',monospace",fontSize:14,color:"#fff",fontWeight:600,flexShrink:0}}>{fmt(p.scaledPrice)}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",paddingTop:14,borderTop:"1px solid #27272a"}}>
+            <span style={{color:"#fff",fontWeight:700,fontSize:15}}>Total</span>
+            <span style={{fontFamily:"'Fira Code',monospace",fontWeight:800,fontSize:19,color:"#fff"}}>{fmt(total)}</span>
+          </div>
+        </div>
+
+        <div style={{padding:"0 22px 20px",display:"flex",flexDirection:"column",gap:8}}>
+          <Btn onClick={copyReceipt} style={{width:"100%"}}>{copied?"✓ Copied":"📋 Copy Receipt Text"}</Btn>
+          <Btn variant="ghost" onClick={onClose} style={{width:"100%"}}>Close</Btn>
         </div>
       </div>
     </div>
@@ -3358,12 +3545,12 @@ function Settings({state,dispatch,toast,theme,setTheme}) {
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
           <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14}}>
             <div style={{fontSize:10,color:"#a1a1aa",marginBottom:4}}>Business Wallet</div>
-            <div style={{fontSize:18,fontWeight:700,color:"#34d399",fontFamily:"monospace"}}>{fmt(state.businessCash||0)}</div>
+            <div style={{fontSize:18,fontWeight:700,color:"#34d399",fontFamily:"'Fira Code',monospace"}}>{fmt(state.businessCash||0)}</div>
             <div style={{fontSize:11,color:"#52525b",marginTop:4}}>Used for buying & selling parts</div>
           </div>
           <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:11,padding:14}}>
             <div style={{fontSize:10,color:"#a1a1aa",marginBottom:4}}>Personal Wallet</div>
-            <div style={{fontSize:18,fontWeight:700,color:"#38bdf8",fontFamily:"monospace"}}>{fmt(state.personalCash||0)}</div>
+            <div style={{fontSize:18,fontWeight:700,color:"#38bdf8",fontFamily:"'Fira Code',monospace"}}>{fmt(state.personalCash||0)}</div>
             <div style={{fontSize:11,color:"#52525b",marginTop:4}}>Your separate personal funds</div>
           </div>
         </div>
@@ -3402,6 +3589,7 @@ function Settings({state,dispatch,toast,theme,setTheme}) {
    APP ROOT
 ═══════════════════════════════════════════ */
 const ALL_TABS=["Dashboard","Buy","Inventory","Builds","Sell","History","Settings"];
+const TAB_ICONS={Dashboard:"🏠",Buy:"🛒",Inventory:"📦",Builds:"🖥️",Sell:"💰",History:"📜",Settings:"⚙️"};
 
 /* ═══════════════════════════════════════════
    QUICK ACTIONS FAB — floating [+] button with a radial menu for Quick Buy / Quick Sell / Note.
@@ -3422,7 +3610,7 @@ function QuickActionsFab({state,dispatch,toast}) {
     <>
       {open&&<div onClick={()=>setOpen(false)} style={{position:"fixed",inset:0,zIndex:899,background:"rgba(0,0,0,0.35)"}}/>}
 
-      <div style={{position:"fixed",right:18,bottom:"calc(20px + env(safe-area-inset-bottom))",zIndex:900,
+      <div style={{position:"fixed",right:18,bottom:"calc(78px + env(safe-area-inset-bottom))",zIndex:900,
         display:"flex",flexDirection:"column",alignItems:"flex-end",gap:12}}>
         {open&&actions.map((a,i)=>(
           <button key={a.key} onClick={()=>{setModal(a.key);setOpen(false);}}
@@ -3508,7 +3696,7 @@ function QuickSellPickerModal({state,dispatch,toast,onClose}) {
   const submit=()=>{
     if(!selected||!salePrice){toast("Pick an item and enter a price","error");return;}
     const buildPartsSnapshot=selected.mode==="build"
-      ?state.parts.filter(p=>builds.find(b=>b.id===selected.id)?.partIds.includes(p.id)).map(p=>({id:p.id,name:p.name,category:p.category,allocatedCost:p.allocatedCost,photoUrl:p.photoUrl}))
+      ?state.parts.filter(p=>builds.find(b=>b.id===selected.id)?.partIds.includes(p.id)).map(p=>({id:p.id,name:p.name,category:p.category,allocatedCost:p.allocatedCost,marketValue:p.marketValue,photoUrl:p.photoUrl}))
       :undefined;
     dispatch({type:"SELL",mode:selected.mode,id:selected.id,sale:{id:uid(),
       partId:selected.mode==="part"?selected.id:null,buildId:selected.mode==="build"?selected.id:null,
@@ -3533,7 +3721,7 @@ function QuickSellPickerModal({state,dispatch,toast,onClose}) {
                   <button key={it.id} onClick={()=>setSelId(it.id)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
                     width:"100%",background:"#09090b",border:"1px solid #27272a",borderRadius:8,padding:"9px 12px",cursor:"pointer",textAlign:"left"}}>
                     <span style={{color:"#fff",fontSize:13}}>{it.mode==="build"?"🖥️ ":"🔧 "}{it.name}</span>
-                    <span style={{fontFamily:"monospace",fontSize:12,color:"#71717a"}}>{fmt(it.cost)}</span>
+                    <span style={{fontFamily:"'Fira Code',monospace",fontSize:12,color:"#71717a"}}>{fmt(it.cost)}</span>
                   </button>
                 ))}
               </div>
@@ -3761,7 +3949,6 @@ export default function App() {
           .part-row{grid-template-columns:1fr !important;gap:8px !important;}
           .header-stats{gap:10px !important;}
           .header-stats .stat-label{font-size:9px !important;}
-          .tab-bar-inner button{padding:11px 11px !important;font-size:12.5px !important;}
         }
       `}</style>
       <ToastContainer toasts={toasts}/>
@@ -3778,9 +3965,9 @@ export default function App() {
           </div>
           <div className="header-stats" style={{display:"flex",gap:14,textAlign:"center",flexShrink:0}}>
             <div><div className="stat-label" style={{fontSize:10,color:sub}}>Parts</div>
-              <div style={{fontFamily:"monospace",fontWeight:700,color:txt,fontSize:13}}><AnimNum value={state.parts.length}/></div></div>
+              <div style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:txt,fontSize:13}}><AnimNum value={state.parts.length}/></div></div>
             <div><div className="stat-label" style={{fontSize:10,color:sub}}>Profit</div>
-              <div style={{fontFamily:"monospace",fontWeight:700,color:"#22c55e",fontSize:13}}>{fmt(state.sales.filter(s=>!s.deleted&&!s.returned).reduce((s,x)=>s+x.profit,0))}</div></div>
+              <div style={{fontFamily:"'Fira Code',monospace",fontWeight:700,color:"#22c55e",fontSize:13}}>{fmt(state.sales.filter(s=>!s.deleted&&!s.returned).reduce((s,x)=>s+x.profit,0))}</div></div>
             <div><div className="stat-label" style={{fontSize:10,color:sub}}>Status</div>
               <div style={{fontSize:10.5,fontWeight:600,color:saveStatus==="saving"?"#eab308":saveStatus==="error"?"#ef4444":"#22c55e",whiteSpace:"nowrap"}}>
                 {saveStatus==="saving"?"Saving…":saveStatus==="error"?"Save failed":"Synced ✓"}
@@ -3790,20 +3977,27 @@ export default function App() {
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div style={{borderBottom:`1px solid ${border}`,overflowX:"auto",background:surface,WebkitOverflowScrolling:"touch"}}>
-        <div className="tab-bar-inner" style={{maxWidth:740,margin:"0 auto",display:"flex"}}>
-          {ALL_TABS.map(t=>(
-            <button key={t} onClick={()=>setTab(t)} style={{
-              padding:"11px 14px",fontSize:13,fontWeight:500,border:"none",cursor:"pointer",background:"none",
-              whiteSpace:"nowrap",transition:"all 0.15s",flexShrink:0,
-              color:tab===t?"#a78bfa":sub,
-              borderBottom:`2px solid ${tab===t?"#7c3aed":"transparent"}`,
-            }}
-              onMouseEnter={e=>{if(tab!==t)e.currentTarget.style.color=isDark?"#d4d4d8":"#18181b";}}
-              onMouseLeave={e=>{if(tab!==t)e.currentTarget.style.color=sub;}}
-            >{t}</button>
-          ))}
+      {/* Bottom nav — was a horizontal-scroll top bar that clipped/scrolled on narrow phones
+          ("Setting" getting cut off). Fixed-width flex items mean all 7 destinations always fit,
+          on any screen, with no scrolling and no overflow — this is the actual fix for that. */}
+      <div style={{position:"fixed",left:0,right:0,bottom:0,zIndex:850,borderTop:`1px solid ${border}`,
+        background:surface,paddingBottom:"env(safe-area-inset-bottom)"}}>
+        <div style={{maxWidth:740,margin:"0 auto",display:"flex"}}>
+          {ALL_TABS.map(t=>{
+            const active=tab===t;
+            return (
+              <button key={t} onClick={()=>setTab(t)} style={{
+                flex:1,minWidth:0,display:"flex",flexDirection:"column",alignItems:"center",gap:2,
+                padding:"9px 2px 8px",border:"none",background:"none",cursor:"pointer",
+                touchAction:"manipulation",WebkitTapHighlightColor:"transparent",
+                transition:"opacity 0.15s ease",opacity:active?1:0.65,
+              }}>
+                <span style={{fontSize:18,lineHeight:1,filter:active?"none":"grayscale(0.4)"}}>{TAB_ICONS[t]}</span>
+                <span style={{fontSize:9.5,fontWeight:active?700:500,color:active?"#a78bfa":sub,
+                  whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{t}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -3812,7 +4006,7 @@ export default function App() {
           switching tabs and coming back. The previous `key={tab}` also forced a full remount of
           this entire wrapper on every switch, which alone was enough to wipe any local form state
           even before considering the per-tab && conditionals — removed for the same reason. */}
-      <div style={{maxWidth:740,margin:"0 auto",padding:"22px 16px calc(40px + env(safe-area-inset-bottom))"}}>
+      <div style={{maxWidth:740,margin:"0 auto",padding:"22px 16px calc(84px + env(safe-area-inset-bottom))"}}>
         <div style={{display:tab==="Dashboard"?"block":"none"}}><Dashboard state={state} dispatch={dispatch} toast={toast} setTab={setTab} openLightbox={openLightbox}/></div>
         <div style={{display:tab==="Buy"?"block":"none"}}><Buy state={state} dispatch={dispatch} toast={toast}/></div>
         <div style={{display:tab==="Inventory"?"block":"none"}}><Inventory state={state} dispatch={dispatch} toast={toast} setTab={setTab} openLightbox={openLightbox}/></div>
