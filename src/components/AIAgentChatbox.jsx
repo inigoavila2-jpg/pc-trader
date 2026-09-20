@@ -875,7 +875,7 @@ For business strategy questions, offer thoughtful advice that considers pricing,
 
   if (historyError) {
     return (
-      <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 5000 }}>
+      <div style={{ position: 'fixed', bottom: 'calc(78px + env(safe-area-inset-bottom))', right: 20, zIndex: 5000 }}>
         <div style={{ background: '#ef4444', color: '#fff', padding: 12, borderRadius: 8, fontSize: 12, maxWidth: 280 }}>
           Chat error: {historyError}
         </div>
@@ -891,7 +891,7 @@ For business strategy questions, offer thoughtful advice that considers pricing,
       <button
         onClick={() => setOpen(!open)}
         style={{
-          position: 'fixed', bottom: 20, right: 20, width: 56, height: 56, borderRadius: '50%',
+          position: 'fixed', bottom: 'calc(78px + env(safe-area-inset-bottom))', right: 20, width: 56, height: 56, borderRadius: '50%',
           background: '#7c3aed', border: 'none', cursor: 'pointer', display: 'flex',
           alignItems: 'center', justifyContent: 'center', fontSize: 24,
           boxShadow: '0 8px 24px rgba(124,58,237,0.4)', zIndex: 4999,
