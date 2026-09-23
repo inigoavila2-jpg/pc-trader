@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo, memo, createContext, useContext, Fragment } from "react";
+import { useState, useEffect, useRef, useCallback, createContext, useContext, Fragment } from "react";
 import { AIAgentChatbox } from "./components/AIAgentChatbox";
 import {
   LayoutDashboard, ShoppingCart, Boxes, Wrench, Banknote, History as HistoryIcon, Settings as SettingsIcon,
@@ -403,7 +403,7 @@ const THEME = {
     bg:"#15161A", bgElevated:"#1B1C21",
     surface:"#1C1D22", surfaceSunken:"#0F1013", surfaceHover:"#232429",
     border:"#2C2E35", borderStrong:"#3B3D46",
-    text:"#F4F4F3", textMuted:"#B4B5BE", textFaint:"#8D8F99",
+    text:"#F4F4F3", textMuted:"#A8A9B3", textFaint:"#7B7D87",
     accent:"#CE7C3E", accentStrong:"#A85B22", accentSoft:"rgba(206,124,62,0.14)", accentSoftBorder:"rgba(206,124,62,0.38)",
     info:"#4FC2CC", infoStrong:"#1D8A96", infoSoft:"rgba(79,194,204,0.13)", infoSoftBorder:"rgba(79,194,204,0.36)",
     positive:"#3FC088", positiveStrong:"#167A4D", positiveSoft:"rgba(63,192,136,0.13)", positiveSoftBorder:"rgba(63,192,136,0.36)",
@@ -417,7 +417,7 @@ const THEME = {
     bg:"#F5F6F8", bgElevated:"#FFFFFF",
     surface:"#FFFFFF", surfaceSunken:"#EEF0F3", surfaceHover:"#F0F1F4",
     border:"#E2E4E9", borderStrong:"#CBCED6",
-    text:"#1B1C21", textMuted:"#43454E", textFaint:"#6B6D78",
+    text:"#1B1C21", textMuted:"#52545E", textFaint:"#82848F",
     accent:"#9A5220", accentStrong:"#8A481B", accentSoft:"rgba(154,82,32,0.08)", accentSoftBorder:"rgba(154,82,32,0.28)",
     info:"#127680", infoStrong:"#0F636C", infoSoft:"rgba(18,118,128,0.08)", infoSoftBorder:"rgba(18,118,128,0.28)",
     positive:"#187A4C", positiveStrong:"#136A41", positiveSoft:"rgba(24,122,76,0.08)", positiveSoftBorder:"rgba(24,122,76,0.28)",
@@ -547,7 +547,7 @@ function AnimNum({value}) {
    stays correct in both themes automatically.
 ═══════════════════════════════════════════ */
 const STATUS_LABEL = { available:"Available", in_build:"In a build", sold:"Sold", defective:"Defective" };
-const StatusBadge = memo(function StatusBadge({s}) {
+function StatusBadge({s}) {
   const t=useTheme();
   const tone=STATUS_TONE[s]||"neutral";
   const color=tone==="neutral"?t.textMuted:t[tone];
@@ -560,7 +560,7 @@ const StatusBadge = memo(function StatusBadge({s}) {
       {STATUS_LABEL[s]||s.replace("_"," ")}
     </span>
   );
-});
+}
 
 /* ═══════════════════════════════════════════
    PHOTO UPLOAD / THUMB / LIGHTBOX — same upload+compression pipeline, restyled,
@@ -661,7 +661,7 @@ function PhotoUpload({photoUrl,photoRecordId,onChange,label="Photo"}) {
   );
 }
 
-const PhotoThumb = memo(function PhotoThumb({url,size=52,seed=0,onClick,label}) {
+function PhotoThumb({url,size=52,seed=0,onClick,label}) {
   const t=useTheme();
   if(!url)return null;
   const tilt=((seed%5)-2)*1.6;
@@ -675,7 +675,7 @@ const PhotoThumb = memo(function PhotoThumb({url,size=52,seed=0,onClick,label}) 
       <img src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:7,border:`2px solid ${t.border}`,boxShadow:t.shadowSm,display:"block"}}/>
     </Tag>
   );
-});
+}
 
 function Lightbox({url,onClose}) {
   const t=useTheme();
@@ -905,7 +905,7 @@ function CategoryPicker({label,value,onChange,customCategories,dispatch,style}) 
 /* ═══════════════════════════════════════════
    STAT BOX — small metric tile used in History's analytics grid
 ═══════════════════════════════════════════ */
-const StatBox = memo(function StatBox({label,value,sub,color}) {
+function StatBox({label,value,sub,color}) {
   const t=useTheme();
   return (
     <div style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:12,padding:"13px 14px"}}>
@@ -914,7 +914,7 @@ const StatBox = memo(function StatBox({label,value,sub,color}) {
       {sub&&<div style={{fontSize:10.5,color:t.textFaint,marginTop:3}}>{sub}</div>}
     </div>
   );
-});
+}
 
 /* ═══════════════════════════════════════════
    SECTION HEADER — every card used to open with a stretched ALL-CAPS tracked
@@ -953,7 +953,7 @@ function PageHeader({title,sub,action}){
 /* ═══════════════════════════════════════════
    DEAL BAR — visual read on "market value vs. what you paid"
 ═══════════════════════════════════════════ */
-const DealBar = memo(function DealBar({score}) {
+function DealBar({score}) {
   const t=useTheme();
   const pctv=Math.min(100,Math.max(0,(score/2)*100));
   const tone=score>=1.3?t.positive:score>=1?t.info:t.negative;
@@ -969,7 +969,7 @@ const DealBar = memo(function DealBar({score}) {
       </div>
     </div>
   );
-});
+}
 
 /* ═══════════════════════════════════════════
    SEGMENTED — reusable pill toggle (Buy's Bundle/Single, Sell's mode switch, etc.)
@@ -1017,31 +1017,18 @@ function PeriodSwitch({period,setPeriod}) {
   );
 }
 
-const KPICard = memo(function KPICard({label,value,question,color,accent,trend}) {
+function KPICard({label,value,question,color,accent}) {
   const t=useTheme();
-  // trend is an optional signed fraction (e.g. 0.124 = +12.4%). Direction is the message —
-  // color and arrow both flip on sign, with a flat state for anything under half a percent.
-  const hasTrend=typeof trend==="number"&&isFinite(trend);
-  const flat=hasTrend&&Math.abs(trend)<0.005;
-  const trendColor=!hasTrend?t.textFaint:flat?t.textFaint:trend>0?t.positive:t.negative;
   return (
     <div style={{background:t.surface,border:`1px solid ${accent||t.border}`,borderRadius:14,padding:"16px 18px",minWidth:0}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:8}}>
-        <div style={{fontSize:11.5,color:t.textMuted,fontWeight:600}}>{label}</div>
-        {hasTrend&&(
-          <div style={{display:"flex",alignItems:"center",gap:2,fontSize:10.5,fontWeight:700,color:trendColor,fontFamily:FONT_MONO,flexShrink:0}}>
-            {!flat&&(trend>0?<ChevronUp size={12} strokeWidth={2.5}/>:<ChevronDown size={12} strokeWidth={2.5}/>)}
-            {pct(Math.abs(trend))}
-          </div>
-        )}
-      </div>
+      <div style={{fontSize:11.5,color:t.textMuted,fontWeight:600,marginBottom:8}}>{label}</div>
       <div style={{fontSize:22,fontWeight:700,fontFamily:FONT_MONO,color:color||t.text,letterSpacing:"-0.01em",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{value}</div>
       {question&&<div style={{fontSize:11,color:t.textFaint,marginTop:7,lineHeight:1.4}}>{question}</div>}
     </div>
   );
-});
+}
 
-const CapitalFlowDiagram = memo(function CapitalFlowDiagram({invested,inventoryVal,recovered,profit}) {
+function CapitalFlowDiagram({invested,inventoryVal,recovered,profit}) {
   const t=useTheme();
   const stages=[
     {label:"Cash in",sub:"capital deployed",value:invested,color:t.info},
@@ -1069,12 +1056,10 @@ const CapitalFlowDiagram = memo(function CapitalFlowDiagram({invested,inventoryV
       ))}
     </div>
   );
-});
+}
 
-const ProfitAreaChart = memo(function ProfitAreaChart({points,positive}) {
+function ProfitAreaChart({points,positive}) {
   const t=useTheme();
-  const [hover,setHover]=useState(null); // index of the nearest point, or null
-  const svgRef=useRef(null);
   if(points.length<2)return null;
   const max=Math.max(1,...points.map(Math.abs));
   const toXY=(v,i)=>{
@@ -1088,21 +1073,8 @@ const ProfitAreaChart = memo(function ProfitAreaChart({points,positive}) {
   const areaPath=`M${firstX},32 ${linePath.replace(/^M/,"L")} L${lastX},32 Z`;
   const color=positive?t.positive:t.negative;
   const gradId=`pg-${positive?"pos":"neg"}-${t.mode}`;
-
-  const handleMove=(e)=>{
-    if(!svgRef.current)return;
-    const rect=svgRef.current.getBoundingClientRect();
-    const relX=((e.clientX-rect.left)/rect.width)*100;
-    const idx=Math.round((relX/100)*(points.length-1));
-    setHover(Math.max(0,Math.min(points.length-1,idx)));
-  };
-  const hoverXY=hover!==null?toXY(points[hover],hover):null;
-
   return (
-    <svg ref={svgRef} viewBox="0 0 100 40" style={{width:"100%",height:96,display:"block",cursor:"crosshair"}} preserveAspectRatio="none"
-      role="img" aria-label="Cumulative profit trend"
-      onMouseMove={handleMove} onMouseLeave={()=>setHover(null)}
-      onTouchMove={(e)=>{if(e.touches[0])handleMove(e.touches[0]);}} onTouchEnd={()=>setHover(null)}>
+    <svg viewBox="0 0 100 40" style={{width:"100%",height:96,display:"block"}} preserveAspectRatio="none" aria-hidden="true">
       <defs>
         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.28"/>
@@ -1114,24 +1086,11 @@ const ProfitAreaChart = memo(function ProfitAreaChart({points,positive}) {
       ))}
       <path d={areaPath} fill={`url(#${gradId})`} stroke="none"/>
       <path d={linePath} fill="none" stroke={color} strokeWidth="1.4" vectorEffect="non-scaling-stroke"/>
-      {hoverXY&&(
-        <g style={{pointerEvents:"none"}}>
-          <line x1={hoverXY[0]} y1="0" x2={hoverXY[0]} y2="32" stroke={t.borderStrong} strokeWidth="0.4" vectorEffect="non-scaling-stroke"/>
-          <circle cx={hoverXY[0]} cy={hoverXY[1]} r="1.6" fill={t.bgElevated} stroke={color} strokeWidth="1" vectorEffect="non-scaling-stroke"/>
-          <foreignObject x={Math.min(Math.max(hoverXY[0]-16,0),68)} y={Math.max(hoverXY[1]-13,0)} width="32" height="11">
-            <div xmlns="http://www.w3.org/1999/xhtml" style={{fontSize:4.6,fontFamily:FONT_MONO,fontWeight:700,color:t.text,
-              background:t.bgElevated,border:`0.3px solid ${t.borderStrong}`,borderRadius:2,padding:"1px 2px",textAlign:"center",lineHeight:1.2,
-              whiteSpace:"nowrap",boxShadow:t.shadowSm}}>
-              {fmt(points[hover])}
-            </div>
-          </foreignObject>
-        </g>
-      )}
     </svg>
   );
-});
+}
 
-const HealthScoreRing = memo(function HealthScoreRing({score,tier}) {
+function HealthScoreRing({score,tier}) {
   const t=useTheme();
   const r=42, c=2*Math.PI*r;
   const filled=(score/100)*c;
@@ -1153,9 +1112,9 @@ const HealthScoreRing = memo(function HealthScoreRing({score,tier}) {
       </div>
     </div>
   );
-});
+}
 
-const SortHeader = memo(function SortHeader({label,active,dir,onClick,align}) {
+function SortHeader({label,active,dir,onClick,align}) {
   const t=useTheme();
   return (
     <th style={{padding:0,textAlign:align||"left"}}>
@@ -1168,7 +1127,7 @@ const SortHeader = memo(function SortHeader({label,active,dir,onClick,align}) {
       </button>
     </th>
   );
-});
+}
 function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
   const t=useTheme();
   const [addingExpense,setAddingExpense]=useState(false);
@@ -1179,12 +1138,6 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
   const [sortDir,setSortDir]=useState("desc");
   const {parts,bundles,builds}=state;
 
-  // Every derived figure on this screen — snapshot metrics, flow metrics, month-over-month,
-  // the profit trend chart, category breakdown, CFO insights, health score, and the sortable
-  // transaction table — used to be recomputed from scratch on every render, including on
-  // keystrokes in unrelated modals. It's all pure function of (state, period, sortKey, sortDir),
-  // so it's wrapped in one useMemo: recomputes only when one of those actually changes.
-  const metrics=useMemo(()=>{
   // Deleted sale records are kept (soft-delete, for History's filter) but must never count
   // toward live figures. Returned sales are excluded too — the money didn't stay made.
   const allSales=state.sales.filter(s=>!s.deleted&&!s.returned);
@@ -1339,31 +1292,12 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
     else{av=av??-Infinity;bv=bv??-Infinity;}
     return sortDir==="asc"?av-bv:bv-av;
   }).slice(0,12);
-
-  const periodLabel=period==="month"?"this month":period==="quarter"?"this quarter":"all time";
-
-  return {
-    allSales,sales,activeInventory,inventoryMarketValue,inventoryCost,cashOnHand,personalCash,netWorth,
-    fundsToRecover,isUnderCapital,available,inBuild,soldCount,totalCapitalAllTime,atRisk,recoveredCostAllTime,
-    writeOffLoss,writeOffCount,DEAD_DAYS,deadInventory,deadInventoryValue,invested,recovered,periodCOGS,
-    totalProfit,roi,inventoryTurnoverRate,avgProfitPerSale,highestProfitSale,avgDaysToSell,monthRows,
-    thisMonthProfit,lastMonthProfit,momGrowthPct,bestMonth,cumPoints,categoryRows,maxCatProfit,insights,
-    healthScore,healthTier,txRows,sortedTx,periodLabel,
-  };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[state,period,sortKey,sortDir,t]);
-  const {
-    allSales,sales,activeInventory,inventoryMarketValue,inventoryCost,cashOnHand,personalCash,netWorth,
-    fundsToRecover,isUnderCapital,available,inBuild,soldCount,totalCapitalAllTime,atRisk,recoveredCostAllTime,
-    writeOffLoss,writeOffCount,DEAD_DAYS,deadInventory,deadInventoryValue,invested,recovered,periodCOGS,
-    totalProfit,roi,inventoryTurnoverRate,avgProfitPerSale,highestProfitSale,avgDaysToSell,monthRows,
-    thisMonthProfit,lastMonthProfit,momGrowthPct,bestMonth,cumPoints,categoryRows,maxCatProfit,insights,
-    healthScore,healthTier,txRows,sortedTx,periodLabel,
-  }=metrics;
   const toggleSort=(key)=>{
     if(sortKey===key)setSortDir(d=>d==="asc"?"desc":"asc");
     else{setSortKey(key);setSortDir("desc");}
   };
+
+  const periodLabel=period==="month"?"this month":period==="quarter"?"this quarter":"all time";
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
@@ -1399,7 +1333,7 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
         <KPICard label="Inventory value" value={fmt(inventoryMarketValue)} color={t.accent}
           question="Current market value if sold today"/>
         <KPICard label="Total profit" value={`${totalProfit>=0?"+":""}${fmt(totalProfit)}`} color={totalProfit>=0?t.positive:t.negative}
-          question={`Net earnings, ${periodLabel}`} trend={period==="month"&&lastMonthProfit!==0?momGrowthPct:undefined}/>
+          question={`Net earnings, ${periodLabel}`}/>
         <KPICard label="ROI" value={pct(roi)} color={roi>=0?t.positive:t.negative}
           question={`Return on capital sold, ${periodLabel}`}/>
       </div>
@@ -2150,33 +2084,29 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
     return b?b.name:null;
   };
 
-  const categoriesPresent=useMemo(()=>[...new Set(parts.map(p=>p.category))],[parts]);
+  const categoriesPresent=[...new Set(parts.map(p=>p.category))];
 
-  // Filtering, then grouping identical parts for display, used to re-run on every render —
-  // including ones triggered by opening/closing an unrelated modal. Both steps are pure
-  // functions of (parts, statusFilter, catFilter, search), so they're memoized together.
-  const groupedCards=useMemo(()=>{
-    const filtered=parts.filter(p=>{
-      if(statusFilter!=="all"&&p.status!==statusFilter)return false;
-      if(catFilter!=="all"&&p.category!==catFilter)return false;
-      if(search&&!p.name.toLowerCase().includes(search.toLowerCase())&&!p.category.toLowerCase().includes(search.toLowerCase()))return false;
-      return true;
-    });
-    // Restocking the same item (e.g. buying 20 identical power cables) still creates 20
-    // independently-trackable part records under the hood — each can still be sold, built, or
-    // marked defective on its own. This only changes how they're DISPLAYED: identical parts
-    // (same name, category, cost, market value, and status) collapse into a single card with a
-    // quantity badge, instead of cluttering the grid with 20 near-identical cards. Anything
-    // that's the only one of its kind renders exactly as a normal single card, unchanged.
-    const groupKey=p=>`${p.name}|${p.category}|${Math.round(p.allocatedCost)}|${Math.round(p.marketValue)}|${p.status}`;
-    const groupMap=new Map();
-    filtered.forEach(p=>{
-      const k=groupKey(p);
-      if(!groupMap.has(k))groupMap.set(k,[]);
-      groupMap.get(k).push(p);
-    });
-    return [...groupMap.values()]; // each entry is an array of 1+ identical parts
-  },[parts,statusFilter,catFilter,search]);
+  const filtered=parts.filter(p=>{
+    if(statusFilter!=="all"&&p.status!==statusFilter)return false;
+    if(catFilter!=="all"&&p.category!==catFilter)return false;
+    if(search&&!p.name.toLowerCase().includes(search.toLowerCase())&&!p.category.toLowerCase().includes(search.toLowerCase()))return false;
+    return true;
+  });
+
+  // Restocking the same item (e.g. buying 20 identical power cables) still creates 20
+  // independently-trackable part records under the hood — each can still be sold, built, or
+  // marked defective on its own. This only changes how they're DISPLAYED: identical parts
+  // (same name, category, cost, market value, and status) collapse into a single card with a
+  // quantity badge, instead of cluttering the grid with 20 near-identical cards. Anything
+  // that's the only one of its kind renders exactly as a normal single card, unchanged.
+  const groupKey=p=>`${p.name}|${p.category}|${Math.round(p.allocatedCost)}|${Math.round(p.marketValue)}|${p.status}`;
+  const groupMap=new Map();
+  filtered.forEach(p=>{
+    const k=groupKey(p);
+    if(!groupMap.has(k))groupMap.set(k,[]);
+    groupMap.get(k).push(p);
+  });
+  const groupedCards=[...groupMap.values()]; // each entry is an array of 1+ identical parts
 
   const handleQuickSell=(sp,buyer)=>{
     if(!quickSell)return;
@@ -2340,7 +2270,7 @@ function Inventory({state,dispatch,toast,setTab,openLightbox}) {
             })}
           </div>
         )
-      ):groupedCards.length===0?(
+      ):filtered.length===0?(
         <Card style={{textAlign:"center",padding:36}}>
           <PackageX size={28} strokeWidth={1.5} color={t.textFaint} style={{marginBottom:10}}/>
           <div style={{color:t.textFaint}}>{search?"No parts match your search.":"No parts here yet."}</div>
@@ -3913,7 +3843,7 @@ function AddExpenseModal({onClose, dispatch, toast}) {
 const ALL_TABS=["Dashboard","Buy","Inventory","Builds","Sell","History","Settings"];
 const TAB_ICON={Dashboard:LayoutDashboard,Buy:ShoppingCart,Inventory:Boxes,Builds:Wrench,Sell:Banknote,History:HistoryIcon,Settings:SettingsIcon};
 
-const BrandMark = memo(function BrandMark({t,compact}) {
+function BrandMark({t,compact}) {
   return (
     <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
       <div style={{width:34,height:34,borderRadius:9,background:t.accentStrong,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -3927,7 +3857,7 @@ const BrandMark = memo(function BrandMark({t,compact}) {
       )}
     </div>
   );
-});
+}
 
 function SyncStatus({saveStatus,t,compact}) {
   const cfg=saveStatus==="saving"?{icon:Loader2,color:t.warning,label:"Saving…",spin:true}
@@ -3961,118 +3891,6 @@ function ErrorScreen({t}) {
     </div>
   );
 }
-
-/* ═══════════════════════════════════════════
-   COMMAND PALETTE — Cmd/Ctrl+K (also opened by "/") for fast keyboard-first navigation.
-   Fuzzy-matches tab names and a short list of quick actions; Enter runs the highlighted
-   row, arrow keys move the highlight, Escape closes. "New note" expands inline into a
-   one-field form that dispatches the same ADD_QUICK_NOTE action as the Quick Actions FAB,
-   so it's a second entry point onto real state, not a decorative shortcut.
-═══════════════════════════════════════════ */
-function fuzzyScore(query,label){
-  const q=query.trim().toLowerCase(), l=label.toLowerCase();
-  if(!q)return 0;
-  if(l.startsWith(q))return 2;
-  if(l.includes(q))return 1;
-  // loose subsequence match — lets "dbrd" find "Dashboard"
-  let qi=0;
-  for(let i=0;i<l.length&&qi<q.length;i++)if(l[i]===q[qi])qi++;
-  return qi===q.length?0.3:-1;
-}
-const CommandPalette = memo(function CommandPalette({open,onClose,tab,setTab,theme,setTheme,dispatch,toast,initialNoteMode=false}){
-  const t=useTheme();
-  const [query,setQuery]=useState("");
-  const [activeIndex,setActiveIndex]=useState(0);
-  const [noteMode,setNoteMode]=useState(false);
-  const [noteText,setNoteText]=useState("");
-  const dialogRef=useDialogA11y(onClose,open);
-  const inputRef=useRef(null);
-
-  useEffect(()=>{
-    if(open){setQuery("");setActiveIndex(0);setNoteMode(initialNoteMode);setNoteText("");
-      setTimeout(()=>inputRef.current?.focus(),10);}
-  },[open,initialNoteMode]);
-
-  const actions=[
-    ...ALL_TABS.filter(name=>name!==tab).map(name=>({id:`tab-${name}`,label:`Go to ${name}`,icon:TAB_ICON[name],
-      run:()=>{setTab(name);onClose();}})),
-    {id:"note",label:"New quick note",icon:StickyNote,run:()=>setNoteMode(true)},
-    {id:"buy",label:"Record a purchase",icon:ShoppingCart,run:()=>{setTab("Buy");onClose();}},
-    {id:"sell",label:"Record a sale",icon:Banknote,run:()=>{setTab("Sell");onClose();}},
-    {id:"theme",label:`Switch to ${theme==="dark"?"light":"dark"} mode`,icon:theme==="dark"?Sun:Moon,
-      run:()=>{setTheme(theme==="dark"?"light":"dark");onClose();}},
-  ];
-  const results=query.trim()
-    ?actions.map(a=>({...a,score:fuzzyScore(query,a.label)})).filter(a=>a.score>=0).sort((a,b)=>b.score-a.score)
-    :actions;
-  const clampedIndex=Math.min(activeIndex,Math.max(0,results.length-1));
-
-  if(!open)return null;
-
-  const submitNote=()=>{
-    if(!noteText.trim())return;
-    dispatch({type:"ADD_QUICK_NOTE",text:noteText});
-    toast("Note added");
-    onClose();
-  };
-
-  const onKeyDown=(e)=>{
-    if(noteMode){
-      if(e.key==="Enter"){e.preventDefault();submitNote();}
-      return;
-    }
-    if(e.key==="ArrowDown"){e.preventDefault();setActiveIndex(i=>Math.min(i+1,results.length-1));}
-    else if(e.key==="ArrowUp"){e.preventDefault();setActiveIndex(i=>Math.max(i-1,0));}
-    else if(e.key==="Enter"){e.preventDefault();results[clampedIndex]?.run();}
-  };
-
-  return (
-    <div style={{position:"fixed",inset:0,background:t.overlay,zIndex:200,display:"flex",alignItems:"flex-start",justifyContent:"center",
-      padding:"12vh 16px 16px",backdropFilter:"blur(2px)"}} onClick={onClose}>
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Command palette" onClick={e=>e.stopPropagation()}
-        style={{width:"100%",maxWidth:480,background:t.bgElevated,border:`1px solid ${t.borderStrong}`,borderRadius:14,
-          boxShadow:t.shadow,overflow:"hidden",animation:"blFadeUp 0.15s ease"}}>
-        {noteMode?(
-          <div style={{padding:14,display:"flex",flexDirection:"column",gap:10}}>
-            <div style={{fontSize:11.5,color:t.textMuted,fontWeight:600}}>New quick note</div>
-            <input autoFocus value={noteText} onChange={e=>setNoteText(e.target.value)} onKeyDown={onKeyDown}
-              placeholder="Jot something down…" style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:9,
-                padding:"10px 12px",color:t.text,fontSize:14,fontFamily:FONT_BODY,outline:"none"}}/>
-            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-              <Btn variant="ghost" small onClick={()=>setNoteMode(false)}>Back</Btn>
-              <Btn variant="primary" small onClick={submitNote} disabled={!noteText.trim()}>Save note</Btn>
-            </div>
-          </div>
-        ):(
-          <>
-            <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderBottom:`1px solid ${t.border}`}}>
-              <Search size={16} color={t.textFaint}/>
-              <input ref={inputRef} value={query} onChange={e=>{setQuery(e.target.value);setActiveIndex(0);}} onKeyDown={onKeyDown}
-                placeholder="Jump to a screen or run an action…" aria-label="Command palette search"
-                style={{flex:1,background:"none",border:"none",outline:"none",color:t.text,fontSize:14.5,fontFamily:FONT_BODY}}/>
-              <kbd style={{fontSize:10,color:t.textFaint,border:`1px solid ${t.border}`,borderRadius:5,padding:"2px 5px",fontFamily:FONT_MONO}}>Esc</kbd>
-            </div>
-            <div style={{maxHeight:320,overflowY:"auto",padding:6}}>
-              {results.length===0&&<div style={{padding:"14px 10px",fontSize:13,color:t.textFaint,textAlign:"center"}}>No matches</div>}
-              {results.map((a,i)=>{
-                const Icon=a.icon;
-                const active=i===clampedIndex;
-                return (
-                  <button key={a.id} onClick={a.run} onMouseEnter={()=>setActiveIndex(i)} className="bl-focusable"
-                    style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"9px 10px",borderRadius:8,border:"none",
-                      cursor:"pointer",textAlign:"left",background:active?t.accentSoft:"transparent",color:active?t.accent:t.text,
-                      fontSize:13.5,fontWeight:600,fontFamily:FONT_BODY}}>
-                    <Icon size={15} strokeWidth={2}/>{a.label}
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-});
 
 export default function App() {
   const [state,setState]=useState(null);
@@ -4120,29 +3938,6 @@ export default function App() {
   const [theme,setTheme]=useState("dark");
   const [lightboxUrl,setLightboxUrl]=useState(null);
   const openLightbox=useCallback(url=>setLightboxUrl(url),[]);
-
-  // Command palette + global hotkeys: Cmd/Ctrl+K or "/" opens fast navigation & search,
-  // "n" jumps straight into the palette's note field, "b"/"s" jump to Buy/Sell. All are
-  // suppressed while a modal's already open or while the person is typing into a field,
-  // so they never hijack normal form input.
-  const [paletteOpen,setPaletteOpen]=useState(false);
-  const [paletteNoteMode,setPaletteNoteMode]=useState(false);
-  const closePalette=useCallback(()=>{setPaletteOpen(false);setPaletteNoteMode(false);},[]);
-  useEffect(()=>{
-    const onKeyDown=(e)=>{
-      const tag=document.activeElement?.tagName;
-      const typing=tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||document.activeElement?.isContentEditable;
-      const meta=e.metaKey||e.ctrlKey;
-      if(meta&&e.key.toLowerCase()==="k"){e.preventDefault();setPaletteNoteMode(false);setPaletteOpen(o=>!o);return;}
-      if(paletteOpen||typing)return; // any other shortcut only fires from the idle app shell
-      if(e.key==="/"){e.preventDefault();setPaletteNoteMode(false);setPaletteOpen(true);}
-      else if(e.key.toLowerCase()==="n"){e.preventDefault();setPaletteNoteMode(true);setPaletteOpen(true);}
-      else if(e.key.toLowerCase()==="b"){setTab("Buy");}
-      else if(e.key.toLowerCase()==="s"){setTab("Sell");}
-    };
-    document.addEventListener("keydown",onKeyDown);
-    return()=>document.removeEventListener("keydown",onKeyDown);
-  },[paletteOpen]);
 
   // Helper for chatbox to pre-fill form fields on AI commands
   const setFormData=useCallback((formType,data)=>{
@@ -4213,15 +4008,7 @@ export default function App() {
                 sidebar plus a wider content column (below) is what actually uses that space. */}
             <nav aria-label="Primary" style={{width:232,flexShrink:0,borderRight:`1px solid ${t.border}`,background:t.bgElevated,
               display:"flex",flexDirection:"column",position:"sticky",top:0,height:"100vh"}}>
-              <div style={{padding:"20px 18px",display:"flex",flexDirection:"column",gap:10}}>
-                <BrandMark t={t}/>
-                <button onClick={()=>{setPaletteNoteMode(false);setPaletteOpen(true);}} className="bl-focusable" style={{display:"flex",
-                  alignItems:"center",gap:8,padding:"7px 9px",borderRadius:8,border:`1px solid ${t.border}`,background:t.surface,
-                  color:t.textFaint,fontSize:12,fontFamily:FONT_BODY,cursor:"pointer",width:"100%"}}>
-                  <Search size={13}/><span style={{flex:1,textAlign:"left"}}>Search & jump</span>
-                  <kbd style={{fontSize:10,fontFamily:FONT_MONO,border:`1px solid ${t.border}`,borderRadius:4,padding:"1px 4px"}}>⌘K</kbd>
-                </button>
-              </div>
+              <div style={{padding:"20px 18px"}}><BrandMark t={t}/></div>
               <div style={{display:"flex",flexDirection:"column",gap:2,padding:"6px 10px",flex:1,overflowY:"auto"}}>
                 {ALL_TABS.map(name=>{
                   const Icon=TAB_ICON[name];
@@ -4263,8 +4050,7 @@ export default function App() {
             <div style={{borderBottom:`1px solid ${t.border}`,padding:"calc(13px + env(safe-area-inset-top)) 16px 13px",background:t.bgElevated}}>
               <div style={{maxWidth:contentMaxWidth,margin:"0 auto",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
                 <BrandMark t={t} compact/>
-                <div style={{display:"flex",gap:12,alignItems:"center",flexShrink:0}}>
-                  <IconBtn icon={Search} label="Search & jump (⌘K)" onClick={()=>{setPaletteNoteMode(false);setPaletteOpen(true);}} size={32} iconSize={15}/>
+                <div style={{display:"flex",gap:16,alignItems:"center",flexShrink:0}}>
                   <div style={{textAlign:"center"}}>
                     <div style={{fontSize:9.5,color:t.textFaint,fontWeight:600}}>Parts</div>
                     <div style={{fontFamily:FONT_MONO,fontWeight:700,color:t.text,fontSize:13}}><AnimNum value={state.parts.length}/></div>
@@ -4310,8 +4096,6 @@ export default function App() {
         <QuickActionsFab state={state} dispatch={dispatch} toast={toast}/>
         <AIAgentChatbox state={state} dispatch={dispatch} setTab={setTab} setFormData={setFormData} toast={toast}/>
         <Lightbox url={lightboxUrl} onClose={()=>setLightboxUrl(null)}/>
-        <CommandPalette open={paletteOpen} onClose={closePalette} tab={tab} setTab={setTab} theme={theme} setTheme={setTheme}
-          dispatch={dispatch} toast={toast} initialNoteMode={paletteNoteMode}/>
       </div>
     </ThemeCtx.Provider>
   );
