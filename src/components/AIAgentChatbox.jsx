@@ -229,6 +229,32 @@ export function AIAgentChatbox({
           parameters: { type: 'object', properties: {} },
         },
         {
+          name: 'query_business_database',
+          description: 'Search the complete business database snapshot, including inventory (available/sold/defective), bundles, builds, sales, cash-ledger transactions, expenses, settings, notes, and per-item history. Use this whenever the user asks about historical/current business records, transaction history, purchases, expenses, profits, cash movement, what happened to an item, bundle contents, build contents, or any record that is not answered by a simple inventory count. This tool reads /data, the same server endpoint backed by PocketBase, so it can see records beyond the small live-inventory summary.',
+          parameters: {
+            type: 'object',
+            properties: {
+              scope: { type: 'string', enum: ['summary','inventory','sales','transactions','expenses','bundles','builds','item_history','quick_notes','all'] },
+              query: { type: 'string', description: 'Optional free-text search across names, descriptions, buyers, notes, sources, bundle names, build names, and transaction descriptions.' },
+              limit: { type: 'number', description: 'Maximum records to return. Defaults to 25; capped at 100.' },
+              includeReturned: { type: 'boolean', description: 'For sales searches, include returned/undone sales as well as active sales.' }
+            },
+            required: ['scope'],
+          },
+        },
+        {
+          name: 'query_chat_history',
+          description: 'Search messages the user previously sent or the assistant previously answered inside this website. Use this when the user asks what they previously asked, discussed, or decided in the AI chat.',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: { type: 'string', description: 'Text to search for in previous chat messages.' },
+              limit: { type: 'number', description: 'Maximum messages to return, capped at 50.' }
+            },
+            required: ['query'],
+          },
+        },
+        {
           name: 'find_sales',
           description: 'Search past transactions by buyer name or item name (case-insensitive, partial match OK). Returns a JSON list with the exact saleId for each match. ALWAYS call this before delete_transaction — never guess a saleId.',
           parameters: {
@@ -367,6 +393,10 @@ When the user wants to sell an item, ensure you know the exact item name, the sa
 When the user wants to delete, undo, or return a sale, first call find_sales to locate the exact transaction. If you get more than one plausible match, ask the user which one they mean instead of guessing. Only after you have verified the exact saleId from the tool output should you call delete_transaction. If the matched sale has isBuild: true and the user wants the item(s) back in inventory, you must also ask whether the build should go back to Builds as one sellable unit (reactivate) or be broken apart into individually available parts (disassemble) — never guess this, since guessing wrong can let the same parts end up claimed by two different builds at once.
 
 When the user wants to change what's in an already-assembled build ("swap the RAM in Gaming Rig 2", "add a PSU to that build", "take the GPU out"), first call find_builds to get the exact buildId and see its current parts. Then call modify_build with that buildId and the part names to add/remove. This works even on a build that's already listed for sale — it doesn't need to be dissolved first.
+
+DATABASE ACCESS RULES: You have read access to the business database through query_business_database. Use it whenever the user asks about past transactions, purchase history, sales history, expenses, cash movements, bundle contents, build records, item history, profits, or any stored business fact. Do not guess from conversation memory when the answer should come from stored records. The tool reads the server /data endpoint backed by PocketBase, so it can see records beyond the small inventory summary. If the user asks about what they previously asked or discussed with you inside this website, use query_chat_history.
+
+IMAGE AUTO-ENTRY RULE: When a user uploads a hardware photo to Buy, treat the photo as an extraction task: identify visible brand/model/spec text and map it to the app's category list. Never invent an exact model or price that is not visible.
 
 Keep responses short and to the point.
 
@@ -543,6 +573,146 @@ For business strategy questions, offer thoughtful advice that considers pricing,
             };
             available.forEach(p => { summary.byCategory[p.category] = (summary.byCategory[p.category] || 0) + 1; });
             return JSON.stringify(summary);
+          }
+
+          case 'query_business_database': {
+            const scope = toolInput.scope || 'summary';
+            const query = String(toolInput.query || '').trim().toLowerCase();
+            const limit = Math.min(100, Math.max(1, Math.floor(Number(toolInput.limit) || 25)));
+
+            let dbState = liveState;
+            try {
+              const dbRes = await fetch('/data', { cache: 'no-store' });
+              if (dbRes.ok) {
+                const fresh = await dbRes.json();
+                if (fresh && Object.keys(fresh).length) dbState = { ...liveState, ...fresh };
+              }
+            } catch (err) {
+              console.warn('Live database read failed; using current in-memory state:', err);
+            }
+
+            const textOf = (...values) => values.filter(v => v !== undefined && v !== null).map(v => String(v)).join(' ').toLowerCase();
+            const matches = (record, extra='') => !query || textOf(extra, record?.name, record?.description, record?.buyerName, record?.source, record?.notes, record?.category, record?.soldTo, record?.reason, record?.date, record?.type).includes(query);
+            const cleanPart = p => ({
+              id: p.id, name: p.name, category: p.category, status: p.status,
+              cost: p.allocatedCost, marketValue: p.marketValue, source: p.source,
+              bundleId: p.bundleId || null, notes: p.notes || '', soldTo: p.soldTo || '',
+              history: Array.isArray(p.history) ? p.history.slice(-20) : [],
+            });
+            const cleanSale = s => ({
+              saleId: s.id, itemName: s.name, buyerName: s.buyerName || '',
+              salePrice: s.salePrice, cost: s.cost, profit: s.profit, date: s.date,
+              buildId: s.buildId || null, partId: s.partId || null,
+              returned: !!s.returned, deleted: !!s.deleted, writeOff: !!s.writeOff,
+              reason: s.reason || '',
+            });
+            const cleanTxn = t => ({
+              id: t.id, type: t.type, amount: t.amount, description: t.description || '',
+              wallet: t.wallet || '', from: t.from || '', to: t.to || '', date: t.date,
+            });
+
+            if (scope === 'summary') {
+              const activeParts = (dbState.parts || []).filter(p => p.status === 'available');
+              const activeSales = (dbState.sales || []).filter(s => !s.deleted && !s.returned);
+              const totalRevenue = activeSales.reduce((sum, s) => sum + (Number(s.salePrice) || 0), 0);
+              const totalProfit = activeSales.reduce((sum, s) => sum + (Number(s.profit) || 0), 0);
+              return JSON.stringify({
+                businessCash: dbState.businessCash || 0,
+                personalCash: dbState.personalCash || 0,
+                activeInventory: activeParts.length,
+                inventoryByCategory: activeParts.reduce((a,p) => { a[p.category] = (a[p.category] || 0) + 1; return a; }, {}),
+                bundles: (dbState.bundles || []).length,
+                activeBuilds: (dbState.builds || []).filter(b => !b.dissolved && !b.sold).length,
+                sales: activeSales.length,
+                revenue: totalRevenue,
+                profit: totalProfit,
+                expenses: (dbState.expenses || []).length,
+                transactions: (dbState.transactions || []).length,
+                quickNotes: (dbState.quickNotes || []).length,
+                targetMargin: dbState.settings?.targetMargin ?? null,
+              });
+            }
+
+            if (scope === 'inventory' || scope === 'item_history') {
+              let parts = (dbState.parts || []).filter(p => matches(p, textOf(...(p.history || []).map(h => `${h.date} ${h.event}`))));
+              if (scope === 'item_history' && !query) parts = [];
+              const result = parts.slice(0, limit).map(cleanPart);
+              return JSON.stringify({count: parts.length, items: result});
+            }
+
+            if (scope === 'sales') {
+              const sales = (dbState.sales || []).filter(s => (toolInput.includeReturned || (!s.returned && !s.deleted)) && matches(s));
+              return JSON.stringify({count: sales.length, sales: sales.slice(0, limit).map(cleanSale)});
+            }
+
+            if (scope === 'transactions') {
+              const txns = (dbState.transactions || []).filter(t => matches(t));
+              return JSON.stringify({count: txns.length, transactions: txns.slice(0, limit).map(cleanTxn)});
+            }
+
+            if (scope === 'expenses') {
+              const expenses = (dbState.expenses || []).filter(e => matches(e));
+              return JSON.stringify({count: expenses.length, expenses: expenses.slice(0, limit)});
+            }
+
+            if (scope === 'bundles') {
+              const bundles = (dbState.bundles || []).filter(b => matches(b));
+              const result = bundles.slice(0, limit).map(b => ({
+                ...b,
+                parts: (dbState.parts || []).filter(p => p.bundleId === b.id).map(cleanPart),
+              }));
+              return JSON.stringify({count: bundles.length, bundles: result});
+            }
+
+            if (scope === 'builds') {
+              const builds = (dbState.builds || []).filter(b => matches(b, (dbState.parts || []).filter(p => b.partIds?.includes(p.id)).map(p => p.name).join(' ')));
+              const result = builds.slice(0, limit).map(b => ({
+                id: b.id, name: b.name, sold: !!b.sold, dissolved: !!b.dissolved,
+                salePrice: b.salePrice, partIds: b.partIds || [],
+                parts: (dbState.parts || []).filter(p => b.partIds?.includes(p.id)).map(cleanPart),
+              }));
+              return JSON.stringify({count: builds.length, builds: result});
+            }
+
+            if (scope === 'quick_notes') {
+              const notes = (dbState.quickNotes || []).filter(n => matches(n));
+              return JSON.stringify({count: notes.length, notes: notes.slice(0, limit)});
+            }
+
+            if (scope === 'all') {
+              return JSON.stringify({
+                summary: {
+                  businessCash: dbState.businessCash || 0,
+                  personalCash: dbState.personalCash || 0,
+                  activeInventory: (dbState.parts || []).filter(p => p.status === 'available').length,
+                  activeBuilds: (dbState.builds || []).filter(b => !b.dissolved && !b.sold).length,
+                  sales: (dbState.sales || []).filter(s => !s.deleted && !s.returned).length,
+                  transactions: (dbState.transactions || []).length,
+                },
+                inventory: (dbState.parts || []).filter(p => matches(p)).slice(0, limit).map(cleanPart),
+                sales: (dbState.sales || []).filter(s => matches(s) && !s.deleted).slice(0, limit).map(cleanSale),
+                transactions: (dbState.transactions || []).filter(t => matches(t)).slice(0, limit).map(cleanTxn),
+                bundles: (dbState.bundles || []).filter(b => matches(b)).slice(0, limit),
+                builds: (dbState.builds || []).filter(b => matches(b)).slice(0, limit),
+                expenses: (dbState.expenses || []).filter(e => matches(e)).slice(0, limit),
+                quickNotes: (dbState.quickNotes || []).filter(n => matches(n)).slice(0, limit),
+                settings: dbState.settings || {},
+              });
+            }
+
+            return `Unknown database scope: ${scope}`;
+          }
+
+          case 'query_chat_history': {
+            const q = String(toolInput.query || '').trim().toLowerCase();
+            const limit = Math.min(50, Math.max(1, Math.floor(Number(toolInput.limit) || 20)));
+            const history = Array.isArray(messages) ? messages : [];
+            const matches = history.filter(m => !q || String(m.text || '').toLowerCase().includes(q));
+            return JSON.stringify(matches.slice(-limit).map(m => ({
+              role: m.role,
+              text: m.text,
+              created: m.created || m.date || m.createdAt || null,
+            })));
           }
 
           case 'find_sales': {
@@ -761,7 +931,7 @@ For business strategy questions, offer thoughtful advice that considers pricing,
         return `Error running ${toolName}: ${err.message}`;
       }
     },
-    [setTab, setFormData, dispatch, toast, uploadImageToPocketBase]
+    [setTab, setFormData, dispatch, toast, uploadImageToPocketBase, messages]
   );
 
   /* ───────────────────────────────────────────

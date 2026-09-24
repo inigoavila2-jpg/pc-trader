@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, createContext, useContext, Fragment } from "react";
+import { GoogleGenAI } from "@google/genai";
 import { AIAgentChatbox } from "./components/AIAgentChatbox";
 import {
   LayoutDashboard, ShoppingCart, Boxes, Wrench, Banknote, History as HistoryIcon, Settings as SettingsIcon,
@@ -587,6 +588,80 @@ function StatusBadge({s}) {
    with real labels on the icon-only controls and a 44px-plus tap target on the
    remove button (was 22px).
 ═══════════════════════════════════════════ */
+let _buyVisionClient = null;
+
+function getGeminiVisionClient(){
+  const apiKey = import.meta.env?.VITE_GEMINI_KEY || import.meta.env?.VITE_GEMINI_API_KEY || import.meta.env?.GEMINI_API_KEY || process?.env?.VITE_GEMINI_KEY || process?.env?.GEMINI_API_KEY;
+  if(!apiKey) return null;
+  if(!_buyVisionClient) _buyVisionClient = new GoogleGenAI({apiKey});
+  return _buyVisionClient;
+}
+
+function parseJsonResponse(text){
+  const raw=String(text||"").trim();
+  try{return JSON.parse(raw);}catch{}
+  const fenced=raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if(fenced){try{return JSON.parse(fenced[1]);}catch{}}
+  const first=raw.indexOf("{");
+  const last=raw.lastIndexOf("}");
+  if(first>=0&&last>first){try{return JSON.parse(raw.slice(first,last+1));}catch{}}
+  return null;
+}
+
+function dataUrlParts(dataUrl){
+  const match=String(dataUrl||"").match(/^data:([^;]+);base64,(.+)$/s);
+  if(!match) throw new Error("Invalid image data");
+  return {mimeType:match[1],data:match[2]};
+}
+
+async function analyzeBuyImage(dataUrl,{mode="single",existingRows=[]}={}){
+  const ai=getGeminiVisionClient();
+  if(!ai) throw new Error("Gemini API key is not configured");
+  const {mimeType,data}=dataUrlParts(dataUrl);
+  const categories=["GPU","CPU","Motherboard","CPU+MB","RAM","PSU","Storage","Cooler","Case","Monitor","Mouse","Keyboard","Other"];
+  const prompt=mode==="bundle"
+    ? `Analyze this PC hardware buying/listing photo quickly and return ONLY valid JSON. Identify every distinct PC part that is visibly present. Do not invent model numbers or prices. If text from a marketplace listing, receipt, label, or screenshot visibly shows a seller/source or total purchase price, extract it; otherwise use null. For each visible part, use one of these categories: ${categories.join(", ")}.\nReturn exactly this shape:\n{"source":string|null,"purchasePrice":number|null,"parts":[{"name":string,"category":string,"notes":string,"marketValue":number|null,"confidence":number}]}\n` 
+    : `Analyze this single PC hardware item photo and return ONLY valid JSON. Read visible brand/model/spec labels. Do not invent details that are not visible. Use one of these categories: ${categories.join(", ")}. If a price is visibly shown, extract it as marketValue; otherwise marketValue must be null.\nReturn exactly this shape:\n{"name":string,"category":string,"notes":string,"marketValue":number|null,"quantity":1,"confidence":number}\n`;
+  const result=await ai.models.generateContent({
+    model:"gemini-2.5-flash",
+    contents:[{role:"user",parts:[{inlineData:{mimeType,data}},{text:prompt}]}],
+    config:{temperature:0.1,responseMimeType:"application/json"},
+  });
+  const parsed=parseJsonResponse(result?.text);
+  if(!parsed) throw new Error("AI returned an unreadable result");
+  if(mode==="bundle"){
+    const parts=Array.isArray(parsed.parts)?parsed.parts.map((p)=>({
+      name:String(p?.name||"").trim(),
+      category:categories.includes(p?.category)?p.category:"Other",
+      notes:String(p?.notes||"").trim(),
+      marketValue:Number.isFinite(Number(p?.marketValue))&&Number(p.marketValue)>0?Number(p.marketValue):"",
+      confidence:Number.isFinite(Number(p?.confidence))?Math.max(0,Math.min(1,Number(p.confidence))):0,
+    })).filter(p=>p.name):[];
+    return {
+      source:String(parsed.source||"").trim(),
+      purchasePrice:Number.isFinite(Number(parsed.purchasePrice))&&Number(parsed.purchasePrice)>0?Number(parsed.purchasePrice):"",
+      parts,
+    };
+  }
+  return {
+    name:String(parsed.name||"").trim(),
+    category:categories.includes(parsed.category)?parsed.category:"Other",
+    notes:String(parsed.notes||"").trim(),
+    marketValue:Number.isFinite(Number(parsed.marketValue))&&Number(parsed.marketValue)>0?Number(parsed.marketValue):"",
+    quantity:Math.max(1,Math.floor(Number(parsed.quantity)||1)),
+    confidence:Number.isFinite(Number(parsed.confidence))?Math.max(0,Math.min(1,Number(parsed.confidence))):0,
+  };
+}
+
+function fileToDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onerror=()=>reject(new Error("Could not read image"));
+    reader.onload=()=>resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
+}
+
 function compressImage(file,maxDimension=1280,quality=0.82){
   return new Promise((resolve,reject)=>{
     const img=new Image();
@@ -615,7 +690,7 @@ function compressImage(file,maxDimension=1280,quality=0.82){
   });
 }
 
-function PhotoUpload({photoUrl,photoRecordId,onChange,label="Photo"}) {
+function PhotoUpload({photoUrl,photoRecordId,onChange,label="Photo",onAnalyze}) {
   const t=useTheme();
   const [status,setStatus]=useState("idle");
   const inputRef=useRef(null);
@@ -626,6 +701,13 @@ function PhotoUpload({photoUrl,photoRecordId,onChange,label="Photo"}) {
     setStatus("compressing");
     try{
       const compressed=await compressImage(file).catch(()=>file);
+      const analysisPromise=onAnalyze
+        ? fileToDataUrl(compressed).then(dataUrl=>onAnalyze(dataUrl,compressed)).catch(err=>{
+            console.error("AI image analysis failed:",err);
+            return null;
+          })
+        : Promise.resolve(null);
+
       setStatus("uploading");
       const form=new FormData();
       form.append("photo",compressed);
@@ -634,6 +716,11 @@ function PhotoUpload({photoUrl,photoRecordId,onChange,label="Photo"}) {
       const {url,recordId}=await res.json();
       if(photoRecordId){fetch(`/photo/${photoRecordId}`,{method:"DELETE"}).catch(()=>{});}
       onChange({photoUrl:url,photoRecordId:recordId});
+
+      if(onAnalyze){
+        setStatus("analyzing");
+        await analysisPromise;
+      }
       setStatus("idle");
     }catch(err){
       console.error("Photo upload error:",err);
@@ -661,9 +748,9 @@ function PhotoUpload({photoUrl,photoRecordId,onChange,label="Photo"}) {
           </button>
         </div>
       ):(
-        <button type="button" onClick={()=>inputRef.current?.click()} disabled={status==="uploading"||status==="compressing"} className="bl-focusable"
+        <button type="button" onClick={()=>inputRef.current?.click()} disabled={status==="uploading"||status==="compressing"||status==="analyzing"} className="bl-focusable"
           style={{width:96,height:96,borderRadius:10,border:`1.5px dashed ${t.borderStrong}`,background:t.surfaceSunken,color:t.textMuted,
-            display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,cursor:(status==="uploading"||status==="compressing")?"wait":"pointer",
+            display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,cursor:(status==="uploading"||status==="compressing"||status==="analyzing")?"wait":"pointer",
             fontSize:11,fontFamily:FONT_BODY,transition:"border-color 0.15s,color 0.15s"}}
           onMouseEnter={e=>{if(status==="idle"){e.currentTarget.style.borderColor=t.accent;e.currentTarget.style.color=t.accent;}}}
           onMouseLeave={e=>{e.currentTarget.style.borderColor=t.borderStrong;e.currentTarget.style.color=t.textMuted;}}>
@@ -671,6 +758,8 @@ function PhotoUpload({photoUrl,photoRecordId,onChange,label="Photo"}) {
             <><Loader2 size={18} className="bl-spin"/><span>Optimizing…</span></>
           ):status==="uploading"?(
             <><Loader2 size={18} className="bl-spin"/><span>Uploading…</span></>
+          ):status==="analyzing"?(
+            <><Sparkles size={18} className="bl-spin"/><span>AI analyzing…</span></>
           ):(
             <><Camera size={20} strokeWidth={1.75}/><span>Add photo</span></>
           )}
@@ -1810,6 +1899,49 @@ function Buy({state,dispatch,toast}) {
 
   // Speed feature: duplicate the most recent bundle's structure (names/categories) so
   // re-buying a similar batch doesn't mean re-typing everything from scratch.
+  const analyzeBundlePhoto=useCallback(async(dataUrl)=>{
+    const result=await analyzeBuyImage(dataUrl,{mode:"bundle",existingRows:partRows});
+    if(result.source) setBundleName(result.source);
+    if(result.purchasePrice) setPurchasePrice(String(result.purchasePrice));
+    if(result.parts.length){
+      setPartRows(prev=>result.parts.map((p,i)=>({
+        id:prev[i]?.id||uid(),
+        name:p.name||prev[i]?.name||"",
+        category:p.category||prev[i]?.category||lastCategory,
+        marketValue:p.marketValue||prev[i]?.marketValue||"",
+        notes:p.notes||prev[i]?.notes||"",
+        photoUrl:prev[i]?.photoUrl||"",
+        photoRecordId:prev[i]?.photoRecordId||"",
+      })));
+      const last=result.parts[result.parts.length-1];
+      if(last?.category) setLastCategory(last.category);
+      toast(`AI identified ${result.parts.length} part${result.parts.length===1?"":"s"} from the bundle photo`,"success");
+    }else{
+      toast("AI could not confidently identify the bundle parts — review the photo and enter them manually","warn");
+    }
+    return result;
+  },[partRows,setLastCategory,toast]);
+
+  const analyzeSinglePhoto=useCallback(async(dataUrl)=>{
+    const result=await analyzeBuyImage(dataUrl,{mode:"single"});
+    if(result.name) setSingleName(result.name);
+    if(result.category) setSingleCat(result.category);
+    if(result.notes) setSingleNotes(result.notes);
+    if(result.marketValue) setSingleMarket(String(result.marketValue));
+    if(result.quantity>1) setSingleQty(String(result.quantity));
+    if(result.category) setLastCategory(result.category);
+    toast(result.name?`AI identified ${result.name}`:"AI analyzed the photo — please review the fields", "success");
+    return result;
+  },[setLastCategory,toast]);
+
+  const analyzeRowPhoto=useCallback((rowId)=>(dataUrl)=>analyzeBuyImage(dataUrl,{mode:"single"}).then(result=>{
+    if(result.name) updateRow(rowId,"name",result.name);
+    if(result.category) updateRow(rowId,"category",result.category);
+    if(result.notes) updateRow(rowId,"notes",result.notes);
+    if(result.marketValue) updateRow(rowId,"marketValue",String(result.marketValue));
+    return result;
+  }),[]);
+
   const duplicateLastBundle=()=>{
     const last=state.bundles[state.bundles.length-1];
     if(!last)return;
@@ -1884,7 +2016,7 @@ function Buy({state,dispatch,toast}) {
             )}
           </div>
           <div style={{marginBottom:16}}>
-            <PhotoUpload label="Bundle photo (optional)" photoUrl={bundlePhoto.photoUrl} photoRecordId={bundlePhoto.photoRecordId} onChange={setBundlePhoto}/>
+            <PhotoUpload label="Bundle photo (optional)" photoUrl={bundlePhoto.photoUrl} photoRecordId={bundlePhoto.photoRecordId} onChange={setBundlePhoto} onAnalyze={analyzeBundlePhoto}/>
           </div>
           <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
             <Inp label="Source / seller" value={bundleName} onChange={e=>setBundleName(e.target.value)} placeholder="FB Marketplace – Juan"/>
@@ -1894,7 +2026,7 @@ function Buy({state,dispatch,toast}) {
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
             {partRows.map((row,idx)=>(
               <div key={row.id} style={{display:"flex",gap:10,alignItems:"flex-start",animation:"blFadeUp 0.15s ease",paddingBottom:14,borderBottom:idx<partRows.length-1?`1px solid ${t.border}`:"none"}}>
-                <PhotoUpload label="" photoUrl={row.photoUrl} photoRecordId={row.photoRecordId} onChange={({photoUrl,photoRecordId})=>{updateRow(row.id,"photoUrl",photoUrl);updateRow(row.id,"photoRecordId",photoRecordId);}}/>
+                <PhotoUpload label="" photoUrl={row.photoUrl} photoRecordId={row.photoRecordId} onChange={({photoUrl,photoRecordId})=>{updateRow(row.id,"photoUrl",photoUrl);updateRow(row.id,"photoRecordId",photoRecordId);}} onAnalyze={analyzeRowPhoto(row.id)}/>
                 <div className="part-row" style={{display:"grid",gridTemplateColumns:"1fr auto 90px 90px auto",gap:8,alignItems:"end",flex:1}}>
                   <Inp label={idx===0?"Part name":""} value={row.name} onChange={e=>updateRow(row.id,"name",e.target.value)} placeholder="RX 580" data-buy-row-name="1"/>
                   <CategoryPicker label={idx===0?"Category":"​"} value={row.category} onChange={v=>updateRow(row.id,"category",v)} customCategories={state.customCategories} dispatch={dispatch} style={{minWidth:90}}/>
@@ -1937,7 +2069,7 @@ function Buy({state,dispatch,toast}) {
         <Card>
           <div style={{fontWeight:700,fontSize:13.5,color:t.text,marginBottom:16,fontFamily:FONT_DISPLAY}}>Single part</div>
           <div style={{marginBottom:16}}>
-            <PhotoUpload label="Photo (optional)" photoUrl={singlePhoto.photoUrl} photoRecordId={singlePhoto.photoRecordId} onChange={setSinglePhoto}/>
+            <PhotoUpload label="Photo (optional)" photoUrl={singlePhoto.photoUrl} photoRecordId={singlePhoto.photoRecordId} onChange={setSinglePhoto} onAnalyze={analyzeSinglePhoto}/>
           </div>
           <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             <Inp label="Part name" value={singleName} onChange={e=>setSingleName(e.target.value)} placeholder="GTX 1060 6GB"/>
