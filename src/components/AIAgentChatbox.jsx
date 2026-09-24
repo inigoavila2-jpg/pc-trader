@@ -11,6 +11,22 @@ const cbUid = () => `chat_${Date.now()}_${Math.random().toString(36).slice(2, 8)
 const cbToday = () => new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
 const cbFmt = (n) => `₱${Number(n || 0).toLocaleString('en-PH', { maximumFractionDigits: 0 })}`;
 
+// Parse the date formats this app stores (for example "Sep 25, 2026") plus
+// ISO dates. Historical business calculations should always compare timestamps,
+// not raw date strings.
+const cbDateMs = (value) => {
+  if (!value) return NaN;
+
+  const str = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const d = new Date(`${str}T00:00:00`);
+    return Number.isNaN(d.getTime()) ? NaN : d.getTime();
+  }
+
+  const d = new Date(str);
+  return Number.isNaN(d.getTime()) ? NaN : d.getTime();
+};
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Gemini's free tier is easy to hit during normal use — every tool-using message burns at
@@ -243,6 +259,20 @@ export function AIAgentChatbox({
           },
         },
         {
+          name: 'calculate_net_worth_growth',
+          description: 'Calculate business net worth growth from a historical start date up to now. Use this for questions like "how much did my business net worth grow since September?", "what is my net worth growth?", or "how much did my business grow financially?". The Dashboard definition is business cash plus market value of active inventory (available and in-build parts), excluding the personal wallet. Reconstruct the historical starting value from dated transactions, purchases, sales, returns, and write-offs. If the user says "since September" without a year, use the most recent September. Return the actual calculated numbers; do not say historical net worth cannot be calculated.',
+          parameters: {
+            type: 'object',
+            properties: {
+              startDate: {
+                type: 'string',
+                description: 'Start date in YYYY-MM-DD format. For "since September", use September 1 of the relevant year.'
+              },
+            },
+            required: ['startDate'],
+          },
+        },
+        {
           name: 'query_chat_history',
           description: 'Search messages the user previously sent or the assistant previously answered inside this website. Use this when the user asks what they previously asked, discussed, or decided in the AI chat.',
           parameters: {
@@ -394,7 +424,9 @@ When the user wants to delete, undo, or return a sale, first call find_sales to 
 
 When the user wants to change what's in an already-assembled build ("swap the RAM in Gaming Rig 2", "add a PSU to that build", "take the GPU out"), first call find_builds to get the exact buildId and see its current parts. Then call modify_build with that buildId and the part names to add/remove. This works even on a build that's already listed for sale — it doesn't need to be dissolved first.
 
-DATABASE ACCESS RULES: You have read access to the business database through query_business_database. Use it whenever the user asks about past transactions, purchase history, sales history, expenses, cash movements, bundle contents, build records, item history, profits, or any stored business fact. Do not guess from conversation memory when the answer should come from stored records. The tool reads the server /data endpoint backed by PocketBase, so it can see records beyond the small inventory summary. If the user asks about what they previously asked or discussed with you inside this website, use query_chat_history.
+DATABASE ACCESS RULES: You have read access to the business database through query_business_database. Use it whenever the user asks about past transactions, purchase history, sales history, expenses, cash movements, bundle contents, build records, item history, profits, or any stored business fact. Do not guess from conversation memory when the answer should come from stored records. The tool reads the server /data endpoint backed by PocketBase, so it can see records beyond the small live-inventory summary. If the user asks about what they previously asked or discussed with you inside this website, use query_chat_history.
+
+NET WORTH RULE: When the user asks about business net worth, net worth growth, business growth in value, or asks "how much did my business net worth grow since [date/month]", you MUST use calculate_net_worth_growth. Do not respond that historical net worth cannot be calculated. The Dashboard definition is business cash + market value of active inventory, where active inventory includes both available and in-build parts and excludes the personal wallet. For "since September" without a year, use the most recent September. Report the starting net worth, current net worth, absolute growth/loss, and percentage growth/loss. Be transparent that historical inventory valuation uses the currently stored marketValue when older market-value versions are not available.
 
 IMAGE AUTO-ENTRY RULE: When a user uploads a hardware photo to Buy, treat the photo as an extraction task: identify visible brand/model/spec text and map it to the app's category list. Never invent an exact model or price that is not visible.
 
@@ -573,6 +605,165 @@ For business strategy questions, offer thoughtful advice that considers pricing,
             };
             available.forEach(p => { summary.byCategory[p.category] = (summary.byCategory[p.category] || 0) + 1; });
             return JSON.stringify(summary);
+          }
+
+          case 'calculate_net_worth_growth': {
+            const startDate = String(toolInput.startDate || '').trim();
+            if (!startDate) return 'Missing startDate. Use YYYY-MM-DD.';
+
+            const startMs = cbDateMs(startDate);
+            if (Number.isNaN(startMs)) return `Invalid startDate: ${startDate}`;
+
+            // Always refresh from the same /data endpoint used by the app so the calculation
+            // includes the latest persisted cash, inventory, sales, and ledger records.
+            let dbState = liveState;
+            try {
+              const dbRes = await fetch('/data', { cache: 'no-store' });
+              if (dbRes.ok) {
+                const fresh = await dbRes.json();
+                if (fresh && Object.keys(fresh).length) dbState = { ...liveState, ...fresh };
+              }
+            } catch (err) {
+              console.warn('Live database read failed; using current in-memory state:', err);
+            }
+
+            const parts = Array.isArray(dbState.parts) ? dbState.parts : [];
+            const sales = Array.isArray(dbState.sales) ? dbState.sales : [];
+            const transactions = Array.isArray(dbState.transactions) ? dbState.transactions : [];
+            const builds = Array.isArray(dbState.builds) ? dbState.builds : [];
+
+            // Keep this definition exactly aligned with Dashboard.jsx.
+            const marketValueOf = (part) => {
+              const market = Number(part?.marketValue || 0);
+              const cost = Number(part?.allocatedCost || 0);
+              return market > 0 ? market : cost;
+            };
+
+            const currentActiveInventory = parts.filter(
+              p => p.status === 'available' || p.status === 'in_build'
+            );
+            const currentInventoryMarketValue = currentActiveInventory.reduce(
+              (sum, p) => sum + marketValueOf(p),
+              0
+            );
+            const currentCash = Number(dbState.businessCash || 0);
+            const currentNetWorth = currentCash + currentInventoryMarketValue;
+
+            // Reconstruct the business cash balance at the start date by reversing every
+            // business-wallet cash movement that happened on/after the start date.
+            const businessCashDelta = (txn) => {
+              const amount = Number(txn?.amount || 0);
+              const wallet = txn?.wallet || '';
+
+              switch (txn?.type) {
+                case 'PURCHASE':
+                  return wallet === 'business' || !wallet ? -amount : 0;
+                case 'SALE':
+                  return wallet === 'business' || !wallet ? amount : 0;
+                case 'EXPENSE':
+                  return wallet === 'business' || !wallet ? -amount : 0;
+                case 'INCOME':
+                  return wallet === 'business' || !wallet ? amount : 0;
+                case 'REVERSAL':
+                  return wallet === 'business' || !wallet ? -amount : 0;
+                case 'TRANSFER':
+                  if (txn?.from === 'business') return -amount;
+                  if (txn?.to === 'business') return amount;
+                  return 0;
+                default:
+                  return 0;
+              }
+            };
+
+            const postStartCashChange = transactions
+              .filter(txn => {
+                const d = cbDateMs(txn?.date);
+                return !Number.isNaN(d) && d >= startMs;
+              })
+              .reduce((sum, txn) => sum + businessCashDelta(txn), 0);
+
+            const historicalCash = currentCash - postStartCashChange;
+
+            // Determine whether each inventory item existed at the beginning of the requested
+            // period. Parts store an event history; sales additionally keep buildPart snapshots.
+            const partWasPresentAtStart = (part) => {
+              const history = Array.isArray(part?.history) ? part.history : [];
+              const firstHistoryDate = cbDateMs(history[0]?.date);
+
+              if (Number.isNaN(firstHistoryDate) || firstHistoryDate >= startMs) {
+                return false;
+              }
+
+              let present = true;
+
+              const partEvents = sales
+                .filter(sale => {
+                  if (sale?.partId === part.id) return true;
+
+                  if (sale?.buildId && Array.isArray(sale.buildPartsSnapshot)) {
+                    return sale.buildPartsSnapshot.some(component => component?.id === part.id);
+                  }
+
+                  // Backward compatibility for older build sales that were recorded before
+                  // buildPartsSnapshot existed.
+                  if (sale?.buildId) {
+                    const build = builds.find(b => b.id === sale.buildId);
+                    return !!build?.partIds?.includes(part.id);
+                  }
+
+                  return false;
+                })
+                .filter(sale => {
+                  const saleDate = cbDateMs(sale?.date);
+                  return !Number.isNaN(saleDate) && saleDate < startMs;
+                })
+                .sort((a, b) => cbDateMs(a.date) - cbDateMs(b.date));
+
+              for (const sale of partEvents) {
+                if (sale?.writeOff) {
+                  present = false;
+                  continue;
+                }
+
+                const returnedAt = cbDateMs(sale?.returnedAt);
+                if (sale?.returnedAt && !Number.isNaN(returnedAt) && returnedAt < startMs) {
+                  present = true;
+                } else {
+                  present = false;
+                }
+              }
+
+              return present;
+            };
+
+            const historicalInventory = parts.filter(partWasPresentAtStart);
+            const historicalInventoryMarketValue = historicalInventory.reduce(
+              (sum, p) => sum + marketValueOf(p),
+              0
+            );
+            const historicalNetWorth = historicalCash + historicalInventoryMarketValue;
+            const growth = currentNetWorth - historicalNetWorth;
+            const growthPct = historicalNetWorth !== 0
+              ? growth / Math.abs(historicalNetWorth)
+              : null;
+
+            return JSON.stringify({
+              startDate,
+              asOfDate: cbToday(),
+              historicalNetWorth,
+              currentNetWorth,
+              growth,
+              growthPct,
+              historicalCash,
+              currentCash,
+              historicalInventoryMarketValue,
+              currentInventoryMarketValue,
+              historicalInventoryItems: historicalInventory.length,
+              currentInventoryItems: currentActiveInventory.length,
+              limitations: [
+                "Historical inventory valuation uses each item's currently stored marketValue because the app does not retain a full time series of prior market values."
+              ],
+            });
           }
 
           case 'query_business_database': {
