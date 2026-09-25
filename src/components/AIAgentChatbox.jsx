@@ -260,16 +260,33 @@ export function AIAgentChatbox({
         },
         {
           name: 'calculate_net_worth_growth',
-          description: 'Calculate business net worth growth from a historical start date up to now. Use this for questions like "how much did my business net worth grow since September?", "what is my net worth growth?", or "how much did my business grow financially?". The Dashboard definition is business cash plus market value of active inventory (available and in-build parts), excluding the personal wallet. Reconstruct the historical starting value from dated transactions, purchases, sales, returns, and write-offs. If the user says "since September" without a year, use the most recent September. Return the actual calculated numbers; do not say historical net worth cannot be calculated.',
+          description: 'Analyze business net worth over time. Use this for ANY question about historical net worth, net worth growth, net worth on a specific date, last 6 months of net worth, biggest monthly increase, or why net worth changed. Use saved netWorthSnapshots as the primary source, but NEVER stop just because a requested date has no saved snapshot. For dates before the snapshot history begins, or for missing dates, reconstruct the historical position from the business transaction ledger and item history. Net worth is business cash + inventory market value + outstanding receivables - total debt, excluding the personal wallet. Use mode="point" for a specific date, mode="growth" for growth since a start date, mode="trend" for the requested number of months, mode="best_month" for the month with the largest increase, and mode="change_analysis" to explain a change using the four tracked components. When reconstructing older history, use each item\'s current stored marketValue because prior market-value versions are not retained, and clearly label the result as reconstructed/estimated rather than claiming it is an exact saved snapshot.',
           parameters: {
             type: 'object',
             properties: {
+              mode: {
+                type: 'string',
+                enum: ['point','growth','trend','best_month','change_analysis'],
+                description: 'point = net worth on a date; growth = change from startDate to now or endDate; trend = monthly history; best_month = largest month-to-month increase; change_analysis = explain the change between two saved snapshots by decomposing cash, inventory value, receivables, and debt.'
+              },
+              date: {
+                type: 'string',
+                description: 'Requested historical date in YYYY-MM-DD format for mode point.'
+              },
               startDate: {
                 type: 'string',
-                description: 'Start date in YYYY-MM-DD format. For "since September", use September 1 of the relevant year.'
+                description: 'Starting date in YYYY-MM-DD format for mode growth.'
+              },
+              endDate: {
+                type: 'string',
+                description: 'Optional ending date in YYYY-MM-DD format for mode growth. Defaults to the latest snapshot/current position.'
+              },
+              months: {
+                type: 'number',
+                description: 'Number of calendar months for mode trend. Defaults to 6 and is capped at 24.'
               },
             },
-            required: ['startDate'],
+            required: ['mode'],
           },
         },
         {
@@ -426,7 +443,7 @@ When the user wants to change what's in an already-assembled build ("swap the RA
 
 DATABASE ACCESS RULES: You have read access to the business database through query_business_database. Use it whenever the user asks about past transactions, purchase history, sales history, expenses, cash movements, bundle contents, build records, item history, profits, or any stored business fact. Do not guess from conversation memory when the answer should come from stored records. The tool reads the server /data endpoint backed by PocketBase, so it can see records beyond the small live-inventory summary. If the user asks about what they previously asked or discussed with you inside this website, use query_chat_history.
 
-NET WORTH RULE: When the user asks about business net worth, net worth growth, business growth in value, or asks "how much did my business net worth grow since [date/month]", you MUST use calculate_net_worth_growth. Do not respond that historical net worth cannot be calculated. The Dashboard definition is business cash + market value of active inventory, where active inventory includes both available and in-build parts and excludes the personal wallet. For "since September" without a year, use the most recent September. Report the starting net worth, current net worth, absolute growth/loss, and percentage growth/loss. Be transparent that historical inventory valuation uses the currently stored marketValue when older market-value versions are not available.
+NET WORTH RULE: When the user asks about business net worth, historical net worth, net worth growth, business growth in value, net worth on a date, last N months of net worth, biggest month-to-month increase, or why net worth changed, you MUST use calculate_net_worth_growth. Do not refuse merely because a saved snapshot is missing. Use saved netWorthSnapshots when available, but use the tool's historical reconstruction when the requested date is before the snapshot history or a daily snapshot is missing. The Dashboard definition is business cash + inventory market value + outstanding receivables - total debt, excluding the personal wallet. For "since September" without a year, use the most recent September. For a specific date, report the exact saved snapshot when available; otherwise report the reconstructed end-of-day value and explicitly say it is reconstructed. For growth, report the starting net worth, ending net worth, absolute change, and percentage change. For trend, present monthly values even when older months are reconstructed. For best_month, analyze the available history rather than stopping at the first snapshot date. For change_analysis, identify which tracked components caused the increase/decrease. When a historical value is reconstructed, explain that inventory market value uses each item\'s current stored marketValue because prior market-value versions are not retained. Keep responses concise and conversational.
 
 IMAGE AUTO-ENTRY RULE: When a user uploads a hardware photo to Buy, treat the photo as an extraction task: identify visible brand/model/spec text and map it to the app's category list. Never invent an exact model or price that is not visible.
 
@@ -608,164 +625,433 @@ For business strategy questions, offer thoughtful advice that considers pricing,
           }
 
           case 'calculate_net_worth_growth': {
+            const mode = String(toolInput.mode || 'growth').toLowerCase();
+            const requestedDate = String(toolInput.date || '').trim();
             const startDate = String(toolInput.startDate || '').trim();
-            if (!startDate) return 'Missing startDate. Use YYYY-MM-DD.';
+            const endDate = String(toolInput.endDate || '').trim();
+            const months = Math.min(24, Math.max(1, Math.floor(Number(toolInput.months) || 6)));
 
-            const startMs = cbDateMs(startDate);
-            if (Number.isNaN(startMs)) return `Invalid startDate: ${startDate}`;
-
-            // Always refresh from the same /data endpoint used by the app so the calculation
-            // includes the latest persisted cash, inventory, sales, and ledger records.
             let dbState = liveState;
             try {
               const dbRes = await fetch('/data', { cache: 'no-store' });
               if (dbRes.ok) {
                 const fresh = await dbRes.json();
-                if (fresh && Object.keys(fresh).length) dbState = { ...liveState, ...fresh };
+                if (fresh && Object.keys(fresh).length) {
+                  dbState = { ...fresh, ...liveState };
+                  dbState.netWorthSnapshots = [
+                    ...(Array.isArray(fresh.netWorthSnapshots) ? fresh.netWorthSnapshots : []),
+                    ...(Array.isArray(liveState.netWorthSnapshots) ? liveState.netWorthSnapshots : []),
+                  ];
+                }
               }
             } catch (err) {
               console.warn('Live database read failed; using current in-memory state:', err);
             }
 
+            const localISO = (d = new Date()) => {
+              const y = d.getFullYear();
+              const m = String(d.getMonth() + 1).padStart(2, '0');
+              const day = String(d.getDate()).padStart(2, '0');
+              return `${y}-${m}-${day}`;
+            };
+
+            const dateKey = (value) => {
+              if (!value) return '';
+              const str = String(value).trim();
+              if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+              const d = new Date(str);
+              if (Number.isNaN(d.getTime())) return '';
+              return localISO(d);
+            };
+
+            const todayKey = localISO();
             const parts = Array.isArray(dbState.parts) ? dbState.parts : [];
             const sales = Array.isArray(dbState.sales) ? dbState.sales : [];
             const transactions = Array.isArray(dbState.transactions) ? dbState.transactions : [];
-            const builds = Array.isArray(dbState.builds) ? dbState.builds : [];
+            const savedSnapshots = Array.isArray(dbState.netWorthSnapshots) ? dbState.netWorthSnapshots : [];
 
-            // Keep this definition exactly aligned with Dashboard.jsx.
-            const marketValueOf = (part) => {
-              const market = Number(part?.marketValue || 0);
-              const cost = Number(part?.allocatedCost || 0);
-              return market > 0 ? market : cost;
-            };
+            const normaliseSnapshot = (s) => ({
+              ...s,
+              date: dateKey(s?.date),
+              netWorth: Number(s?.netWorth || 0),
+              businessCash: Number(s?.businessCash || 0),
+              inventoryCost: Number(s?.inventoryCost || 0),
+              inventoryMarketValue: Number(s?.inventoryMarketValue || 0),
+              outstandingReceivables: Number(s?.outstandingReceivables || 0),
+              totalDebt: Number(s?.totalDebt || 0),
+              activeInventoryCount: Number(s?.activeInventoryCount || 0),
+            });
 
-            const currentActiveInventory = parts.filter(
-              p => p.status === 'available' || p.status === 'in_build'
-            );
-            const currentInventoryMarketValue = currentActiveInventory.reduce(
-              (sum, p) => sum + marketValueOf(p),
-              0
-            );
-            const currentCash = Number(dbState.businessCash || 0);
-            const currentNetWorth = currentCash + currentInventoryMarketValue;
+            const byDate = new Map();
+            for (const raw of savedSnapshots) {
+              const s = normaliseSnapshot(raw);
+              if (!s.date || !Number.isFinite(s.netWorth)) continue;
+              const old = byDate.get(s.date);
+              if (!old || String(s.capturedAt || '') >= String(old.capturedAt || '')) byDate.set(s.date, s);
+            }
+            const history = [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
 
-            // Reconstruct the business cash balance at the start date by reversing every
-            // business-wallet cash movement that happened on/after the start date.
-            const businessCashDelta = (txn) => {
+            const currentLive = (() => {
+              const active = parts.filter(p => p.status === 'available' || p.status === 'in_build');
+              const inventoryMarketValue = active.reduce((sum, p) => {
+                const market = Number(p?.marketValue || 0);
+                const cost = Number(p?.allocatedCost || 0);
+                return sum + (market > 0 ? market : cost);
+              }, 0);
+              const inventoryCost = active.reduce((sum, p) => sum + Number(p?.allocatedCost || 0), 0);
+              const businessCash = Number(dbState.businessCash || 0);
+              const outstandingReceivables = Number(dbState.outstandingReceivables || 0);
+              const totalDebt = Number(dbState.totalDebt || 0);
+              return {
+                id: `nw_live_${todayKey}`,
+                date: todayKey,
+                capturedAt: new Date().toISOString(),
+                source: 'live_current_state',
+                businessCash,
+                inventoryCost,
+                inventoryMarketValue,
+                outstandingReceivables,
+                totalDebt,
+                netWorth: businessCash + inventoryMarketValue + outstandingReceivables - totalDebt,
+                activeInventoryCount: active.length,
+              };
+            })();
+
+            const transactionCashDelta = (txn) => {
               const amount = Number(txn?.amount || 0);
-              const wallet = txn?.wallet || '';
-
+              const wallet = txn?.wallet || 'business';
               switch (txn?.type) {
-                case 'PURCHASE':
-                  return wallet === 'business' || !wallet ? -amount : 0;
-                case 'SALE':
-                  return wallet === 'business' || !wallet ? amount : 0;
-                case 'EXPENSE':
-                  return wallet === 'business' || !wallet ? -amount : 0;
-                case 'INCOME':
-                  return wallet === 'business' || !wallet ? amount : 0;
-                case 'REVERSAL':
-                  return wallet === 'business' || !wallet ? -amount : 0;
+                case 'PURCHASE': return wallet === 'business' ? -amount : 0;
+                case 'SALE': return wallet === 'business' ? amount : 0;
+                case 'EXPENSE': return wallet === 'business' ? -amount : 0;
+                case 'INCOME': return wallet === 'business' ? amount : 0;
                 case 'TRANSFER':
                   if (txn?.from === 'business') return -amount;
                   if (txn?.to === 'business') return amount;
                   return 0;
-                default:
-                  return 0;
+                case 'REVERSAL': return wallet === 'business' ? -amount : 0;
+                default: return 0;
               }
             };
 
-            const postStartCashChange = transactions
-              .filter(txn => {
-                const d = cbDateMs(txn?.date);
-                return !Number.isNaN(d) && d >= startMs;
-              })
-              .reduce((sum, txn) => sum + businessCashDelta(txn), 0);
+            const reconstructSnapshot = (targetDate) => {
+              const key = dateKey(targetDate);
+              if (!key) return null;
 
-            const historicalCash = currentCash - postStartCashChange;
+              // Reverse all business-cash movements after the requested day.
+              // Transactions on the requested day remain included in the historical balance,
+              // so the reconstructed snapshot represents the end of that calendar day.
+              const cashAfterTarget = transactions
+                .filter(txn => dateKey(txn?.date) > key)
+                .reduce((sum, txn) => sum + transactionCashDelta(txn), 0);
+              const businessCash = Number(dbState.businessCash || 0) - cashAfterTarget;
 
-            // Determine whether each inventory item existed at the beginning of the requested
-            // period. Parts store an event history; sales additionally keep buildPart snapshots.
-            const partWasPresentAtStart = (part) => {
-              const history = Array.isArray(part?.history) ? part.history : [];
-              const firstHistoryDate = cbDateMs(history[0]?.date);
+              const activeAtDate = [];
+              for (const part of parts) {
+                const historyEntries = Array.isArray(part?.history)
+                  ? part.history
+                    .map(h => ({ ...h, day: dateKey(h?.date) }))
+                    .filter(h => h.day)
+                    .sort((a, b) => a.day.localeCompare(b.day))
+                  : [];
 
-              if (Number.isNaN(firstHistoryDate) || firstHistoryDate >= startMs) {
-                return false;
-              }
+                const created = historyEntries[0]?.day;
+                if (!created || created > key) continue;
 
-              let present = true;
+                let present = true;
+                for (const h of historyEntries) {
+                  if (h.day > key) break;
+                  const event = String(h.event || '').toLowerCase();
 
-              const partEvents = sales
-                .filter(sale => {
-                  if (sale?.partId === part.id) return true;
-
-                  if (sale?.buildId && Array.isArray(sale.buildPartsSnapshot)) {
-                    return sale.buildPartsSnapshot.some(component => component?.id === part.id);
+                  if (
+                    event.includes('sold to ') ||
+                    event.includes('sold in build') ||
+                    event.includes('marked defective/write-off') ||
+                    event.includes('marked defective') ||
+                    event.includes('write-off')
+                  ) {
+                    present = false;
                   }
 
-                  // Backward compatibility for older build sales that were recorded before
-                  // buildPartsSnapshot existed.
-                  if (sale?.buildId) {
-                    const build = builds.find(b => b.id === sale.buildId);
-                    return !!build?.partIds?.includes(part.id);
+                  if (
+                    event.includes('sale undone') &&
+                    (event.includes('returned to inventory') || event.includes('reactivated'))
+                  ) {
+                    present = true;
                   }
 
-                  return false;
-                })
-                .filter(sale => {
-                  const saleDate = cbDateMs(sale?.date);
-                  return !Number.isNaN(saleDate) && saleDate < startMs;
-                })
-                .sort((a, b) => cbDateMs(a.date) - cbDateMs(b.date));
-
-              for (const sale of partEvents) {
-                if (sale?.writeOff) {
-                  present = false;
-                  continue;
+                  if (
+                    event.includes('sale record deleted') &&
+                    (event.includes('returned to inventory') || event.includes('reactivated'))
+                  ) {
+                    present = true;
+                  }
                 }
 
-                const returnedAt = cbDateMs(sale?.returnedAt);
-                if (sale?.returnedAt && !Number.isNaN(returnedAt) && returnedAt < startMs) {
-                  present = true;
-                } else {
-                  present = false;
-                }
+                if (present) activeAtDate.push(part);
               }
 
-              return present;
+              const inventoryMarketValue = activeAtDate.reduce((sum, p) => {
+                const market = Number(p?.marketValue || 0);
+                const cost = Number(p?.allocatedCost || 0);
+                return sum + (market > 0 ? market : cost);
+              }, 0);
+              const inventoryCost = activeAtDate.reduce(
+                (sum, p) => sum + Number(p?.allocatedCost || 0),
+                0
+              );
+
+              // Receivables and debt currently have no dated history in the state model, so the
+              // best defensible reconstruction is their currently stored values. They are exposed
+              // separately so the model does not mistake them for transaction-derived history.
+              const outstandingReceivables = Number(dbState.outstandingReceivables || 0);
+              const totalDebt = Number(dbState.totalDebt || 0);
+              const netWorth =
+                businessCash +
+                inventoryMarketValue +
+                outstandingReceivables -
+                totalDebt;
+
+              return {
+                id: `nw_reconstructed_${key}`,
+                date: key,
+                capturedAt: null,
+                source: 'reconstructed',
+                businessCash,
+                inventoryCost,
+                inventoryMarketValue,
+                outstandingReceivables,
+                totalDebt,
+                netWorth,
+                activeInventoryCount: activeAtDate.length,
+                exactHistoricalMarketValues: false,
+              };
             };
 
-            const historicalInventory = parts.filter(partWasPresentAtStart);
-            const historicalInventoryMarketValue = historicalInventory.reduce(
-              (sum, p) => sum + marketValueOf(p),
-              0
-            );
-            const historicalNetWorth = historicalCash + historicalInventoryMarketValue;
-            const growth = currentNetWorth - historicalNetWorth;
-            const growthPct = historicalNetWorth !== 0
-              ? growth / Math.abs(historicalNetWorth)
-              : null;
+            const firstSavedDate = history[0]?.date || null;
 
-            return JSON.stringify({
-              startDate,
-              asOfDate: cbToday(),
-              historicalNetWorth,
-              currentNetWorth,
-              growth,
-              growthPct,
-              historicalCash,
-              currentCash,
-              historicalInventoryMarketValue,
-              currentInventoryMarketValue,
-              historicalInventoryItems: historicalInventory.length,
-              currentInventoryItems: currentActiveInventory.length,
-              limitations: [
-                "Historical inventory valuation uses each item's currently stored marketValue because the app does not retain a full time series of prior market values."
-              ],
-            });
+            // A saved snapshot is always preferred. If it is missing, reconstruct the exact day
+            // from the transaction ledger + item history instead of refusing the question.
+            const resolveSnapshot = (targetDate, allowFutureCurrent = false) => {
+              const key = dateKey(targetDate);
+              if (!key) return null;
+
+              if (allowFutureCurrent && key >= todayKey) return currentLive;
+
+              const exact = history.find(s => s.date === key);
+              if (exact) return { ...exact, source: 'saved_snapshot' };
+
+              return reconstructSnapshot(key);
+            };
+
+            if (mode === 'point') {
+              if (!requestedDate) return 'Missing date. Provide the requested date as YYYY-MM-DD.';
+              const key = dateKey(requestedDate);
+              if (!key) return `Invalid date: ${requestedDate}`;
+
+              const snapshot = resolveSnapshot(key, true);
+              if (!snapshot) {
+                return JSON.stringify({
+                  mode,
+                  available: false,
+                  requestedDate: key,
+                  firstSnapshotDate: firstSavedDate,
+                  message: 'The historical position could not be reconstructed from the available records.'
+                });
+              }
+
+              return JSON.stringify({
+                mode,
+                available: true,
+                requestedDate: key,
+                snapshot,
+                exactSavedSnapshot: snapshot.source === 'saved_snapshot',
+                reconstructionUsed: snapshot.source === 'reconstructed',
+                firstSavedSnapshotDate: firstSavedDate,
+                valuationNote: snapshot.source === 'reconstructed'
+                  ? 'Historical inventory market value uses each item\'s currently stored marketValue because prior market-value versions are not retained.'
+                  : null,
+              });
+            }
+
+            if (mode === 'growth') {
+              if (!startDate) return 'Missing startDate. Provide the start date as YYYY-MM-DD.';
+              const startKey = dateKey(startDate);
+              if (!startKey) return `Invalid startDate: ${startDate}`;
+
+              const start = resolveSnapshot(startKey);
+              if (!start) {
+                return JSON.stringify({
+                  mode,
+                  available: false,
+                  requestedStartDate: startKey,
+                  firstSnapshotDate: firstSavedDate,
+                  message: 'The historical starting value could not be reconstructed from the available records.'
+                });
+              }
+
+              let end = currentLive;
+              if (endDate) {
+                const endKey = dateKey(endDate);
+                if (!endKey) return `Invalid endDate: ${endDate}`;
+                end = resolveSnapshot(endKey, true);
+                if (!end) {
+                  return JSON.stringify({ mode, available: false, requestedEndDate: endKey });
+                }
+              }
+
+              const growth = end.netWorth - start.netWorth;
+              const growthPct = start.netWorth !== 0 ? growth / Math.abs(start.netWorth) : null;
+
+              return JSON.stringify({
+                mode,
+                available: true,
+                requestedStartDate: startKey,
+                startSnapshot: start,
+                endSnapshot: end,
+                growth,
+                growthPct,
+                exactStartDate: start.date === startKey,
+                exactEndDate: !endDate || end.date === dateKey(endDate),
+                reconstructionUsed: start.source === 'reconstructed' || end.source === 'reconstructed',
+                valuationNote: start.source === 'reconstructed'
+                  ? 'The starting inventory market value is reconstructed using each item\'s current stored marketValue because historical market-value versions are not retained.'
+                  : null,
+              });
+            }
+
+            if (mode === 'trend') {
+              const now = new Date();
+              const rows = [];
+              for (let i = months - 1; i >= 0; i--) {
+                const first = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const last = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+                const key = localISO(last);
+                const resolved = key === todayKey ? currentLive : resolveSnapshot(key, true);
+                rows.push({
+                  month: `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}`,
+                  label: last.toLocaleDateString('en-PH', { month: 'short', year: 'numeric' }),
+                  netWorth: resolved?.netWorth ?? null,
+                  snapshotDate: resolved?.date ?? null,
+                  source: resolved?.source ?? null,
+                });
+              }
+              return JSON.stringify({
+                mode,
+                months,
+                rows,
+                firstSavedSnapshotDate: firstSavedDate,
+                reconstructionAvailable: parts.length > 0 || transactions.length > 0,
+              });
+            }
+
+            if (mode === 'change_analysis') {
+              if (!startDate) return 'Missing startDate. Provide the beginning date as YYYY-MM-DD.';
+              const startKey = dateKey(startDate);
+              if (!startKey) return `Invalid startDate: ${startDate}`;
+
+              const start = resolveSnapshot(startKey);
+              if (!start) return JSON.stringify({ mode, available: false, requestedStartDate: startKey });
+
+              const end = endDate
+                ? resolveSnapshot(endDate, true)
+                : currentLive;
+              if (!end) return JSON.stringify({ mode, available: false, requestedEndDate: endDate || todayKey });
+
+              const delta = {
+                businessCash: end.businessCash - start.businessCash,
+                inventoryMarketValue: end.inventoryMarketValue - start.inventoryMarketValue,
+                outstandingReceivables: end.outstandingReceivables - start.outstandingReceivables,
+                totalDebt: end.totalDebt - start.totalDebt,
+                netWorth: end.netWorth - start.netWorth,
+              };
+
+              const contributors = [
+                { name: 'Business cash', impact: delta.businessCash },
+                { name: 'Inventory market value', impact: delta.inventoryMarketValue },
+                { name: 'Outstanding receivables', impact: delta.outstandingReceivables },
+                { name: 'Debt reduction', impact: -delta.totalDebt },
+              ].sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact));
+
+              return JSON.stringify({
+                mode,
+                available: true,
+                startSnapshot: start,
+                endSnapshot: end,
+                delta,
+                contributors,
+                reconstructionUsed: start.source === 'reconstructed' || end.source === 'reconstructed',
+              });
+            }
+
+            if (mode === 'best_month') {
+              const currentMonth = new Date();
+              const monthly = [];
+
+              // Analyze up to 24 months, but start from the earliest month represented by the
+              // available records when that is earlier than the rolling window. This restores the
+              // useful pre-snapshot analysis the previous AI behaviour provided.
+              const knownDays = [
+                ...history.map(s => s.date),
+                ...transactions.map(t => dateKey(t?.date)).filter(Boolean),
+                ...parts.flatMap(p => Array.isArray(p?.history) ? p.history.map(h => dateKey(h?.date)).filter(Boolean) : []),
+              ].sort();
+
+              const earliest = knownDays[0] || localISO(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - (months - 1), 1));
+              const earliestDate = new Date(`${earliest}T00:00:00`);
+              const rollingStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - (months - 1), 1);
+              const startMonth = earliestDate < rollingStart ? earliestDate : rollingStart;
+
+              const cursor = new Date(startMonth.getFullYear(), startMonth.getMonth(), 1);
+              while (cursor <= currentMonth) {
+                const last = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+                const monthEndKey = cursor.getFullYear() === currentMonth.getFullYear() && cursor.getMonth() === currentMonth.getMonth()
+                  ? todayKey
+                  : localISO(last);
+                const value = monthEndKey === todayKey
+                  ? currentLive
+                  : resolveSnapshot(monthEndKey, true);
+
+                monthly.push({
+                  key: `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`,
+                  label: cursor.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' }),
+                  snapshot: value,
+                });
+
+                cursor.setMonth(cursor.getMonth() + 1);
+              }
+
+              const increases = [];
+              for (let i = 1; i < monthly.length; i++) {
+                const previous = monthly[i - 1];
+                const current = monthly[i];
+                if (!previous.snapshot || !current.snapshot) continue;
+                increases.push({
+                  month: current.key,
+                  label: current.label,
+                  previousMonth: previous.key,
+                  increase: current.snapshot.netWorth - previous.snapshot.netWorth,
+                  from: previous.snapshot.netWorth,
+                  to: current.snapshot.netWorth,
+                  previousSource: previous.snapshot.source,
+                  source: current.snapshot.source,
+                });
+              }
+
+              increases.sort((a, b) => b.increase - a.increase);
+              return JSON.stringify({
+                mode,
+                available: increases.length > 0,
+                bestMonth: increases[0] || null,
+                monthlyChanges: increases,
+                firstSavedSnapshotDate: firstSavedDate,
+                reconstructionUsed: increases.some(x => x.source === 'reconstructed' || x.previousSource === 'reconstructed'),
+                valuationNote: 'Reconstructed historical months use each item\'s current stored marketValue because prior market-value versions are not retained.',
+              });
+            }
+
+            return `Unknown net-worth analysis mode: ${mode}`;
           }
-
           case 'query_business_database': {
             const scope = toolInput.scope || 'summary';
             const query = String(toolInput.query || '').trim().toLowerCase();
@@ -807,9 +1093,20 @@ For business strategy questions, offer thoughtful advice that considers pricing,
               const activeSales = (dbState.sales || []).filter(s => !s.deleted && !s.returned);
               const totalRevenue = activeSales.reduce((sum, s) => sum + (Number(s.salePrice) || 0), 0);
               const totalProfit = activeSales.reduce((sum, s) => sum + (Number(s.profit) || 0), 0);
+              const activeBusinessParts = (dbState.parts || []).filter(p => p.status === 'available' || p.status === 'in_build');
+              const inventoryMarketValue = activeBusinessParts.reduce((sum,p) => {
+                const market=Number(p.marketValue || 0);
+                const cost=Number(p.allocatedCost || 0);
+                return sum + (market > 0 ? market : cost);
+              },0);
+              const currentNetWorth = Number(dbState.businessCash || 0) + inventoryMarketValue + Number(dbState.outstandingReceivables || 0) - Number(dbState.totalDebt || 0);
               return JSON.stringify({
                 businessCash: dbState.businessCash || 0,
                 personalCash: dbState.personalCash || 0,
+                inventoryMarketValue,
+                outstandingReceivables: dbState.outstandingReceivables || 0,
+                totalDebt: dbState.totalDebt || 0,
+                netWorth: currentNetWorth,
                 activeInventory: activeParts.length,
                 inventoryByCategory: activeParts.reduce((a,p) => { a[p.category] = (a[p.category] || 0) + 1; return a; }, {}),
                 bundles: (dbState.bundles || []).length,
@@ -888,6 +1185,9 @@ For business strategy questions, offer thoughtful advice that considers pricing,
                 expenses: (dbState.expenses || []).filter(e => matches(e)).slice(0, limit),
                 quickNotes: (dbState.quickNotes || []).filter(n => matches(n)).slice(0, limit),
                 settings: dbState.settings || {},
+                netWorthSnapshots: (dbState.netWorthSnapshots || []).slice(-100),
+                outstandingReceivables: dbState.outstandingReceivables || 0,
+                totalDebt: dbState.totalDebt || 0,
               });
             }
 
