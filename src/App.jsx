@@ -22,15 +22,19 @@ let _id = Date.now();
 const uid = () => `id_${_id++}`;
 const CATEGORIES = ["GPU","CPU","Motherboard","CPU+MB","RAM","PSU","Storage","Cooler","Case","Monitor","Mouse","Keyboard","Other"];
 
-// Every built-in category is a PC part by definition. Custom categories (added via the
-// "+ Add Category" picker) carry their own domain in state.customCategories, looked up at
-// render/dispatch time rather than re-derived from the category name string.
+const categoryKey = (name) => String(name || "").trim().toLowerCase().replace(/\s+/g," ");
+const findBuiltInCategory = (name) => CATEGORIES.find(c => categoryKey(c) === categoryKey(name));
+const findCustomCategory = (name, customCategories=[]) => (customCategories||[]).find(c => categoryKey(c?.name) === categoryKey(name));
+
+// Every built-in category is a PC part by definition. Custom categories carry their own
+// domain in state.customCategories. Unknown legacy categories are recovered on load.
 function domainOf(category, customCategories){
-  if(CATEGORIES.includes(category))return "pc_part";
-  const custom=customCategories?.find(c=>c.name===category);
-  return custom?custom.domain:"pc_part"; // safe default — never silently misfile into General Assets
+  const builtIn=findBuiltInCategory(category);
+  if(builtIn)return "pc_part";
+  const custom=findCustomCategory(category,customCategories);
+  return custom?custom.domain:"pc_part";
 }
-const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ targetMargin:30 }, customCategories:[], quickNotes:[], businessCash:14500, personalCash:0, expenses:[], transactions:[], netWorthSnapshots:[], outstandingReceivables:0, totalDebt:0 };
+const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ targetMargin:30 }, customCategories:[], hiddenCategories:[], quickNotes:[], businessCash:14500, personalCash:0, expenses:[], transactions:[], netWorthSnapshots:[], outstandingReceivables:0, totalDebt:0 };
 
 // Historical financial snapshots are the source of truth for net-worth-over-time analysis.
 // One snapshot is kept per local calendar day; when the business changes during the day,
@@ -84,6 +88,23 @@ const SNAPSHOT_ACTIONS = new Set([
   'UPDATE_LIQUID_CASH','UNDO_SALE','DELETE_SALE','DELETE_PART','DUPLICATE_PART','DELETE_BUILD',
   'DELETE_BUNDLE','MARK_DEFECTIVE'
 ]);
+
+// Older versions could save a category directly on a part without registering it in
+// customCategories. Recover those names on load so Buy, Inventory and the manager agree.
+function normalizeCategoryRegistry(state){
+  const hidden=[...(state.hiddenCategories||[])].map(String);
+  const custom=[...(state.customCategories||[])].filter(c=>c?.name).map(c=>({...c,name:String(c.name).trim().replace(/\s+/g," "),domain:c.domain==="general"?"general":"pc_part"}));
+  const seen=new Set(custom.map(c=>categoryKey(c.name)));
+  const hiddenKeys=new Set(hidden.map(categoryKey));
+  for(const part of (state.parts||[])){
+    const name=String(part?.category||"").trim().replace(/\s+/g," ");
+    if(!name || findBuiltInCategory(name) || hiddenKeys.has(categoryKey(name)) || seen.has(categoryKey(name))) continue;
+    custom.push({name,domain:"general"});
+    seen.add(categoryKey(name));
+  }
+  return {...state,customCategories:custom,hiddenCategories:[...new Set(hidden.map(h=>findBuiltInCategory(h)||h))]};
+}
+
 
 /* ═══════════════════════════════════════════
    REDUCER
@@ -206,12 +227,44 @@ function reducer(state, action) {
     case "SET_SETTING":
       return {...state, settings:{...state.settings,[action.key]:action.value}};
 
-    // Dynamic Tag Generation — saves a new category permanently with its domain (PC Part or
-    // General Asset), so it persists across sessions and appears in future dropdowns.
+    // Category manager — custom categories persist in state; built-ins can be hidden/re-enabled.
+    // Category names are case-insensitive and whitespace-normalized so duplicates like
+    // "iPhone", "iphone", and " IPhone " cannot be created. Removing any category moves
+    // existing inventory items into the always-available "Other" bucket.
     case "ADD_CATEGORY": {
-      const {name,domain}=action;
-      if(!name||state.customCategories?.some(c=>c.name===name)||CATEGORIES.includes(name))return state;
-      return {...state, customCategories:[...(state.customCategories||[]),{name,domain}]};
+      const name=String(action.name||"").trim().replace(/\s+/g," ");
+      const domain=action.domain==="general"?"general":"pc_part";
+      if(!name)return state;
+      const key=categoryKey(name);
+      const builtIn=findBuiltInCategory(name);
+      if(builtIn){
+        return {...state,hiddenCategories:(state.hiddenCategories||[]).filter(c=>categoryKey(c)!==key)};
+      }
+      if((state.customCategories||[]).some(c=>categoryKey(c?.name)===key))return state;
+      return {...state,customCategories:[...(state.customCategories||[]),{name,domain}]};
+    }
+
+    case "REMOVE_CATEGORY": {
+      const target=String(action.name||"").trim();
+      const targetKey=categoryKey(target);
+      if(!targetKey || targetKey===categoryKey("Other"))return state;
+      const builtIn=findBuiltInCategory(target);
+      const customExists=(state.customCategories||[]).some(c=>categoryKey(c?.name)===targetKey);
+      if(!builtIn && !customExists)return state;
+
+      const parts=state.parts.map(p=>categoryKey(p.category)===targetKey
+        ? {...p,category:"Other",history:[...(Array.isArray(p.history)?p.history:[]),{date:today(),event:`Category "${p.category}" removed — moved to Other` }]}
+        : p);
+
+      return {...state,
+        hiddenCategories: builtIn
+          ? [...new Set([...(state.hiddenCategories||[]),builtIn])]
+          : (state.hiddenCategories||[]),
+        customCategories: builtIn
+          ? (state.customCategories||[])
+          : (state.customCategories||[]).filter(c=>categoryKey(c?.name)!==targetKey),
+        parts,
+      };
     }
 
     // Quick Actions toolbar's "Note" option — a fast scratchpad entry with no other fields,
@@ -1015,11 +1068,20 @@ function Sel({label,children,style,...props}) {
 /* ═══════════════════════════════════════════
    CATEGORY PICKER
 ═══════════════════════════════════════════ */
-function CategoryPicker({label,value,onChange,customCategories,dispatch,style}) {
+function CategoryPicker({label,value,onChange,customCategories,dispatch,style,hiddenCategories=[],knownCategories=[],showManage=false,onManage}) {
   const t=useTheme();
   const [adding,setAdding]=useState(false);
   const [newName,setNewName]=useState("");
-  const [newDomain,setNewDomain]=useState("pc_part");
+  const [newDomain,setNewDomain]=useState("general");
+
+  const hiddenKeys=new Set((hiddenCategories||[]).map(categoryKey));
+  const builtIns=CATEGORIES.filter(c=>!hiddenKeys.has(categoryKey(c)));
+  const custom=(customCategories||[]).filter(c=>c?.name&&!hiddenKeys.has(categoryKey(c.name)));
+  const legacy=(knownCategories||[])
+    .map(v=>String(v||"").trim().replace(/\s+/g," "))
+    .filter(v=>v && !hiddenKeys.has(categoryKey(v)) && !findBuiltInCategory(v) && !findCustomCategory(v,custom))
+    .reduce((acc,v)=>{ if(!acc.some(x=>categoryKey(x)===categoryKey(v))) acc.push(v); return acc; },[]);
+  const options=[...builtIns,...custom.map(c=>c.name),...legacy];
 
   const handleSelect=(e)=>{
     if(e.target.value==="__add__"){setAdding(true);return;}
@@ -1027,23 +1089,30 @@ function CategoryPicker({label,value,onChange,customCategories,dispatch,style}) 
   };
 
   const confirmAdd=()=>{
-    const name=newName.trim();
+    const name=newName.trim().replace(/\s+/g," ");
     if(!name)return;
+    const duplicate=findBuiltInCategory(name)||findCustomCategory(name,customCategories)||
+      (knownCategories||[]).find(v=>categoryKey(v)===categoryKey(name));
+    if(duplicate){
+      onChange(findBuiltInCategory(duplicate)||duplicate?.name||duplicate);
+      setAdding(false);setNewName("");
+      return;
+    }
     dispatch({type:"ADD_CATEGORY",name,domain:newDomain});
     onChange(name);
-    setAdding(false);setNewName("");setNewDomain("pc_part");
+    setAdding(false);setNewName("");setNewDomain("general");
   };
 
   if(adding){
     return (
       <div style={{display:"flex",flexDirection:"column",gap:8,background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:9,padding:10,...style}}>
         <div style={{fontSize:11.5,color:t.textMuted,fontWeight:600}}>New category</div>
-        <input autoFocus value={newName} onChange={e=>setNewName(e.target.value)} placeholder="e.g. Webcam"
-          style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:7,padding:"7px 9px",color:t.text,fontSize:13,fontFamily:FONT_BODY,outline:"none"}}/>
+        <input autoFocus value={newName} onChange={e=>setNewName(e.target.value)} placeholder="e.g. iPhone or Motorcycle"
+          style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:7,padding:"8px 9px",color:t.text,fontSize:13,fontFamily:FONT_BODY,outline:"none"}}/>
         <div style={{display:"flex",gap:6}}>
-          {[["pc_part","PC Part"],["general","General Asset"]].map(([v,l])=>(
+          {[['pc_part','PC part'],['general','General asset']].map(([v,l])=>(
             <button key={v} type="button" onClick={()=>setNewDomain(v)} className="bl-focusable"
-              style={{flex:1,padding:"6px 8px",borderRadius:7,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:FONT_BODY,
+              style={{flex:1,padding:"7px 8px",borderRadius:7,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:FONT_BODY,
                 background:newDomain===v?t.accentSoft:t.surface,border:`1px solid ${newDomain===v?t.accentSoftBorder:t.border}`,color:newDomain===v?t.accent:t.textMuted}}>{l}</button>
           ))}
         </div>
@@ -1056,11 +1125,110 @@ function CategoryPicker({label,value,onChange,customCategories,dispatch,style}) 
   }
 
   return (
-    <Sel label={label} value={value} onChange={handleSelect} style={style}>
-      {CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
-      {(customCategories||[]).map(c=><option key={c.name} value={c.name}>{c.name}</option>)}
-      <option value="__add__">+ Add category…</option>
-    </Sel>
+    <div style={{display:"flex",flexDirection:"column",gap:5,...style}}>
+      <Sel label={label} value={options.some(o=>categoryKey(o)===categoryKey(value))?value:"Other"} onChange={handleSelect} style={{}}>
+        {options.map(c=><option key={`cat-${c}`} value={c}>{c}</option>)}
+        <option value="__add__">+ Add category…</option>
+      </Sel>
+      {showManage&&(
+        <Btn small variant="ghost" icon={Settings} onClick={onManage} style={{alignSelf:"flex-start"}}>Manage categories</Btn>
+      )}
+    </div>
+  );
+}
+
+function CategoryManager({state,dispatch,toast,onClose}) {
+  const t=useTheme();
+  const [adding,setAdding]=useState(false);
+  const [newName,setNewName]=useState("");
+  const [newDomain,setNewDomain]=useState("general");
+  const [pendingRemove,setPendingRemove]=useState(null);
+  const hiddenKeys=new Set((state.hiddenCategories||[]).map(categoryKey));
+  const custom=(state.customCategories||[]).filter(c=>c?.name);
+  const usedCategoryNames=[...new Set((state.parts||[]).map(p=>String(p.category||"").trim()).filter(Boolean))];
+  const activeBuiltIns=CATEGORIES.filter(c=>!hiddenKeys.has(categoryKey(c)));
+  const removedBuiltIns=CATEGORIES.filter(c=>hiddenKeys.has(categoryKey(c)));
+  const legacyCustom=usedCategoryNames.filter(name=>!findBuiltInCategory(name) && !findCustomCategory(name,custom) && !hiddenKeys.has(categoryKey(name)));
+
+  const doAdd=()=>{
+    const name=newName.trim().replace(/\s+/g," ");
+    if(!name)return;
+    const key=categoryKey(name);
+    const built=findBuiltInCategory(name);
+    const exists=activeBuiltIns.some(c=>categoryKey(c)===key) || removedBuiltIns.some(c=>categoryKey(c)===key) || custom.some(c=>categoryKey(c.name)===key) || legacyCustom.some(c=>categoryKey(c)===key);
+    if(exists){ toast("That category already exists", "error"); return; }
+    dispatch({type:"ADD_CATEGORY",name,domain:newDomain});
+    toast(`Added category "${name}"`);
+    setNewName("");setNewDomain("general");setAdding(false);
+  };
+
+  const removeNow=(name)=>{
+    dispatch({type:"REMOVE_CATEGORY",name});
+    toast(`Removed "${name}" — existing items moved to Other`,'warn');
+    setPendingRemove(null);
+  };
+
+  const addExistingBuiltIn=(name)=>{
+    dispatch({type:"ADD_CATEGORY",name});
+    toast(`Restored "${name}"`,'success');
+  };
+
+  return (
+    <ModalShell onClose={onClose} label="Manage categories" maxWidth={500} sheet>
+      <div style={{fontWeight:700,fontSize:18,color:t.text,fontFamily:FONT_DISPLAY}}>Manage categories</div>
+      <div style={{fontSize:12,color:t.textMuted,marginTop:4,marginBottom:16}}>Add, remove, or restore categories used by Buy and Inventory.</div>
+
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:8}}>
+        <div style={{fontSize:12,color:t.textMuted,fontWeight:700}}>Active categories ({activeBuiltIns.length+custom.length+legacyCustom.length})</div>
+        <Btn small icon={Plus} onClick={()=>setAdding(v=>!v)}>{adding?"Cancel":"Add category"}</Btn>
+      </div>
+
+      {adding&&(
+        <div style={{background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:10,padding:12,marginBottom:12,display:"flex",flexDirection:"column",gap:8}}>
+          <input autoFocus value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')doAdd();}} placeholder="e.g. iPhone, Motorcycle, Webcam"
+            style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:8,padding:"9px 10px",color:t.text,fontSize:13,fontFamily:FONT_BODY,outline:"none"}}/>
+          <div style={{display:"flex",gap:6}}>
+            {[['pc_part','PC part'],['general','General asset']].map(([v,l])=>(
+              <button key={v} type="button" onClick={()=>setNewDomain(v)} className="bl-focusable"
+                style={{flex:1,padding:"7px 8px",borderRadius:8,fontSize:11.5,fontWeight:600,cursor:"pointer",fontFamily:FONT_BODY,
+                  background:newDomain===v?t.accentSoft:t.surface,border:`1px solid ${newDomain===v?t.accentSoftBorder:t.border}`,color:newDomain===v?t.accent:t.textMuted}}>{l}</button>
+            ))}
+          </div>
+          <Btn onClick={doAdd} disabled={!newName.trim()}>Add category</Btn>
+        </div>
+      )}
+
+      <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:440,overflowY:"auto",paddingRight:2}}>
+        {activeBuiltIns.map(name=>(
+          <div key={`builtin-${name}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:9,background:t.surfaceSunken,border:`1px solid ${t.border}`}}>
+            <Tag size={15} color={t.textFaint}/><div style={{flex:1,color:t.text,fontSize:13}}>{name}</div>
+            {name!=="Other"?<Btn small variant="danger" onClick={()=>setPendingRemove(name)}>Remove</Btn>:<span style={{fontSize:10.5,color:t.textFaint}}>Fallback</span>}
+          </div>
+        ))}
+        {custom.map(c=>(
+          <div key={`custom-${c.name}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:9,background:t.surfaceSunken,border:`1px solid ${t.border}`}}>
+            <Tag size={15} color={t.accent}/><div style={{flex:1,minWidth:0}}><div style={{color:t.text,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</div><div style={{fontSize:10.5,color:t.textFaint}}>{c.domain==="general"?"General asset":"PC part"}</div></div>
+            <Btn small variant="danger" onClick={()=>setPendingRemove(c.name)}>Remove</Btn>
+          </div>
+        ))}
+        {legacyCustom.map(name=>(
+          <div key={`legacy-${name}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:9,background:t.surfaceSunken,border:`1px solid ${t.border}`}}>
+            <Tag size={15} color={t.accent}/><div style={{flex:1,color:t.text,fontSize:13}}>{name}</div><span style={{fontSize:10.5,color:t.textFaint}}>Recovered from inventory</span><Btn small variant="danger" onClick={()=>setPendingRemove(name)}>Remove</Btn>
+          </div>
+        ))}
+      </div>
+
+      {removedBuiltIns.length>0&&(
+        <div style={{marginTop:16,paddingTop:14,borderTop:`1px solid ${t.border}`}}>
+          <div style={{fontSize:12,color:t.textMuted,fontWeight:700,marginBottom:8}}>Removed built-ins</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {removedBuiltIns.map(name=><Btn key={name} small variant="ghost" onClick={()=>addExistingBuiltIn(name)}>{name} · Restore</Btn>)}
+          </div>
+        </div>
+      )}
+
+      <div style={{marginTop:16,display:"flex",justifyContent:"flex-end"}}><Btn variant="ghost" onClick={onClose}>Done</Btn></div>
+      {pendingRemove&&<ConfirmModal title={`Remove “${pendingRemove}”?`} message={`Any existing inventory items in “${pendingRemove}” will automatically move to “Other”. This cannot be undone for the category assignment.`} onConfirm={()=>removeNow(pendingRemove)} onCancel={()=>setPendingRemove(null)}/>}\n    </ModalShell>
   );
 }
 
@@ -1950,7 +2118,7 @@ function EditPartModal({part,onClose,onSave,dispatch,customCategories}) {
       <div style={{display:"flex",flexDirection:"column",gap:12}}>
         <PhotoUpload label="Photo" photoUrl={photo.photoUrl} photoRecordId={photo.photoRecordId} onChange={setPhoto}/>
         <Inp label="Name" value={name} onChange={e=>setName(e.target.value)}/>
-        <CategoryPicker label="Category" value={cat} onChange={setCat} customCategories={customCategories} dispatch={dispatch}/>
+        <CategoryPicker label="Category" value={cat} onChange={setCat} customCategories={customCategories} dispatch={dispatch} showManage={false}/>
         <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           <Inp label="Cost (₱)" type="number" value={cost} onChange={e=>setCost(e.target.value)}/>
           <Inp label="Market value (₱)" type="number" value={market} onChange={e=>setMarket(e.target.value)}/>
@@ -1996,6 +2164,7 @@ function TransferModal({onClose, dispatch, toast, businessCash, personalCash}) {
 }
 function Buy({state,dispatch,toast}) {
   const t=useTheme();
+  const [categoryManagerOpen,setCategoryManagerOpen]=useState(false);
   const [mode,setMode]=useState("bundle");
   const [bundleName,setBundleName]=useState("");
   const [purchasePrice,setPurchasePrice]=useState("");
@@ -2142,7 +2311,11 @@ function Buy({state,dispatch,toast}) {
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
+      {categoryManagerOpen&&<CategoryManager state={state} dispatch={dispatch} toast={toast} onClose={()=>setCategoryManagerOpen(false)}/>}
       <PageHeader title="Buy parts" sub="Add a bundle PC or an individual part."/>
+      <div style={{display:"flex",justifyContent:"flex-end",marginTop:-8}}>
+        <Btn small variant="ghost" icon={Settings} onClick={()=>setCategoryManagerOpen(true)}>Manage categories</Btn>
+      </div>
       <Segmented ariaLabel="Purchase type" value={mode} onChange={setMode} options={[["bundle","Bundle PC",Boxes],["single","Single part",Cpu]]}/>
 
       {mode==="bundle"&&(
@@ -2167,7 +2340,7 @@ function Buy({state,dispatch,toast}) {
                 <PhotoUpload label="" photoUrl={row.photoUrl} photoRecordId={row.photoRecordId} onChange={({photoUrl,photoRecordId})=>{updateRow(row.id,"photoUrl",photoUrl);updateRow(row.id,"photoRecordId",photoRecordId);}} onAnalyze={analyzeRowPhoto(row.id)}/>
                 <div className="part-row" style={{display:"grid",gridTemplateColumns:"1fr auto 90px 90px auto",gap:8,alignItems:"end",flex:1}}>
                   <Inp label={idx===0?"Part name":""} value={row.name} onChange={e=>updateRow(row.id,"name",e.target.value)} placeholder="RX 580" data-buy-row-name="1"/>
-                  <CategoryPicker label={idx===0?"Category":"​"} value={row.category} onChange={v=>updateRow(row.id,"category",v)} customCategories={state.customCategories} dispatch={dispatch} style={{minWidth:90}}/>
+                  <CategoryPicker label={idx===0?"Category":"​"} value={row.category} onChange={v=>updateRow(row.id,"category",v)} customCategories={state.customCategories} hiddenCategories={state.hiddenCategories} knownCategories={state.parts.map(p=>p.category)} dispatch={dispatch} style={{minWidth:90}}/>
                   <Inp label={idx===0?"Market (₱)":""} type="number" value={row.marketValue} onChange={e=>updateRow(row.id,"marketValue",e.target.value)} placeholder="4000"
                     onKeyDown={idx===partRows.length-1?handleLastRowKeyDown:undefined}/>
                   <Inp label={idx===0?"Notes":""} value={row.notes||""} onChange={e=>updateRow(row.id,"notes",e.target.value)} placeholder="condition"/>
@@ -2211,7 +2384,7 @@ function Buy({state,dispatch,toast}) {
           </div>
           <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             <Inp label="Part name" value={singleName} onChange={e=>setSingleName(e.target.value)} placeholder="GTX 1060 6GB"/>
-            <CategoryPicker label="Category" value={singleCat} onChange={setSingleCat} customCategories={state.customCategories} dispatch={dispatch}/>
+            <CategoryPicker label="Category" value={singleCat} onChange={setSingleCat} customCategories={state.customCategories} hiddenCategories={state.hiddenCategories} knownCategories={state.parts.map(p=>p.category)} dispatch={dispatch} />
             <Inp label="Cost (₱, per unit)" type="number" value={singleCost} onChange={e=>setSingleCost(e.target.value)} placeholder="3000"/>
             <Inp label="Market value (₱, per unit, optional)" type="number" value={singleMarket} onChange={e=>setSingleMarket(e.target.value)} placeholder="3500"/>
             <Inp label="Quantity" type="number" min="1" value={singleQty} onChange={e=>setSingleQty(e.target.value)} placeholder="1"/>
@@ -2375,6 +2548,7 @@ function PartGroupSheet({group,onClose,onViewUnit}) {
 }
 function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}) {
   const t=useTheme();
+  const [categoryManagerOpen,setCategoryManagerOpen]=useState(false);
   const [statusFilter,setStatusFilter]=useState("all");
   const [catFilter,setCatFilter]=useState("all");
   const [search,setSearch]=useState("");
@@ -2494,6 +2668,7 @@ function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}) {
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
       {quickSell&&<QuickSellModal part={quickSell} onClose={()=>setQuickSell(null)} onConfirm={handleQuickSell} targetMargin={settings?.targetMargin||30}/>}
       {editing&&<EditPartModal part={editing} onClose={()=>setEditing(null)} onSave={handleEdit} dispatch={dispatch} customCategories={state.customCategories}/>}
+      {categoryManagerOpen&&<CategoryManager state={state} dispatch={dispatch} toast={toast} onClose={()=>setCategoryManagerOpen(false)}/>}
       {deleting&&!deleting._isBundle&&(
         <ConfirmModal title="Delete this part?" message={`"${deleting.name}" will be permanently removed. This can't be undone.`}
           onConfirm={confirmDelete} onCancel={()=>setDeleting(null)}/>
@@ -2527,9 +2702,11 @@ function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}) {
 
       <PageHeader title="Inventory" sub={`${parts.length} part${parts.length===1?"":"s"} tracked`}/>
 
-      <Inp value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name or category…" icon={Search} aria-label="Search inventory"/>
+      <div style={{display:"flex",justifyContent:"flex-end",marginTop:-8}}>
+        <Btn small variant="ghost" icon={Settings} onClick={()=>setCategoryManagerOpen(true)}>Manage categories</Btn>
+      </div>
 
-      {categoriesPresent.length>0&&(
+      {categoriesPresent.length>0&&
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
           <Btn small variant={catFilter==="all"?"primary":"ghost"} onClick={()=>setCatFilter("all")}>All categories</Btn>
           {categoriesPresent.map(c=>(
@@ -2723,7 +2900,9 @@ function EditBuildPartsModal({build,state,dispatch,toast,onClose}) {
   // Same Domain Firewall as build creation — only PC Parts, never General Assets.
   const avail=state.parts.filter(p=>p.status==="available"&&domainOf(p.category,state.customCategories)==="pc_part");
   const customPcPartCats=(state.customCategories||[]).filter(c=>c.domain==="pc_part").map(c=>c.name);
-  const categoriesPresent=[...CATEGORIES,...customPcPartCats].filter(c=>avail.some(p=>p.category===c));
+  const hiddenKeys=new Set((state.hiddenCategories||[]).map(categoryKey));
+  const activeBuiltInCats=CATEGORIES.filter(c=>!hiddenKeys.has(categoryKey(c)));
+  const categoriesPresent=[...activeBuiltInCats,...customPcPartCats].filter(c=>avail.some(p=>p.category===c));
   const selectedCountByCat=cat=>avail.filter(p=>p.category===cat&&toAdd.includes(p.id)).length;
   const toggleAdd=id=>setToAdd(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
   const toggleRemove=id=>setToRemove(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
@@ -2941,7 +3120,9 @@ function Builds({state,dispatch,toast,openLightbox}) {
   const toggle=id=>setSel(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
 
   const customPcPartCats=(state.customCategories||[]).filter(c=>c.domain==="pc_part").map(c=>c.name);
-  const categoriesPresent=[...CATEGORIES,...customPcPartCats].filter(c=>avail.some(p=>p.category===c));
+  const hiddenKeys=new Set((state.hiddenCategories||[]).map(categoryKey));
+  const activeBuiltInCats=CATEGORIES.filter(c=>!hiddenKeys.has(categoryKey(c)));
+  const categoriesPresent=[...activeBuiltInCats,...customPcPartCats].filter(c=>avail.some(p=>p.category===c));
   const selectedCountByCat=cat=>avail.filter(p=>p.category===cat&&sel.includes(p.id)).length;
 
   const submit=()=>{
@@ -4001,7 +4182,7 @@ function QuickBuyModal({state,dispatch,toast,onClose}) {
       <div style={{fontSize:12,color:t.textFaint,marginBottom:16}}>Lock it in fast — fill in the rest later.</div>
       <div style={{display:"flex",flexDirection:"column",gap:11}}>
         <Inp label="Name" value={name} onChange={e=>setName(e.target.value)} placeholder="RX 580"/>
-        <CategoryPicker label="Category" value={cat} onChange={setCat} customCategories={state.customCategories} dispatch={dispatch}/>
+        <CategoryPicker label="Category" value={cat} onChange={setCat} customCategories={state.customCategories} hiddenCategories={state.hiddenCategories} knownCategories={state.parts.map(p=>p.category)} dispatch={dispatch}/>
         <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:10}}>
           <Inp label="Cost (₱, per unit)" type="number" value={cost} onChange={e=>setCost(e.target.value)} placeholder="3000"/>
           <Inp label="Qty" type="number" min="1" value={qty} onChange={e=>setQty(e.target.value)} placeholder="1"/>
@@ -4332,6 +4513,7 @@ export default function App() {
       .then(r=>{if(!r.ok)throw new Error(`Server returned ${r.status}`);return r.json();})
       .then(json=>{
         let loadedState = json&&Object.keys(json).length?{...initialState,...json}:initialState;
+        loadedState = normalizeCategoryRegistry(loadedState);
         if(loadedState.businessCash===undefined && loadedState.liquidCash!==undefined) {
           loadedState.businessCash = loadedState.liquidCash;
         }
