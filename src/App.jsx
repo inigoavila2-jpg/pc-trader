@@ -1131,7 +1131,7 @@ function CategoryPicker({label,value,onChange,customCategories,dispatch,style,hi
         <option value="__add__">+ Add category…</option>
       </Sel>
       {showManage&&(
-        <Btn small variant="ghost" icon={Settings} onClick={onManage} style={{alignSelf:"flex-start"}}>Manage categories</Btn>
+        <Btn small variant="ghost" icon={SettingsIcon} onClick={onManage} style={{alignSelf:"flex-start"}}>Manage categories</Btn>
       )}
     </div>
   );
@@ -2314,7 +2314,7 @@ function Buy({state,dispatch,toast}) {
       {categoryManagerOpen&&<CategoryManager state={state} dispatch={dispatch} toast={toast} onClose={()=>setCategoryManagerOpen(false)}/>}
       <PageHeader title="Buy parts" sub="Add a bundle PC or an individual part."/>
       <div style={{display:"flex",justifyContent:"flex-end",marginTop:-8}}>
-        <Btn small variant="ghost" icon={Settings} onClick={()=>setCategoryManagerOpen(true)}>Manage categories</Btn>
+        <Btn small variant="ghost" icon={SettingsIcon} onClick={()=>setCategoryManagerOpen(true)}>Manage categories</Btn>
       </div>
       <Segmented ariaLabel="Purchase type" value={mode} onChange={setMode} options={[["bundle","Bundle PC",Boxes],["single","Single part",Cpu]]}/>
 
@@ -2703,7 +2703,7 @@ function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}) {
       <PageHeader title="Inventory" sub={`${parts.length} part${parts.length===1?"":"s"} tracked`}/>
 
       <div style={{display:"flex",justifyContent:"flex-end",marginTop:-8}}>
-        <Btn small variant="ghost" icon={Settings} onClick={()=>setCategoryManagerOpen(true)}>Manage categories</Btn>
+        <Btn small variant="ghost" icon={SettingsIcon} onClick={()=>setCategoryManagerOpen(true)}>Manage categories</Btn>
       </div>
 
       {categoriesPresent.length>0&&(
