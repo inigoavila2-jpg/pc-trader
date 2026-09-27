@@ -2713,7 +2713,7 @@ function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}) {
             <Btn key={c} small variant={catFilter===c?"primary":"ghost"} onClick={()=>setCatFilter(c)}>{c}</Btn>
           ))}
         </div>
-      )}
+      }
 
       <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
         {["all","available","in_build","sold","defective"].map(f=>{
