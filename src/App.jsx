@@ -2706,14 +2706,14 @@ function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}) {
         <Btn small variant="ghost" icon={Settings} onClick={()=>setCategoryManagerOpen(true)}>Manage categories</Btn>
       </div>
 
-      {categoriesPresent.length>0&&
+      {categoriesPresent.length>0&&(
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
           <Btn small variant={catFilter==="all"?"primary":"ghost"} onClick={()=>setCatFilter("all")}>All categories</Btn>
           {categoriesPresent.map(c=>(
             <Btn key={c} small variant={catFilter===c?"primary":"ghost"} onClick={()=>setCatFilter(c)}>{c}</Btn>
           ))}
         </div>
-      }
+      )}
 
       <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
         {["all","available","in_build","sold","defective"].map(f=>{
