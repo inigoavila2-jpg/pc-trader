@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, createContext, useContext, Fragment } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext, Fragment } from "react";
 import { GoogleGenAI } from "@google/genai";
 import { AIAgentChatbox } from "./components/AIAgentChatbox";
 import {
