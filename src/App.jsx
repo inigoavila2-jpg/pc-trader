@@ -1362,11 +1362,21 @@ function Segmented({options,value,onChange,ariaLabel}) {
 }
 function HeroNumber({children,color}) {
   const t=useTheme();
+  // Use a solid text fill for reliable rendering across browsers/mobile WebViews.
+  // The previous background-clip:text gradient could render as a blank gradient
+  // rectangle on some browsers, hiding the actual net-worth number.
+  const numberColor = color || t.text;
   return (
     <span style={{
-      background: color || (t.mode==="dark"?`linear-gradient(135deg,${t.text} 0%,${t.textMuted} 100%)`:`linear-gradient(135deg,${t.text} 0%,${t.textMuted} 100%)`),
-      WebkitBackgroundClip:"text", backgroundClip:"text", color:"transparent",
-      fontFamily:FONT_MONO, fontWeight:700, letterSpacing:"-0.02em",
+      display:"inline-block",
+      background:"none",
+      WebkitBackgroundClip:"initial",
+      backgroundClip:"initial",
+      color:numberColor,
+      WebkitTextFillColor:numberColor,
+      fontFamily:FONT_MONO,
+      fontWeight:700,
+      letterSpacing:"-0.02em",
     }}>{children}</span>
   );
 }
