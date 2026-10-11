@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, createContext, useContext, Fragment } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext, Fragment } from "react";
 import { GoogleGenAI } from "@google/genai";
 import { AIAgentChatbox } from "./components/AIAgentChatbox";
 import {
@@ -8,7 +8,7 @@ import {
   User, Link as LinkIcon, Info, ArrowRight, Loader2,
   CheckCircle2, XCircle, PackageX, ClipboardList, StickyNote, Undo2,
   Monitor, Cpu, ClipboardCopy, PackageCheck,
-  Tag, FileDown, Sparkles,
+  Tag, FileDown, Sparkles, ArrowDownUp, CalendarDays, SlidersHorizontal,
 } from "lucide-react";
 
 /* ═══════════════════════════════════════════
@@ -22,15 +22,105 @@ let _id = Date.now();
 const uid = () => `id_${_id++}`;
 const CATEGORIES = ["GPU","CPU","Motherboard","CPU+MB","RAM","PSU","Storage","Cooler","Case","Monitor","Mouse","Keyboard","Other"];
 
+const categoryKey = (name) => String(name || "").trim().toLowerCase().replace(/\s+/g," ");
+const findBuiltInCategory = (name) => CATEGORIES.find(c => categoryKey(c) === categoryKey(name));
+const findCustomCategory = (name, customCategories=[]) => (customCategories||[]).find(c => categoryKey(c?.name) === categoryKey(name));
+
+
 // Every built-in category is a PC part by definition. Custom categories (added via the
 // "+ Add Category" picker) carry their own domain in state.customCategories, looked up at
 // render/dispatch time rather than re-derived from the category name string.
 function domainOf(category, customCategories){
-  if(CATEGORIES.includes(category))return "pc_part";
-  const custom=customCategories?.find(c=>c.name===category);
-  return custom?custom.domain:"pc_part"; // safe default — never silently misfile into General Assets
+  if(findBuiltInCategory(category))return "pc_part";
+  const custom=findCustomCategory(category,customCategories);
+  return custom?custom.domain:"pc_part";
 }
-const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ targetMargin:30 }, customCategories:[], quickNotes:[], businessCash:14500, personalCash:0, expenses:[], transactions:[] };
+const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ targetMargin:30 }, customCategories:[], quickNotes:[], hiddenCategories:[], businessCash:14500, cashOnHand:0, personalCash:0, expenses:[], transactions:[], netWorthSnapshots:[], outstandingReceivables:0, totalDebt:0 };
+
+// New account model: businessCash is retained as the storage field for Business Bank.
+// cashOnHand is physical cash. Legacy personal records remain stored but are hidden from UI.
+const normalizeAccount = (value) => {
+  if (value === "cash" || value === "cash_on_hand") return "cash";
+  if (value === "personal") return "cash"; // compatibility for old UI/AI actions; never create personal records
+  return "bank";
+};
+const accountLabel = (value) => normalizeAccount(value) === "cash" ? "Cash" : "Business Bank";
+const getAccountBalance = (state, value) => normalizeAccount(value) === "cash"
+  ? Number(state?.cashOnHand || 0) : Number(state?.businessCash || 0);
+const withAccountDelta = (state, value, delta) => normalizeAccount(value) === "cash"
+  ? { ...state, cashOnHand: Number(state?.cashOnHand || 0) + Number(delta || 0) }
+  : { ...state, businessCash: Number(state?.businessCash || 0) + Number(delta || 0) };
+
+// Historical financial snapshots are the source of truth for net-worth-over-time analysis.
+// One snapshot is kept per local calendar day; when the business changes during the day,
+// that day's snapshot is replaced with the newest state. This keeps the history compact while
+// still ensuring that a daily snapshot always reflects the latest business position.
+const localISODate = (date=new Date()) => {
+  const y=date.getFullYear();
+  const m=String(date.getMonth()+1).padStart(2,'0');
+  const d=String(date.getDate()).padStart(2,'0');
+  return `${y}-${m}-${d}`;
+};
+
+const calculateNetWorthSnapshot = (state, date=localISODate()) => {
+  const parts=Array.isArray(state?.parts)?state.parts:[];
+  const activeInventory=parts.filter(p=>p.status==='available'||p.status==='in_build');
+  const inventoryMarketValue=activeInventory.reduce((sum,p)=>{
+    const market=Number(p?.marketValue||0);
+    const cost=Number(p?.allocatedCost||0);
+    return sum+(market>0?market:cost);
+  },0);
+  const inventoryCost=activeInventory.reduce((sum,p)=>sum+Number(p?.allocatedCost||0),0);
+  const businessCash=Number(state?.businessCash||0);
+  const cashOnHand=Number(state?.cashOnHand||0);
+  const totalLiquid=businessCash+cashOnHand;
+  const outstandingReceivables=Number(state?.outstandingReceivables||0);
+  const totalDebt=Number(state?.totalDebt||0);
+  const netWorth=totalLiquid+inventoryMarketValue+outstandingReceivables-totalDebt;
+
+  return {
+    id:`nw_${date}`,
+    date,
+    capturedAt:new Date().toISOString(),
+    businessCash,
+    cashOnHand,
+    totalLiquid,
+    inventoryCost,
+    inventoryMarketValue,
+    outstandingReceivables,
+    totalDebt,
+    netWorth,
+    activeInventoryCount:activeInventory.length,
+  };
+};
+
+const recordNetWorthSnapshot = (state) => {
+  const snapshot=calculateNetWorthSnapshot(state);
+  const existing=Array.isArray(state?.netWorthSnapshots)?state.netWorthSnapshots:[];
+  const next=[...existing.filter(s=>s.date!==snapshot.date),snapshot]
+    .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  return {...state,netWorthSnapshots:next};
+};
+
+function normalizeCategoryRegistry(state){
+  const hidden=[...(state.hiddenCategories||[])].map(String);
+  const custom=[...(state.customCategories||[])].filter(c=>c?.name).map(c=>({...c,name:String(c.name).trim().replace(/\s+/g," "),domain:c.domain==="general"?"general":"pc_part"}));
+  const seen=new Set(custom.map(c=>categoryKey(c.name)));
+  const hiddenKeys=new Set(hidden.map(categoryKey));
+  for(const part of (state.parts||[])){
+    const name=String(part?.category||"").trim().replace(/\s+/g," ");
+    if(!name || findBuiltInCategory(name) || hiddenKeys.has(categoryKey(name)) || seen.has(categoryKey(name))) continue;
+    custom.push({name,domain:"general"});
+    seen.add(categoryKey(name));
+  }
+  return {...state,customCategories:custom,hiddenCategories:[...new Set(hidden.map(h=>findBuiltInCategory(h)||h))]};
+}
+
+const SNAPSHOT_ACTIONS = new Set([
+  'ADD_BUNDLE','ADD_PARTS','UPDATE_PART','SELL','ADD_EXPENSE','ADD_INCOME','TRANSFER_FUNDS',
+  'UPDATE_LIQUID_CASH','UNDO_SALE','DELETE_SALE','DELETE_PART','DUPLICATE_PART','DELETE_BUILD',
+  'DELETE_BUNDLE','MARK_DEFECTIVE'
+]);
 
 /* ═══════════════════════════════════════════
    REDUCER
@@ -38,26 +128,20 @@ const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ tar
 function reducer(state, action) {
   switch(action.type) {
     case "ADD_BUNDLE": {
-      const bundleCost = action.bundle.purchasePrice || 0;
-      const bundleTxn = {id:uid(), type:"PURCHASE", amount:bundleCost,
-        description:`Bought bundle: ${action.bundle.name||"Untitled bundle"}`, wallet:"business", date:today()};
-      return {...state, bundles:[...state.bundles,action.bundle], parts:[...state.parts,...action.parts],
-        businessCash:(state.businessCash||0)-bundleCost, // cash out for bundle purchase
-        transactions:[bundleTxn, ...(state.transactions||[])]};
+      const amount=Number(action.bundle.purchasePrice||0);
+      const account=normalizeAccount(action.paymentAccount||action.account);
+      const txn={id:uid(),type:"PURCHASE",amount,description:`Bought bundle: ${action.bundle.name||"Untitled bundle"}`,wallet:"business",account,date:today()};
+      const base={...state,bundles:[...state.bundles,action.bundle],parts:[...state.parts,...action.parts],transactions:[txn,...(state.transactions||[])]};
+      return withAccountDelta(base,account,-amount);
     }
     case "ADD_PARTS": {
-      const totalCost=action.parts.reduce((s,p)=>s+(p.allocatedCost||0),0);
-      // Quantity purchases (e.g. buying 3 identical RAM sticks) create N parts with the same
-      // name — say "Bought 3× RAM Stick" instead of the generic "Bought 3 items" when that's
-      // what actually happened, since it reads much clearer in the Cash Ledger.
+      const totalCost=action.parts.reduce((sum,p)=>sum+(p.allocatedCost||0),0);
       const allSameName=action.parts.length>1&&action.parts.every(p=>p.name===action.parts[0].name);
-      const partDesc=action.parts.length===1?`Bought ${action.parts[0].name}`
-        :allSameName?`Bought ${action.parts.length}× ${action.parts[0].name}`
-        :`Bought ${action.parts.length} items`;
-      const purchaseTxn={id:uid(),type:"PURCHASE",amount:totalCost,description:partDesc,wallet:"business",date:today()};
-      return {...state, parts:[...state.parts,...action.parts],
-        businessCash:(state.businessCash||0)-totalCost, // cash out for purchases
-        transactions:[purchaseTxn, ...(state.transactions||[])]};
+      const description=action.parts.length===1?`Bought ${action.parts[0].name}`:allSameName?`Bought ${action.parts.length}× ${action.parts[0].name}`:`Bought ${action.parts.length} items`;
+      const account=normalizeAccount(action.paymentAccount||action.account);
+      const txn={id:uid(),type:"PURCHASE",amount:totalCost,description,wallet:"business",account,date:today()};
+      const base={...state,parts:[...state.parts,...action.parts],transactions:[txn,...(state.transactions||[])]};
+      return withAccountDelta(base,account,-totalCost);
     }
     case "UPDATE_PART": {
       return {...state, parts: state.parts.map(p => p.id === action.id
@@ -127,38 +211,63 @@ function reducer(state, action) {
       };
     }
     case "SELL": {
-      const {mode,id,sale} = action;
-      const saleTxn={id:uid(),type:"SALE",amount:sale.salePrice,
-        description:`Sold ${sale.name}${sale.buyerName?` to ${sale.buyerName}`:""}`,wallet:"business",date:today()};
-      if(mode==="part") {
-        return {...state, sales:[...state.sales,sale],
-          businessCash:(state.businessCash||0)+sale.salePrice, // cash in from the sale
-          transactions:[saleTxn, ...(state.transactions||[])],
-          parts: state.parts.map(p=>p.id===id
-            ? {...p,status:"sold",soldTo:sale.buyerName,history:[...p.history,{date:today(),event:`Sold to ${sale.buyerName||"buyer"} for ${fmt(sale.salePrice)} — profit ${fmt(sale.profit)}`}]}
-            : p
-          )};
-      } else {
-        const build = state.builds.find(b=>b.id===id);
-        return {...state, sales:[...state.sales,sale],
-          businessCash:(state.businessCash||0)+sale.salePrice, // cash in from the sale
-          transactions:[saleTxn, ...(state.transactions||[])],
-          builds: state.builds.map(b=>b.id===id?{...b,sold:true}:b),
-          parts: state.parts.map(p=>build?.partIds.includes(p.id)
-            ? {...p,status:"sold",soldTo:sale.buyerName,history:[...p.history,{date:today(),event:`Sold in build "${build.name}" to ${sale.buyerName||"buyer"} for ${fmt(sale.salePrice)}`}]}
-            : p
-          )};
+      const {mode,id,sale}=action;
+      const account=normalizeAccount(sale.paymentAccount||sale.account);
+      const amount=Number(sale.salePrice||0);
+      const saleWithAccount={...sale,paymentAccount:account};
+      const txn={id:uid(),type:"SALE",amount,description:`Sold ${sale.name}${sale.buyerName?` to ${sale.buyerName}`:""}`,wallet:"business",account,date:today()};
+      if(mode==="part"){
+        const base={...state,sales:[...state.sales,saleWithAccount],transactions:[txn,...(state.transactions||[])],
+          parts:state.parts.map(p=>p.id===id?{...p,status:"sold",soldTo:sale.buyerName,history:[...p.history,{date:today(),event:`Sold to ${sale.buyerName||"buyer"} for ${fmt(amount)} — profit ${fmt(sale.profit)}` }]}:p)};
+        return withAccountDelta(base,account,amount);
       }
+      const build=state.builds.find(b=>b.id===id);
+      const base={...state,sales:[...state.sales,saleWithAccount],transactions:[txn,...(state.transactions||[])],
+        builds:state.builds.map(b=>b.id===id?{...b,sold:true}:b),
+        parts:state.parts.map(p=>build?.partIds.includes(p.id)?{...p,status:"sold",soldTo:sale.buyerName,history:[...p.history,{date:today(),event:`Sold in build "${build.name}" to ${sale.buyerName||"buyer"} for ${fmt(amount)}` }]}:p)};
+      return withAccountDelta(base,account,amount);
     }
     case "SET_SETTING":
       return {...state, settings:{...state.settings,[action.key]:action.value}};
 
-    // Dynamic Tag Generation — saves a new category permanently with its domain (PC Part or
-    // General Asset), so it persists across sessions and appears in future dropdowns.
+    // Category manager — custom categories persist in state; built-ins can be hidden/re-enabled.
+    // Category names are case-insensitive and whitespace-normalized so duplicates like
+    // "iPhone", "iphone", and " IPhone " cannot be created. Removing any category moves
+    // existing inventory items into the always-available "Other" bucket.
     case "ADD_CATEGORY": {
-      const {name,domain}=action;
-      if(!name||state.customCategories?.some(c=>c.name===name)||CATEGORIES.includes(name))return state;
-      return {...state, customCategories:[...(state.customCategories||[]),{name,domain}]};
+      const name=String(action.name||"").trim().replace(/\s+/g," ");
+      const domain=action.domain==="general"?"general":"pc_part";
+      if(!name)return state;
+      const key=categoryKey(name);
+      const builtIn=findBuiltInCategory(name);
+      if(builtIn){
+        return {...state,hiddenCategories:(state.hiddenCategories||[]).filter(c=>categoryKey(c)!==key)};
+      }
+      if((state.customCategories||[]).some(c=>categoryKey(c?.name)===key))return state;
+      return {...state,customCategories:[...(state.customCategories||[]),{name,domain}]};
+    }
+
+    case "REMOVE_CATEGORY": {
+      const target=String(action.name||"").trim();
+      const targetKey=categoryKey(target);
+      if(!targetKey || targetKey===categoryKey("Other"))return state;
+      const builtIn=findBuiltInCategory(target);
+      const customExists=(state.customCategories||[]).some(c=>categoryKey(c?.name)===targetKey);
+      if(!builtIn && !customExists)return state;
+
+      const parts=state.parts.map(p=>categoryKey(p.category)===targetKey
+        ? {...p,category:"Other",history:[...(Array.isArray(p.history)?p.history:[]),{date:today(),event:`Category "${p.category}" removed — moved to Other` }]}
+        : p);
+
+      return {...state,
+        hiddenCategories: builtIn
+          ? [...new Set([...(state.hiddenCategories||[]),builtIn])]
+          : (state.hiddenCategories||[]),
+        customCategories: builtIn
+          ? (state.customCategories||[])
+          : (state.customCategories||[]).filter(c=>categoryKey(c?.name)!==targetKey),
+        parts,
+      };
     }
 
     // Quick Actions toolbar's "Note" option — a fast scratchpad entry with no other fields,
@@ -170,58 +279,33 @@ function reducer(state, action) {
     case "DELETE_QUICK_NOTE":
       return {...state, quickNotes:(state.quickNotes||[]).filter(n=>n.id!==action.id)};
 
-    // Mixed-Finance Tracker: record business expenses and personal draws, with separate tracking
-    // for funds to recover (owner's draw) vs business costs (operation).
+    // New business-funds model. Old personal history is retained; new actions use bank/cash.
     case "ADD_EXPENSE": {
-      const {expenseType,amount,description,wallet}=action; // expenseType: "business" | "personal_draw"
-      const newExpense={id:uid(),type:expenseType,amount,description,date:today(),wallet};
-      const newTransaction={id:uid(),type:"EXPENSE",amount,description,wallet,date:today()};
-      if (wallet === "personal") {
-        return {...state,
-          expenses:[...(state.expenses||[]),newExpense],
-          transactions:[newTransaction, ...(state.transactions||[])],
-          personalCash:(state.personalCash||0)-amount};
-      } else {
-        return {...state,
-          expenses:[...(state.expenses||[]),newExpense],
-          transactions:[newTransaction, ...(state.transactions||[])],
-          businessCash:(state.businessCash||0)-amount};
-      }
+      const amount=Number(action.amount||0);
+      const account=normalizeAccount(action.account||action.wallet);
+      const txn={id:uid(),type:"EXPENSE",amount,description:action.description,wallet:"business",account,date:today()};
+      const expense={id:uid(),type:"business",amount,description:action.description,date:today(),wallet:"business",account};
+      const base={...state,expenses:[...(state.expenses||[]),expense],transactions:[txn,...(state.transactions||[])]};
+      return withAccountDelta(base,account,-amount);
     }
     case "ADD_INCOME": {
-      const {amount,description,wallet} = action;
-      const newTransaction={id:uid(),type:"INCOME",amount,description,wallet,date:today()};
-      return {...state,
-        transactions:[newTransaction, ...(state.transactions||[])],
-        [`${wallet}Cash`]: (state[`${wallet}Cash`]||0) + amount};
+      const amount=Number(action.amount||0);
+      const account=normalizeAccount(action.account||action.wallet);
+      const txn={id:uid(),type:"INCOME",amount,description:action.description,wallet:"business",account,date:today()};
+      return withAccountDelta({...state,transactions:[txn,...(state.transactions||[])]},account,amount);
     }
     case "TRANSFER_FUNDS": {
-      const { amount, direction } = action;
-      const transferRecord={
-        id:uid(),
-        type:"TRANSFER",
-        amount,
-        description: direction==="to_personal"?"Transfer to Personal Wallet":"Transfer to Business Wallet",
-        from: direction==="to_personal"?"business":"personal",
-        to: direction==="to_personal"?"personal":"business",
-        date:today(),
-      };
-      if (direction === "to_personal") {
-        return { ...state,
-          businessCash: (state.businessCash||0) - amount,
-          personalCash: (state.personalCash||0) + amount,
-          transactions:[transferRecord, ...(state.transactions||[])] };
-      } else {
-        return { ...state,
-          personalCash: (state.personalCash||0) - amount,
-          businessCash: (state.businessCash||0) + amount,
-          transactions:[transferRecord, ...(state.transactions||[])] };
-      }
+      const amount=Number(action.amount||0);
+      const direction=action.direction==="to_personal"?"bank_to_cash":action.direction==="to_business"?"cash_to_bank":action.direction;
+      if(amount<=0||!["bank_to_cash","cash_to_bank"].includes(direction))return state;
+      const from=direction==="bank_to_cash"?"bank":"cash";
+      const to=direction==="bank_to_cash"?"cash":"bank";
+      const txn={id:uid(),type:"TRANSFER",amount,description:direction==="bank_to_cash"?"Transfer: Business Bank → Cash":"Transfer: Cash → Business Bank",from,to,account:from,date:today()};
+      const afterFrom=withAccountDelta({...state,transactions:[txn,...(state.transactions||[])]},from,-amount);
+      return withAccountDelta(afterFrom,to,amount);
     }
-
-    // Direct cash balance update (used by SELL to add revenue, or other revenue sources)
     case "UPDATE_LIQUID_CASH":
-      return {...state, businessCash:(state.businessCash||0)+action.amount};
+      return withAccountDelta(state,action.account||"bank",Number(action.amount||0));
 
     // Reverses a completed sale: removes it from active totals (soft-deleted, not erased — kept
     // for the "Returned sales" filter), and returns the part(s)/build back to available inventory.
@@ -260,12 +344,12 @@ function reducer(state, action) {
       // The cash from this sale isn't real anymore once the item goes back to inventory — reverse it.
       // Guarded by sale.returned so the same sale can't have its cash pulled back twice.
       const alreadyReversed=sale.returned;
-      const reversalTxn={id:uid(),type:"REVERSAL",amount:sale.salePrice,description:`Sale undone: ${sale.name}`,wallet:"business",date:today()};
-      return {...state, parts, builds,
-        businessCash: alreadyReversed?(state.businessCash||0):(state.businessCash||0)-sale.salePrice,
-        transactions: alreadyReversed?(state.transactions||[]):[reversalTxn, ...(state.transactions||[])],
-        sales: state.sales.map(s=>s.id===saleId?{...s,returned:true,returnReason:reason,returnedAt:today()}:s)
-      };
+      const account=normalizeAccount(sale.paymentAccount||sale.account);
+      const reversalTxn={id:uid(),type:"REVERSAL",amount:sale.salePrice,description:`Sale undone: ${sale.name}`,wallet:"business",account,date:today()};
+      const base={...state,parts,builds,
+        transactions:alreadyReversed?(state.transactions||[]):[reversalTxn,...(state.transactions||[])],
+        sales:state.sales.map(s=>s.id===saleId?{...s,returned:true,returnReason:reason,returnedAt:today()}:s)};
+      return alreadyReversed?base:withAccountDelta(base,account,-Number(sale.salePrice||0));
     }
 
     case "EDIT_SALE": {
@@ -307,15 +391,14 @@ function reducer(state, action) {
         }
         // Only pull the cash back if it hasn't already been reversed by an earlier undo on this sale.
         if(!sale.returned){
-          cashReversal=sale.salePrice;
-          extraTxns=[{id:uid(),type:"REVERSAL",amount:sale.salePrice,description:`Sale deleted & returned: ${sale.name}`,wallet:"business",date:today()}];
+          cashReversal=Number(sale.salePrice||0);
+          extraTxns=[{id:uid(),type:"REVERSAL",amount:cashReversal,description:`Sale deleted & returned: ${sale.name}`,wallet:"business",account:normalizeAccount(sale.paymentAccount||sale.account),date:today()}];
         }
       }
-      return {...state, parts, builds,
-        businessCash:(state.businessCash||0)-cashReversal,
-        transactions:[...extraTxns, ...(state.transactions||[])],
+      const base={...state,parts,builds,transactions:[...extraTxns,...(state.transactions||[])],
         sales: state.sales.map(s=>s.id===saleId?{...s,deleted:true,deletedAt:today(),returned:mode==="undo-and-return"||s.returned}:s)
       };
+      return cashReversal>0?withAccountDelta(base,normalizeAccount(sale.paymentAccount||sale.account),-cashReversal):base;
     }
 
     case "DELETE_PART": {
@@ -962,11 +1045,20 @@ function Sel({label,children,style,...props}) {
 /* ═══════════════════════════════════════════
    CATEGORY PICKER
 ═══════════════════════════════════════════ */
-function CategoryPicker({label,value,onChange,customCategories,dispatch,style}) {
+function CategoryPicker({label,value,onChange,customCategories,dispatch,style,hiddenCategories=[],knownCategories=[],showManage=false,onManage}) {
   const t=useTheme();
   const [adding,setAdding]=useState(false);
   const [newName,setNewName]=useState("");
-  const [newDomain,setNewDomain]=useState("pc_part");
+  const [newDomain,setNewDomain]=useState("general");
+
+  const hiddenKeys=new Set((hiddenCategories||[]).map(categoryKey));
+  const builtIns=CATEGORIES.filter(c=>!hiddenKeys.has(categoryKey(c)));
+  const custom=(customCategories||[]).filter(c=>c?.name&&!hiddenKeys.has(categoryKey(c.name)));
+  const legacy=(knownCategories||[])
+    .map(v=>String(v||"").trim().replace(/\s+/g," "))
+    .filter(v=>v && !hiddenKeys.has(categoryKey(v)) && !findBuiltInCategory(v) && !findCustomCategory(v,custom))
+    .reduce((acc,v)=>{ if(!acc.some(x=>categoryKey(x)===categoryKey(v))) acc.push(v); return acc; },[]);
+  const options=[...builtIns,...custom.map(c=>c.name),...legacy];
 
   const handleSelect=(e)=>{
     if(e.target.value==="__add__"){setAdding(true);return;}
@@ -974,23 +1066,30 @@ function CategoryPicker({label,value,onChange,customCategories,dispatch,style}) 
   };
 
   const confirmAdd=()=>{
-    const name=newName.trim();
+    const name=newName.trim().replace(/\s+/g," ");
     if(!name)return;
+    const duplicate=findBuiltInCategory(name)||findCustomCategory(name,customCategories)||
+      (knownCategories||[]).find(v=>categoryKey(v)===categoryKey(name));
+    if(duplicate){
+      onChange(findBuiltInCategory(duplicate)||duplicate?.name||duplicate);
+      setAdding(false);setNewName("");
+      return;
+    }
     dispatch({type:"ADD_CATEGORY",name,domain:newDomain});
     onChange(name);
-    setAdding(false);setNewName("");setNewDomain("pc_part");
+    setAdding(false);setNewName("");setNewDomain("general");
   };
 
   if(adding){
     return (
       <div style={{display:"flex",flexDirection:"column",gap:8,background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:9,padding:10,...style}}>
         <div style={{fontSize:11.5,color:t.textMuted,fontWeight:600}}>New category</div>
-        <input autoFocus value={newName} onChange={e=>setNewName(e.target.value)} placeholder="e.g. Webcam"
-          style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:7,padding:"7px 9px",color:t.text,fontSize:13,fontFamily:FONT_BODY,outline:"none"}}/>
+        <input autoFocus value={newName} onChange={e=>setNewName(e.target.value)} placeholder="e.g. iPhone or Motorcycle"
+          style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:7,padding:"8px 9px",color:t.text,fontSize:13,fontFamily:FONT_BODY,outline:"none"}}/>
         <div style={{display:"flex",gap:6}}>
-          {[["pc_part","PC Part"],["general","General Asset"]].map(([v,l])=>(
+          {[['pc_part','PC part'],['general','General asset']].map(([v,l])=>(
             <button key={v} type="button" onClick={()=>setNewDomain(v)} className="bl-focusable"
-              style={{flex:1,padding:"6px 8px",borderRadius:7,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:FONT_BODY,
+              style={{flex:1,padding:"7px 8px",borderRadius:7,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:FONT_BODY,
                 background:newDomain===v?t.accentSoft:t.surface,border:`1px solid ${newDomain===v?t.accentSoftBorder:t.border}`,color:newDomain===v?t.accent:t.textMuted}}>{l}</button>
           ))}
         </div>
@@ -1003,11 +1102,110 @@ function CategoryPicker({label,value,onChange,customCategories,dispatch,style}) 
   }
 
   return (
-    <Sel label={label} value={value} onChange={handleSelect} style={style}>
-      {CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
-      {(customCategories||[]).map(c=><option key={c.name} value={c.name}>{c.name}</option>)}
-      <option value="__add__">+ Add category…</option>
-    </Sel>
+    <div style={{display:"flex",flexDirection:"column",gap:5,...style}}>
+      <Sel label={label} value={options.some(o=>categoryKey(o)===categoryKey(value))?value:"Other"} onChange={handleSelect} style={{}}>
+        {options.map(c=><option key={`cat-${c}`} value={c}>{c}</option>)}
+        <option value="__add__">+ Add category…</option>
+      </Sel>
+      {showManage&&(
+        <Btn small variant="ghost" icon={SettingsIcon} onClick={onManage} style={{alignSelf:"flex-start"}}>Manage categories</Btn>
+      )}
+    </div>
+  );
+}
+
+function CategoryManager({state,dispatch,toast,onClose}) {
+  const t=useTheme();
+  const [adding,setAdding]=useState(false);
+  const [newName,setNewName]=useState("");
+  const [newDomain,setNewDomain]=useState("general");
+  const [pendingRemove,setPendingRemove]=useState(null);
+  const hiddenKeys=new Set((state.hiddenCategories||[]).map(categoryKey));
+  const custom=(state.customCategories||[]).filter(c=>c?.name);
+  const usedCategoryNames=[...new Set((state.parts||[]).map(p=>String(p.category||"").trim()).filter(Boolean))];
+  const activeBuiltIns=CATEGORIES.filter(c=>!hiddenKeys.has(categoryKey(c)));
+  const removedBuiltIns=CATEGORIES.filter(c=>hiddenKeys.has(categoryKey(c)));
+  const legacyCustom=usedCategoryNames.filter(name=>!findBuiltInCategory(name) && !findCustomCategory(name,custom) && !hiddenKeys.has(categoryKey(name)));
+
+  const doAdd=()=>{
+    const name=newName.trim().replace(/\s+/g," ");
+    if(!name)return;
+    const key=categoryKey(name);
+    const built=findBuiltInCategory(name);
+    const exists=activeBuiltIns.some(c=>categoryKey(c)===key) || removedBuiltIns.some(c=>categoryKey(c)===key) || custom.some(c=>categoryKey(c.name)===key) || legacyCustom.some(c=>categoryKey(c)===key);
+    if(exists){ toast("That category already exists", "error"); return; }
+    dispatch({type:"ADD_CATEGORY",name,domain:newDomain});
+    toast(`Added category "${name}"`);
+    setNewName("");setNewDomain("general");setAdding(false);
+  };
+
+  const removeNow=(name)=>{
+    dispatch({type:"REMOVE_CATEGORY",name});
+    toast(`Removed "${name}" — existing items moved to Other`,'warn');
+    setPendingRemove(null);
+  };
+
+  const addExistingBuiltIn=(name)=>{
+    dispatch({type:"ADD_CATEGORY",name});
+    toast(`Restored "${name}"`,'success');
+  };
+
+  return (
+    <ModalShell onClose={onClose} label="Manage categories" maxWidth={500} sheet>
+      <div style={{fontWeight:700,fontSize:18,color:t.text,fontFamily:FONT_DISPLAY}}>Manage categories</div>
+      <div style={{fontSize:12,color:t.textMuted,marginTop:4,marginBottom:16}}>Add, remove, or restore categories used by Buy and Inventory.</div>
+
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:8}}>
+        <div style={{fontSize:12,color:t.textMuted,fontWeight:700}}>Active categories ({activeBuiltIns.length+custom.length+legacyCustom.length})</div>
+        <Btn small icon={Plus} onClick={()=>setAdding(v=>!v)}>{adding?"Cancel":"Add category"}</Btn>
+      </div>
+
+      {adding&&(
+        <div style={{background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:10,padding:12,marginBottom:12,display:"flex",flexDirection:"column",gap:8}}>
+          <input autoFocus value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')doAdd();}} placeholder="e.g. iPhone, Motorcycle, Webcam"
+            style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:8,padding:"9px 10px",color:t.text,fontSize:13,fontFamily:FONT_BODY,outline:"none"}}/>
+          <div style={{display:"flex",gap:6}}>
+            {[['pc_part','PC part'],['general','General asset']].map(([v,l])=>(
+              <button key={v} type="button" onClick={()=>setNewDomain(v)} className="bl-focusable"
+                style={{flex:1,padding:"7px 8px",borderRadius:8,fontSize:11.5,fontWeight:600,cursor:"pointer",fontFamily:FONT_BODY,
+                  background:newDomain===v?t.accentSoft:t.surface,border:`1px solid ${newDomain===v?t.accentSoftBorder:t.border}`,color:newDomain===v?t.accent:t.textMuted}}>{l}</button>
+            ))}
+          </div>
+          <Btn onClick={doAdd} disabled={!newName.trim()}>Add category</Btn>
+        </div>
+      )}
+
+      <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:440,overflowY:"auto",paddingRight:2}}>
+        {activeBuiltIns.map(name=>(
+          <div key={`builtin-${name}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:9,background:t.surfaceSunken,border:`1px solid ${t.border}`}}>
+            <Tag size={15} color={t.textFaint}/><div style={{flex:1,color:t.text,fontSize:13}}>{name}</div>
+            {name!=="Other"?<Btn small variant="danger" onClick={()=>setPendingRemove(name)}>Remove</Btn>:<span style={{fontSize:10.5,color:t.textFaint}}>Fallback</span>}
+          </div>
+        ))}
+        {custom.map(c=>(
+          <div key={`custom-${c.name}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:9,background:t.surfaceSunken,border:`1px solid ${t.border}`}}>
+            <Tag size={15} color={t.accent}/><div style={{flex:1,minWidth:0}}><div style={{color:t.text,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</div><div style={{fontSize:10.5,color:t.textFaint}}>{c.domain==="general"?"General asset":"PC part"}</div></div>
+            <Btn small variant="danger" onClick={()=>setPendingRemove(c.name)}>Remove</Btn>
+          </div>
+        ))}
+        {legacyCustom.map(name=>(
+          <div key={`legacy-${name}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:9,background:t.surfaceSunken,border:`1px solid ${t.border}`}}>
+            <Tag size={15} color={t.accent}/><div style={{flex:1,color:t.text,fontSize:13}}>{name}</div><span style={{fontSize:10.5,color:t.textFaint}}>Recovered from inventory</span><Btn small variant="danger" onClick={()=>setPendingRemove(name)}>Remove</Btn>
+          </div>
+        ))}
+      </div>
+
+      {removedBuiltIns.length>0&&(
+        <div style={{marginTop:16,paddingTop:14,borderTop:`1px solid ${t.border}`}}>
+          <div style={{fontSize:12,color:t.textMuted,fontWeight:700,marginBottom:8}}>Removed built-ins</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {removedBuiltIns.map(name=><Btn key={name} small variant="ghost" onClick={()=>addExistingBuiltIn(name)}>{name} · Restore</Btn>)}
+          </div>
+        </div>
+      )}
+
+      <div style={{marginTop:16,display:"flex",justifyContent:"flex-end"}}><Btn variant="ghost" onClick={onClose}>Done</Btn></div>
+      {pendingRemove&&<ConfirmModal title={`Remove “${pendingRemove}”?`} message={`Any existing inventory items in “${pendingRemove}” will automatically move to “Other”. This cannot be undone for the category assignment.`} onConfirm={()=>removeNow(pendingRemove)} onCancel={()=>setPendingRemove(null)}/>}\n    </ModalShell>
   );
 }
 
@@ -1199,6 +1397,46 @@ function ProfitAreaChart({points,positive}) {
   );
 }
 
+function NetWorthHistoryChart({rows}) {
+  const t=useTheme();
+  if(!rows?.length)return null;
+  if(rows.length===1){
+    return <div style={{fontFamily:FONT_MONO,fontSize:17,fontWeight:700,color:t.text,padding:"16px 0 8px"}}>{fmt(rows[0].value)}</div>;
+  }
+  const values=rows.map(r=>Number(r.value||0));
+  const min=Math.min(...values),max=Math.max(...values);
+  const span=Math.max(1,max-min);
+  const toXY=(v,i)=>{
+    const x=(i/(rows.length-1))*100;
+    const y=33-((v-min)/span)*27;
+    return [x,y];
+  };
+  const path=rows.map((r,i)=>{const [x,y]=toXY(r.value,i);return `${i===0?"M":"L"}${x.toFixed(2)},${y.toFixed(2)}`;}).join(" ");
+  const [fx]=toXY(values[0],0),[lx]=toXY(values[values.length-1],values.length-1);
+  const area=`M${fx},33 ${path.replace(/^M/,"L")} L${lx},33 Z`;
+  const trend=values[values.length-1]-values[0];
+  const color=trend>=0?t.positive:t.negative;
+  const gid=`nwh-${t.mode}`;
+  return (
+    <div>
+      <svg viewBox="0 0 100 42" style={{width:"100%",height:112,display:"block"}} preserveAspectRatio="none" role="img" aria-label="Net worth history chart">
+        <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity="0.24"/><stop offset="100%" stopColor={color} stopOpacity="0"/></linearGradient></defs>
+        {[7,14,21,28,35].map(y=><line key={y} x1="0" y1={y} x2="100" y2={y} stroke={t.border} strokeWidth="0.4"/>)}
+        <path d={area} fill={`url(#${gid})`} stroke="none"/>
+        <path d={path} fill="none" stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke"/>
+        {rows.map((r,i)=>{const [x,y]=toXY(r.value,i);return <circle key={r.key} cx={x} cy={y} r="1.6" fill={color}/>;})}
+      </svg>
+      <div style={{display:"flex",justifyContent:"space-between",gap:8,marginTop:4}}>
+        {rows.map(r=><div key={r.key} style={{fontSize:9.5,color:t.textFaint,textAlign:"center",flex:1,whiteSpace:"nowrap"}}>{r.label}</div>)}
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:12}}>
+        <span style={{fontSize:11,color:t.textFaint}}>First → latest saved monthly value</span>
+        <span style={{fontSize:12,fontFamily:FONT_MONO,fontWeight:700,color}}>{trend>=0?"+":"−"}{fmt(Math.abs(trend))}</span>
+      </div>
+    </div>
+  );
+}
+
 function HealthScoreRing({score,tier}) {
   const t=useTheme();
   const r=42, c=2*Math.PI*r;
@@ -1267,11 +1505,35 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
   const activeInventory=parts.filter(p=>p.status==="available"||p.status==="in_build");
   const inventoryMarketValue=activeInventory.reduce((s,p)=>{const mkt=p.marketValue||0;return s+(mkt>0?mkt:p.allocatedCost);},0);
   const inventoryCost=activeInventory.reduce((s,p)=>s+p.allocatedCost,0);
-  const cashOnHand=state.businessCash||0;
-  const personalCash=state.personalCash||0;
-  const netWorth=cashOnHand+inventoryMarketValue;
+  const businessBank=Number(state.businessCash||0);
+  const cashOnHand=Number(state.cashOnHand||0);
+  const totalLiquid=businessBank+cashOnHand;
+  const outstandingReceivables=Number(state.outstandingReceivables||0);
+  const totalDebt=Number(state.totalDebt||0);
+  const netWorth=totalLiquid+inventoryMarketValue+outstandingReceivables-totalDebt;
+  const netWorthSnapshots=Array.isArray(state.netWorthSnapshots)?state.netWorthSnapshots:[];
+
+  // Last six calendar months, using the latest saved snapshot available in each month.
+  const sixMonthNetWorthRows=Array.from({length:6},(_,idx)=>{
+    const d=new Date(now.getFullYear(),now.getMonth()-(5-idx),1);
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+    const monthSnaps=netWorthSnapshots
+      .filter(s=>String(s.date||"").slice(0,7)===key)
+      .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    const latest=monthSnaps[monthSnaps.length-1];
+    return {
+      key,
+      label:d.toLocaleDateString("en-PH",{month:"short",year:"numeric"}),
+      value:latest?Number(latest.netWorth||0):null,
+      date:latest?.date||null,
+    };
+  }).filter(r=>r.value!==null);
+  const previousNetWorth=netWorthSnapshots
+    .filter(s=>s.date!==localISODate())
+    .sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]?.netWorth;
+  const netWorthDailyChange=previousNetWorth!==undefined?netWorth-Number(previousNetWorth):null;
   const fundsToRecover=(state.expenses||[]).filter(e=>e.type==="personal_draw").reduce((s,e)=>s+e.amount,0);
-  const isUnderCapital=cashOnHand<14500;
+  const isUnderCapital=totalLiquid<14500;
   const available=parts.filter(p=>p.status==="available").length;
   const inBuild=parts.filter(p=>p.status==="in_build").length;
   const soldCount=parts.filter(p=>p.status==="sold").length;
@@ -1356,8 +1618,8 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
   if(avgDaysToSell!==null)insights.push(`Average sale completes in ${avgDaysToSell} day${avgDaysToSell===1?"":"s"} from purchase to sale.`);
   if(parts.length>0){
     const avgCost=totalCapitalAllTime/parts.length;
-    if(avgCost>0&&cashOnHand>0){
-      const buyingPower=Math.floor(cashOnHand/avgCost);
+    if(avgCost>0&&totalLiquid>0){
+      const buyingPower=Math.floor(totalLiquid/avgCost);
       if(buyingPower>0)insights.push(`Current cash position supports ${buyingPower} more purchase${buyingPower===1?"":"s"} at your average part cost of ${fmt(Math.round(avgCost))}.`);
     }
   }
@@ -1368,7 +1630,7 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
   // ── Financial Health Score (0–100), weighted composite ──
   const roiScore=Math.max(0,Math.min(roi/0.5,1));
   const turnoverScore=Math.max(0,Math.min(inventoryTurnoverRate/2,1));
-  const cashScore=Math.max(0,Math.min(cashOnHand/14500,1));
+  const cashScore=Math.max(0,Math.min(totalLiquid/14500,1));
   const growthScore=Math.max(0,Math.min((momGrowthPct+0.5)/1,1));
   const healthScore=Math.round(roiScore*25+turnoverScore*25+cashScore*25+growthScore*25);
   const healthTier=healthScore>=90?{label:"Excellent",color:t.positive}
@@ -1412,7 +1674,7 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       {addingExpense&&<AddExpenseModal dispatch={dispatch} toast={toast} onClose={()=>setAddingExpense(false)}/>}
       {addingIncome&&<AddIncomeModal dispatch={dispatch} toast={toast} onClose={()=>setAddingIncome(false)}/>}
-      {transferring&&<TransferModal dispatch={dispatch} toast={toast} onClose={()=>setTransferring(false)} businessCash={cashOnHand} personalCash={personalCash}/>}
+      {transferring&&<TransferModal dispatch={dispatch} toast={toast} onClose={()=>setTransferring(false)} businessBank={businessBank} cashOnHand={cashOnHand}/>}
 
       {/* Header */}
       <div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -1432,13 +1694,39 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
         border:`1px solid ${t.border}`,borderRadius:16,padding:"24px 24px"}}>
         <div style={{fontSize:12,color:t.textMuted,fontWeight:600,marginBottom:9}}>Total business net worth</div>
         <div style={{fontSize:40,lineHeight:1}}><HeroNumber><AnimNum value={netWorth}/></HeroNumber></div>
-        <div style={{fontSize:12,color:t.textFaint,marginTop:11}}>Business cash ({fmt(cashOnHand)}) + inventory at market value ({fmt(inventoryMarketValue)}) · excludes personal wallet</div>
+        <div style={{fontSize:12,color:t.textFaint,marginTop:11}}>Business Bank ({fmt(businessBank)}) + Cash ({fmt(cashOnHand)}) + inventory at market value ({fmt(inventoryMarketValue)}) + receivables ({fmt(outstandingReceivables)}) − debt ({fmt(totalDebt)})</div>
+        {netWorthDailyChange!==null&&(
+          <div style={{fontSize:11.5,color:netWorthDailyChange>=0?t.positive:t.negative,marginTop:8,fontFamily:FONT_MONO,fontWeight:600}}>
+            {netWorthDailyChange>=0?"▲":"▼"} {fmt(Math.abs(netWorthDailyChange))} vs. previous saved snapshot
+          </div>
+        )}
       </div>
+
+      {/* Historical net-worth snapshots */}
+      <Card>
+        <SectionHeader icon={TrendingUp} title="Net worth history" sub="Saved financial snapshots — latest value captured for each calendar month" action={
+          <div style={{fontFamily:FONT_MONO,fontSize:12,color:t.textMuted}}>{netWorthSnapshots.length} snapshot{netWorthSnapshots.length===1?"":"s"}</div>
+        }/>
+        {sixMonthNetWorthRows.length>=2
+          ? <NetWorthHistoryChart rows={sixMonthNetWorthRows}/>
+          : <div style={{padding:"18px 0 6px",textAlign:"center",fontSize:12.5,color:t.textFaint}}>
+              Your financial history starts with today’s baseline. Keep using the app and this chart will build automatically day by day.
+            </div>}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:14,marginTop:16,paddingTop:14,borderTop:`1px solid ${t.border}`}}>
+          <div><div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Current net worth</div><div style={{fontSize:15,fontWeight:700,fontFamily:FONT_MONO,color:t.text}}>{fmt(netWorth)}</div></div>
+          <div><div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Saved snapshots</div><div style={{fontSize:15,fontWeight:700,fontFamily:FONT_MONO,color:t.info}}>{netWorthSnapshots.length}</div></div>
+          <div><div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Latest snapshot</div><div style={{fontSize:15,fontWeight:700,fontFamily:FONT_MONO,color:t.text}}>{netWorthSnapshots.length?netWorthSnapshots[netWorthSnapshots.length-1].date:"—"}</div></div>
+        </div>
+      </Card>
 
       {/* KPI Row */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10}}>
-        <KPICard label="Available cash" value={fmt(cashOnHand)} color={isUnderCapital?t.negative:t.info} accent={isUnderCapital?t.negativeSoftBorder:undefined}
-          question="Ready to deploy on new inventory"/>
+        <KPICard label="Business Bank" value={fmt(businessBank)} color={t.info}
+          question="Actual balance in the business bank account"/>
+        <KPICard label="Cash" value={fmt(cashOnHand)} color={t.accent}
+          question="Physical cash you have on hand"/>
+        <KPICard label="Total Liquid" value={fmt(totalLiquid)} color={isUnderCapital?t.negative:t.positive} accent={isUnderCapital?t.negativeSoftBorder:undefined}
+          question="Business Bank plus physical Cash"/>
         <KPICard label="Inventory value" value={fmt(inventoryMarketValue)} color={t.accent}
           question="Current market value if sold today"/>
         <KPICard label="Total profit" value={`${totalProfit>=0?"+":""}${fmt(totalProfit)}`} color={totalProfit>=0?t.positive:t.negative}
@@ -1496,20 +1784,20 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
             <div><div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Money invested</div><div style={{fontSize:15,fontWeight:700,color:t.info,fontFamily:FONT_MONO}}>{fmt(invested)}</div></div>
             <div><div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Money recovered</div><div style={{fontSize:15,fontWeight:700,color:t.positive,fontFamily:FONT_MONO}}>{fmt(recovered)}</div></div>
             <div><div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Net profit</div><div style={{fontSize:15,fontWeight:700,color:totalProfit>=0?t.positive:t.negative,fontFamily:FONT_MONO}}>{totalProfit>=0?"+":""}{fmt(totalProfit)}</div></div>
-            <div><div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Cash position</div><div style={{fontSize:15,fontWeight:700,color:t.text,fontFamily:FONT_MONO}}>{fmt(cashOnHand)}</div></div>
+            <div><div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Total liquid</div><div style={{fontSize:15,fontWeight:700,color:t.text,fontFamily:FONT_MONO}}>{fmt(totalLiquid)}</div></div>
           </div>
           <CapitalFlowDiagram invested={invested} inventoryVal={inventoryMarketValue} recovered={recovered} profit={totalProfit}/>
 
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:18,paddingTop:16,borderTop:`1px solid ${t.border}`}}>
             <div style={{background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:9,padding:12}}>
-              <div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Personal wallet</div>
-              <div style={{fontSize:15,fontWeight:700,color:t.text,fontFamily:FONT_MONO}}>{fmt(personalCash)}</div>
-              <div style={{fontSize:10,color:t.textFaint,marginTop:3}}>owner's pocket money — not business capital</div>
+              <div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Business Bank</div>
+              <div style={{fontSize:15,fontWeight:700,color:t.text,fontFamily:FONT_MONO}}>{fmt(businessBank)}</div>
+              <div style={{fontSize:10,color:t.textFaint,marginTop:3}}>actual bank balance</div>
             </div>
-            <div style={{background:fundsToRecover>0?t.warningSoft:t.surfaceSunken,border:`1px solid ${fundsToRecover>0?t.warningSoftBorder:t.border}`,borderRadius:9,padding:12}}>
-              <div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Funds to recover</div>
-              <div style={{fontSize:15,fontWeight:700,color:fundsToRecover>0?t.warning:t.textFaint,fontFamily:FONT_MONO}}>{fmt(fundsToRecover)}</div>
-              <div style={{fontSize:10,color:t.textFaint,marginTop:3}}>lifetime personal draws from the business</div>
+            <div style={{background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:9,padding:12}}>
+              <div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Cash</div>
+              <div style={{fontSize:15,fontWeight:700,color:t.text,fontFamily:FONT_MONO}}>{fmt(cashOnHand)}</div>
+              <div style={{fontSize:10,color:t.textFaint,marginTop:3}}>physical cash on hand</div>
             </div>
           </div>
 
@@ -1518,7 +1806,7 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
               <div style={{display:"flex",alignItems:"flex-start",gap:9}}>
                 <AlertTriangle size={16} color={t.negative} style={{flexShrink:0,marginTop:1}}/>
                 <div style={{color:t.textMuted,fontSize:12.5,lineHeight:1.5}}>
-                  <strong style={{color:t.negative}}>Below target baseline.</strong> Cash on hand ({fmt(cashOnHand)}) is under the ₱14,500 war chest. Consider pausing purchases or raising prices until it recovers.
+                  <strong style={{color:t.negative}}>Below target baseline.</strong> Total liquid ({fmt(totalLiquid)}) is under the ₱14,500 war chest. Consider pausing purchases or raising prices until it recovers.
                 </div>
               </div>
             </div>
@@ -1765,6 +2053,7 @@ function QuickSellModal({part,onClose,onConfirm,targetMargin}) {
   const suggested = Math.round(part.allocatedCost * (1 + targetMargin/100));
   const [price,setPrice]=useState(String(suggested));
   const [buyer,setBuyer]=useState("");
+  const [paymentAccount,setPaymentAccount]=usePersistentState("pctrader:lastSaleAccount","bank");
   const sp=parseFloat(price)||0;
   const profit=sp-part.allocatedCost;
   const m=part.allocatedCost>0?profit/part.allocatedCost:0;
@@ -1774,6 +2063,7 @@ function QuickSellModal({part,onClose,onConfirm,targetMargin}) {
       <div style={{fontSize:13,color:t.textFaint,marginBottom:16}}>{part.name} · cost {fmt(part.allocatedCost)}</div>
       <div style={{display:"flex",flexDirection:"column",gap:12}}>
         <Inp label={`Sale price (₱) — suggested ${fmt(suggested)} at ${targetMargin}% margin`} type="number" value={price} onChange={e=>setPrice(e.target.value)} />
+        <div><div style={{fontSize:12.5,color:t.textMuted,fontWeight:500,marginBottom:6}}>Receive payment into</div><Segmented ariaLabel="Receive payment into" value={paymentAccount} onChange={setPaymentAccount} options={[["bank","Business Bank",Wallet],["cash","Cash",Banknote]]}/></div>
         <Inp label="Buyer name (optional)" value={buyer} onChange={e=>setBuyer(e.target.value)} placeholder="Juan dela Cruz" />
         {sp>0&&(
           <div style={{background:t.surfaceSunken,borderRadius:9,padding:12,border:`1px solid ${t.border}`}}>
@@ -1787,7 +2077,7 @@ function QuickSellModal({part,onClose,onConfirm,targetMargin}) {
           </div>
         )}
         <div style={{display:"flex",gap:8,marginTop:4}}>
-          <Btn variant="success" icon={Check} onClick={()=>onConfirm(sp,buyer)} disabled={!sp} style={{flex:1}}>Confirm sale</Btn>
+          <Btn variant="success" icon={Check} onClick={()=>onConfirm(sp,buyer,paymentAccount)} disabled={!sp} style={{flex:1}}>Confirm sale</Btn>
           <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         </div>
       </div>
@@ -1798,7 +2088,7 @@ function QuickSellModal({part,onClose,onConfirm,targetMargin}) {
 /* ═══════════════════════════════════════════
    EDIT PART MODAL
 ═══════════════════════════════════════════ */
-function EditPartModal({part,onClose,onSave,dispatch,customCategories}) {
+function EditPartModal({part,onClose,onSave,dispatch,customCategories,hiddenCategories=[]}) {
   const t=useTheme();
   const [name,setName]=useState(part.name);
   const [cat,setCat]=useState(part.category);
@@ -1812,7 +2102,7 @@ function EditPartModal({part,onClose,onSave,dispatch,customCategories}) {
       <div style={{display:"flex",flexDirection:"column",gap:12}}>
         <PhotoUpload label="Photo" photoUrl={photo.photoUrl} photoRecordId={photo.photoRecordId} onChange={setPhoto}/>
         <Inp label="Name" value={name} onChange={e=>setName(e.target.value)}/>
-        <CategoryPicker label="Category" value={cat} onChange={setCat} customCategories={customCategories} dispatch={dispatch}/>
+        <CategoryPicker label="Category" value={cat} onChange={setCat} customCategories={customCategories} hiddenCategories={hiddenCategories} dispatch={dispatch}/>
         <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           <Inp label="Cost (₱)" type="number" value={cost} onChange={e=>setCost(e.target.value)}/>
           <Inp label="Market value (₱)" type="number" value={market} onChange={e=>setMarket(e.target.value)}/>
@@ -1826,41 +2116,40 @@ function EditPartModal({part,onClose,onSave,dispatch,customCategories}) {
     </ModalShell>
   );
 }
-function TransferModal({onClose, dispatch, toast, businessCash, personalCash}) {
+function TransferModal({onClose,dispatch,toast,businessBank,cashOnHand}) {
   const t=useTheme();
-  const [amount, setAmount] = useState("");
-  const [direction, setDirection] = useState("to_personal");
-
-  const handleTransfer = () => {
-    const amt = parseFloat(amount);
-    if(!amt || amt <= 0) return toast("Enter a valid amount", "error");
-    if(direction === "to_personal" && amt > businessCash) return toast("Insufficient business funds", "error");
-    if(direction === "to_business" && amt > personalCash) return toast("Insufficient personal funds", "error");
-
-    dispatch({type: "TRANSFER_FUNDS", amount: amt, direction});
-    toast(`Transferred ${fmt(amt)} to ${direction === "to_personal" ? "personal wallet" : "business wallet"}`);
+  const [amount,setAmount]=useState("");
+  const [direction,setDirection]=useState("bank_to_cash");
+  const handleTransfer=()=>{
+    const amt=Number(amount);
+    if(!amt||amt<=0)return toast("Enter a valid amount","error");
+    if(direction==="bank_to_cash"&&amt>businessBank)return toast("Insufficient Business Bank funds","error");
+    if(direction==="cash_to_bank"&&amt>cashOnHand)return toast("Insufficient Cash on hand","error");
+    dispatch({type:"TRANSFER_FUNDS",amount:amt,direction});
+    toast(direction==="bank_to_cash"?`${fmt(amt)} withdrawn from Business Bank to Cash`:`${fmt(amt)} deposited from Cash to Business Bank`);
     onClose();
   };
-
   return (
     <ModalShell onClose={onClose} label="Transfer funds">
-      <div style={{fontWeight:700,fontSize:16,color:t.text,marginBottom:16,fontFamily:FONT_DISPLAY}}>Transfer funds</div>
-      <Segmented ariaLabel="Direction" value={direction} onChange={setDirection} options={[["to_personal","To personal",User],["to_business","To business",Wallet]]}/>
-      <div style={{marginTop:12}}>
-        <Inp label="Amount (₱)" type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0" />
+      <div style={{fontWeight:700,fontSize:16,color:t.text,marginBottom:6,fontFamily:FONT_DISPLAY}}>Transfer funds</div>
+      <div style={{fontSize:12,color:t.textFaint,marginBottom:14}}>Move money between your bank account and physical cash.</div>
+      <Segmented ariaLabel="Transfer direction" value={direction} onChange={setDirection} options={[["bank_to_cash","Bank → Cash",Wallet],["cash_to_bank","Cash → Bank",Banknote]]}/>
+      <div style={{marginTop:12}}><Inp label="Amount (₱)" type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0"/></div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:12}}>
+        <div style={{background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:9,padding:10}}><div style={{fontSize:10,color:t.textFaint}}>Business Bank</div><div style={{fontFamily:FONT_MONO,fontSize:13,fontWeight:700,color:t.text,marginTop:3}}>{fmt(businessBank)}</div></div>
+        <div style={{background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:9,padding:10}}><div style={{fontSize:10,color:t.textFaint}}>Cash</div><div style={{fontFamily:FONT_MONO,fontSize:13,fontWeight:700,color:t.text,marginTop:3}}>{fmt(cashOnHand)}</div></div>
       </div>
-      <div style={{marginTop:16, display:"flex", gap:8}}>
-        <Btn variant="success" icon={ArrowLeftRight} onClick={handleTransfer} style={{flex:1}}>Confirm transfer</Btn>
-        <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-      </div>
+      <div style={{marginTop:16,display:"flex",gap:8}}><Btn variant="success" icon={ArrowLeftRight} onClick={handleTransfer} style={{flex:1}}>Confirm transfer</Btn><Btn variant="ghost" onClick={onClose}>Cancel</Btn></div>
     </ModalShell>
   );
 }
 function Buy({state,dispatch,toast}) {
   const t=useTheme();
+  const [categoryManagerOpen,setCategoryManagerOpen]=useState(false);
   const [mode,setMode]=useState("bundle");
   const [bundleName,setBundleName]=useState("");
   const [purchasePrice,setPurchasePrice]=useState("");
+  const [purchaseAccount,setPurchaseAccount]=usePersistentState("pctrader:lastPurchaseAccount","bank");
   const [bundlePhoto,setBundlePhoto]=useState({photoUrl:"",photoRecordId:""});
   // Smart default: start each new row on whatever category was bought last, instead of
   // always resetting to GPU — most buying sessions are one category at a time (a batch of
@@ -1967,7 +2256,7 @@ function Buy({state,dispatch,toast}) {
           photoUrl:r.photoUrl||"",photoRecordId:r.photoRecordId||"",
           history:[{date:today(),event:`Bought via ${src} — allocated ${fmt(alloc)}`}]};
       });
-      dispatch({type:"ADD_BUNDLE",bundle:{id:bundleId,name:bundleName,purchasePrice:paid,totalMarket,date:today(),
+      dispatch({type:"ADD_BUNDLE",paymentAccount:purchaseAccount,bundle:{id:bundleId,name:bundleName,purchasePrice:paid,totalMarket,date:today(),
         photoUrl:bundlePhoto.photoUrl,photoRecordId:bundlePhoto.photoRecordId},parts:newParts});
       toast(`Bundle added — ${newParts.length} parts in inventory`);
       if(newParts.length)setLastCategory(newParts[newParts.length-1].category);
@@ -1993,7 +2282,7 @@ function Buy({state,dispatch,toast}) {
         allocatedCost:cost,source:"Direct purchase",bundleId:null,status:"available",notes:singleNotes,soldTo:"",
         photoUrl:singlePhoto.photoUrl,photoRecordId:singlePhoto.photoRecordId,
         history:[{date:today(),event:`Bought for ${fmt(cost)}`}]}));
-      dispatch({type:"ADD_PARTS",parts:newParts});
+      dispatch({type:"ADD_PARTS",paymentAccount:purchaseAccount,parts:newParts});
       toast(qty>1?`${qty}× ${singleName} added`:`${singleName} added`);
       setLastCategory(singleCat);
       setSingleName("");setSingleCost("");setSingleMarket("");setSingleQty("1");setSingleNotes("");
@@ -2004,7 +2293,11 @@ function Buy({state,dispatch,toast}) {
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
+      {categoryManagerOpen&&<CategoryManager state={state} dispatch={dispatch} toast={toast} onClose={()=>setCategoryManagerOpen(false)}/>}
       <PageHeader title="Buy parts" sub="Add a bundle PC or an individual part."/>
+      <div style={{display:"flex",justifyContent:"flex-end",marginTop:-8}}>
+        <Btn small variant="ghost" icon={SettingsIcon} onClick={()=>setCategoryManagerOpen(true)}>Manage categories</Btn>
+      </div>
       <Segmented ariaLabel="Purchase type" value={mode} onChange={setMode} options={[["bundle","Bundle PC",Boxes],["single","Single part",Cpu]]}/>
 
       {mode==="bundle"&&(
@@ -2029,7 +2322,7 @@ function Buy({state,dispatch,toast}) {
                 <PhotoUpload label="" photoUrl={row.photoUrl} photoRecordId={row.photoRecordId} onChange={({photoUrl,photoRecordId})=>{updateRow(row.id,"photoUrl",photoUrl);updateRow(row.id,"photoRecordId",photoRecordId);}} onAnalyze={analyzeRowPhoto(row.id)}/>
                 <div className="part-row" style={{display:"grid",gridTemplateColumns:"1fr auto 90px 90px auto",gap:8,alignItems:"end",flex:1}}>
                   <Inp label={idx===0?"Part name":""} value={row.name} onChange={e=>updateRow(row.id,"name",e.target.value)} placeholder="RX 580" data-buy-row-name="1"/>
-                  <CategoryPicker label={idx===0?"Category":"​"} value={row.category} onChange={v=>updateRow(row.id,"category",v)} customCategories={state.customCategories} dispatch={dispatch} style={{minWidth:90}}/>
+                  <CategoryPicker label={idx===0?"Category":"​"} value={row.category} onChange={v=>updateRow(row.id,"category",v)} customCategories={state.customCategories} hiddenCategories={state.hiddenCategories||[]} dispatch={dispatch} style={{minWidth:90}}/>
                   <Inp label={idx===0?"Market (₱)":""} type="number" value={row.marketValue} onChange={e=>updateRow(row.id,"marketValue",e.target.value)} placeholder="4000"
                     onKeyDown={idx===partRows.length-1?handleLastRowKeyDown:undefined}/>
                   <Inp label={idx===0?"Notes":""} value={row.notes||""} onChange={e=>updateRow(row.id,"notes",e.target.value)} placeholder="condition"/>
@@ -2061,6 +2354,10 @@ function Buy({state,dispatch,toast}) {
               </div>
             </div>
           )}
+          <div style={{marginTop:14,marginBottom:14}}>
+            <div style={{fontSize:11.5,color:t.textMuted,marginBottom:6,fontWeight:600}}>Payment source</div>
+            <Segmented ariaLabel="Payment source" value={purchaseAccount} onChange={setPurchaseAccount} options={[["bank","Business Bank",Wallet],["cash","Cash",Banknote]]}/>
+          </div>
           <div style={{marginTop:16}}><Btn loading={loading} onClick={submitBundle} disabled={!bundleName||!purchasePrice||totalMarket===0} style={{width:"100%"}}>Add bundle to inventory</Btn></div>
         </Card>
       )}
@@ -2073,7 +2370,7 @@ function Buy({state,dispatch,toast}) {
           </div>
           <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             <Inp label="Part name" value={singleName} onChange={e=>setSingleName(e.target.value)} placeholder="GTX 1060 6GB"/>
-            <CategoryPicker label="Category" value={singleCat} onChange={setSingleCat} customCategories={state.customCategories} dispatch={dispatch}/>
+            <CategoryPicker label="Category" value={singleCat} onChange={setSingleCat} customCategories={state.customCategories} hiddenCategories={state.hiddenCategories||[]} dispatch={dispatch}/>
             <Inp label="Cost (₱, per unit)" type="number" value={singleCost} onChange={e=>setSingleCost(e.target.value)} placeholder="3000"/>
             <Inp label="Market value (₱, per unit, optional)" type="number" value={singleMarket} onChange={e=>setSingleMarket(e.target.value)} placeholder="3500"/>
             <Inp label="Quantity" type="number" min="1" value={singleQty} onChange={e=>setSingleQty(e.target.value)} placeholder="1"/>
@@ -2085,6 +2382,10 @@ function Buy({state,dispatch,toast}) {
               <span style={{fontFamily:FONT_MONO,fontWeight:700,color:t.text}}>{fmt((Math.max(1,parseInt(singleQty,10)||1))*(parseFloat(singleCost)||0))} total</span>
             </div>
           )}
+          <div style={{marginTop:14}}>
+            <div style={{fontSize:11.5,color:t.textMuted,marginBottom:6,fontWeight:600}}>Payment source</div>
+            <Segmented ariaLabel="Payment source" value={purchaseAccount} onChange={setPurchaseAccount} options={[["bank","Business Bank",Wallet],["cash","Cash",Banknote]]}/>
+          </div>
           <div style={{marginTop:14}}>
             <Inp label="Notes — condition, extras, observations" value={singleNotes} onChange={e=>setSingleNotes(e.target.value)} placeholder="Tested working. Includes original box."/>
           </div>
@@ -2237,6 +2538,7 @@ function PartGroupSheet({group,onClose,onViewUnit}) {
 }
 function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}) {
   const t=useTheme();
+  const [categoryManagerOpen,setCategoryManagerOpen]=useState(false);
   const [statusFilter,setStatusFilter]=useState("all");
   const [catFilter,setCatFilter]=useState("all");
   const [search,setSearch]=useState("");
@@ -2290,10 +2592,10 @@ function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}) {
   });
   const groupedCards=[...groupMap.values()]; // each entry is an array of 1+ identical parts
 
-  const handleQuickSell=(sp,buyer)=>{
+  const handleQuickSell=(sp,buyer,paymentAccount="bank")=>{
     if(!quickSell)return;
     const p=quickSell;
-    const sale={id:uid(),partId:p.id,name:p.name,cost:p.allocatedCost,salePrice:sp,profit:sp-p.allocatedCost,buyerName:buyer,date:today()};
+    const sale={id:uid(),partId:p.id,name:p.name,cost:p.allocatedCost,salePrice:sp,profit:sp-p.allocatedCost,buyerName:buyer,date:today(),paymentAccount};
     dispatch({type:"SELL",mode:"part",id:p.id,sale});
     toast(`${p.name} sold for ${fmt(sp)} — profit ${fmt(sp-p.allocatedCost)}`,sp-p.allocatedCost>=0?"success":"warn");
     setQuickSell(null);setViewing(null);
@@ -2354,8 +2656,9 @@ function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}) {
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      {categoryManagerOpen&&<CategoryManager state={state} dispatch={dispatch} toast={toast} onClose={()=>setCategoryManagerOpen(false)}/>}
       {quickSell&&<QuickSellModal part={quickSell} onClose={()=>setQuickSell(null)} onConfirm={handleQuickSell} targetMargin={settings?.targetMargin||30}/>}
-      {editing&&<EditPartModal part={editing} onClose={()=>setEditing(null)} onSave={handleEdit} dispatch={dispatch} customCategories={state.customCategories}/>}
+      {editing&&<EditPartModal part={editing} onClose={()=>setEditing(null)} onSave={handleEdit} dispatch={dispatch} customCategories={state.customCategories} hiddenCategories={state.hiddenCategories||[]}/>}
       {deleting&&!deleting._isBundle&&(
         <ConfirmModal title="Delete this part?" message={`"${deleting.name}" will be permanently removed. This can't be undone.`}
           onConfirm={confirmDelete} onCancel={()=>setDeleting(null)}/>
@@ -2388,6 +2691,7 @@ function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}) {
       )}
 
       <PageHeader title="Inventory" sub={`${parts.length} part${parts.length===1?"":"s"} tracked`}/>
+      <div style={{display:"flex",justifyContent:"flex-end",marginTop:-8}}><Btn small variant="ghost" icon={SettingsIcon} onClick={()=>setCategoryManagerOpen(true)}>Manage categories</Btn></div>
 
       <Inp value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name or category…" icon={Search} aria-label="Search inventory"/>
 
@@ -2584,8 +2888,9 @@ function EditBuildPartsModal({build,state,dispatch,toast,onClose}) {
 
   // Same Domain Firewall as build creation — only PC Parts, never General Assets.
   const avail=state.parts.filter(p=>p.status==="available"&&domainOf(p.category,state.customCategories)==="pc_part");
-  const customPcPartCats=(state.customCategories||[]).filter(c=>c.domain==="pc_part").map(c=>c.name);
-  const categoriesPresent=[...CATEGORIES,...customPcPartCats].filter(c=>avail.some(p=>p.category===c));
+  const hiddenKeys=new Set((state.hiddenCategories||[]).map(categoryKey));
+  const customPcPartCats=(state.customCategories||[]).filter(c=>c.domain==="pc_part"&&!hiddenKeys.has(categoryKey(c.name))).map(c=>c.name);
+  const categoriesPresent=[...CATEGORIES.filter(c=>!hiddenKeys.has(categoryKey(c))),...customPcPartCats].filter(c=>avail.some(p=>p.category===c));
   const selectedCountByCat=cat=>avail.filter(p=>p.category===cat&&toAdd.includes(p.id)).length;
   const toggleAdd=id=>setToAdd(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
   const toggleRemove=id=>setToRemove(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
@@ -2802,8 +3107,9 @@ function Builds({state,dispatch,toast,openLightbox}) {
   const buildMarket=avail.filter(p=>sel.includes(p.id)).reduce((s,p)=>s+p.marketValue,0);
   const toggle=id=>setSel(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
 
-  const customPcPartCats=(state.customCategories||[]).filter(c=>c.domain==="pc_part").map(c=>c.name);
-  const categoriesPresent=[...CATEGORIES,...customPcPartCats].filter(c=>avail.some(p=>p.category===c));
+  const hiddenKeys=new Set((state.hiddenCategories||[]).map(categoryKey));
+  const customPcPartCats=(state.customCategories||[]).filter(c=>c.domain==="pc_part"&&!hiddenKeys.has(categoryKey(c.name))).map(c=>c.name);
+  const categoriesPresent=[...CATEGORIES.filter(c=>!hiddenKeys.has(categoryKey(c))),...customPcPartCats].filter(c=>avail.some(p=>p.category===c));
   const selectedCountByCat=cat=>avail.filter(p=>p.category===cat&&sel.includes(p.id)).length;
 
   const submit=()=>{
@@ -2985,6 +3291,7 @@ function Sell({state,dispatch,toast,openLightbox}) {
   const [selId,setSelId]=useState("");
   const [salePrice,setSalePrice]=useState("");
   const [buyer,setBuyer]=useState("");
+  const [paymentAccount,setPaymentAccount]=usePersistentState("pctrader:lastSaleAccount","bank");
   const [convoLink,setConvoLink]=useState("");
   const [proofPhoto,setProofPhoto]=useState({photoUrl:"",photoRecordId:""});
   const [loading,setLoading]=useState(false);
@@ -3012,7 +3319,7 @@ function Sell({state,dispatch,toast,openLightbox}) {
       ?state.parts.filter(p=>tb.partIds.includes(p.id)).map(p=>({id:p.id,name:p.name,category:p.category,allocatedCost:p.allocatedCost,marketValue:p.marketValue,photoUrl:p.photoUrl}))
       :undefined;
     setTimeout(()=>{
-      dispatch({type:"SELL",mode,id:selId,sale:{id:uid(),partId:mode==="part"?selId:null,buildId:mode==="build"?selId:null,name,cost,salePrice:sp,profit,buyerName:buyer,date:today(),
+      dispatch({type:"SELL",mode,id:selId,sale:{id:uid(),partId:mode==="part"?selId:null,buildId:mode==="build"?selId:null,name,cost,salePrice:sp,profit,buyerName:buyer,date:today(),paymentAccount,
         buildPartsSnapshot,
         convoLink:convoLink.trim(),proofPhotoUrl:proofPhoto.photoUrl,proofPhotoRecordId:proofPhoto.photoRecordId}});
       toast(`${name} sold for ${fmt(sp)} — profit ${fmt(profit)}`,profit>=0?"success":"warn");
@@ -3105,6 +3412,7 @@ function Sell({state,dispatch,toast,openLightbox}) {
             </div>
           )}
           <Inp label="Sale price (₱)" type="number" value={salePrice} onChange={e=>setSalePrice(e.target.value)} placeholder="5000" data-sell-price-input="1"/>
+          <div><div style={{fontSize:12.5,color:t.textMuted,fontWeight:500,marginBottom:6}}>Receive payment into</div><Segmented ariaLabel="Receive payment into" value={paymentAccount} onChange={setPaymentAccount} options={[["bank","Business Bank",Wallet],["cash","Cash",Banknote]]}/></div>
           <Inp label="Buyer name (optional)" value={buyer} onChange={e=>setBuyer(e.target.value)} placeholder="Juan dela Cruz"/>
           <Inp label="Conversation link (optional)" value={convoLink} onChange={e=>setConvoLink(e.target.value)} placeholder="https://m.me/... or FB Marketplace chat link" icon={LinkIcon}/>
           <PhotoUpload label="Proof of transaction (optional) — screenshot or photo" photoUrl={proofPhoto.photoUrl} photoRecordId={proofPhoto.photoRecordId} onChange={setProofPhoto}/>
@@ -3130,7 +3438,7 @@ const STATUS_COLOR_KEY={completed:"positive",returned:"warning",deleted:"neutral
 function History({state,dispatch,toast,openLightbox,jumpRequest}) {
   const t=useTheme();
   const [view,setView]=useState("transactions"); // "transactions" | "partTimeline" | "ledger"
-  const [walletFilter,setWalletFilter]=useState("business");
+  const [walletFilter,setWalletFilter]=useState("all");
   const [sel,setSel]=useState("");
   const [search,setSearch]=useState("");
   const [typeFilter,setTypeFilter]=useState("all");
@@ -3153,9 +3461,73 @@ function History({state,dispatch,toast,openLightbox,jumpRequest}) {
   const allSales=state.sales;
   const activeSales=allSales.filter(s=>!s.deleted&&!s.returned&&!s.writeOff);
 
-  const ledgerEntries=(state.transactions||[])
-    .filter(t=>t.type==="TRANSFER"?(t.from===walletFilter||t.to===walletFilter):t.wallet===walletFilter)
-    .map(t=>({...t,_positive: t.type==="TRANSFER"?t.to===walletFilter:(t.type==="INCOME"||t.type==="SALE")}));
+  const ledgerEntries=useMemo(()=>{
+    const transactions=(state.transactions||[]).filter(tx=>{
+      // Keep old personal entries stored, but exclude them from the new business-funds UI.
+      if(tx.type==="TRANSFER" && (tx.from==="personal"||tx.to==="personal")) return false;
+      if(tx.type!=="TRANSFER" && tx.wallet==="personal" && !tx.account) return false;
+      return true;
+    }).map(tx=>{
+      const txAccount=tx.account ? normalizeAccount(tx.account) : (tx.wallet==="business"?"bank":null);
+      let bankDelta=0,cashDelta=0;
+      if(tx.type==="TRANSFER"){
+        const from=tx.from==="business"?"bank":normalizeAccount(tx.from);
+        const to=tx.to==="business"?"bank":normalizeAccount(tx.to);
+        if(from==="bank")bankDelta-=Number(tx.amount||0);
+        if(from==="cash")cashDelta-=Number(tx.amount||0);
+        if(to==="bank")bankDelta+=Number(tx.amount||0);
+        if(to==="cash")cashDelta+=Number(tx.amount||0);
+      } else {
+        const amount=Number(tx.amount||0);
+        const delta=(tx.type==="SALE"||tx.type==="INCOME")?amount:-amount;
+        if(txAccount==="bank")bankDelta=delta;
+        if(txAccount==="cash")cashDelta=delta;
+      }
+      return {...tx,_txAccount:txAccount,_bankDelta:bankDelta,_cashDelta:cashDelta};
+    }).filter(tx=>walletFilter==="all" ? true : walletFilter==="bank" ? tx._bankDelta!==0 : tx._cashDelta!==0);
+
+    // Reconstruct each account independently from the live balances, then attach accurate
+    // before/after values to every event. Filters are applied after these balances are derived.
+    const chronological=[...transactions].sort((a,b)=>new Date(a.date||0)-new Date(b.date||0)||String(a.id).localeCompare(String(b.id)));
+    let bankRunning=Number(state.businessCash||0),cashRunning=Number(state.cashOnHand||0);
+    const balances=new Map();
+    [...chronological].reverse().forEach(tx=>{
+      const bankAfter=bankRunning,cashAfter=cashRunning;
+      const bankBefore=bankAfter-tx._bankDelta,cashBefore=cashAfter-tx._cashDelta;
+      bankRunning=bankBefore;cashRunning=cashBefore;
+      balances.set(String(tx.id),{_bankBefore:bankBefore,_bankAfter:bankAfter,_cashBefore:cashBefore,_cashAfter:cashAfter});
+    });
+    return chronological.map(tx=>({...tx,...(balances.get(String(tx.id))||{})}));
+  },[state.transactions,state.businessCash,state.cashOnHand,walletFilter]);
+
+  const [ledgerSort,setLedgerSort]=useState("newest");
+  const [ledgerFlow,setLedgerFlow]=useState("all");
+  const [ledgerRange,setLedgerRange]=useState("all");
+
+  const filteredLedgerEntries=useMemo(()=>{
+    const now=new Date();
+    const startOfToday=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
+    const startOfMonth=new Date(now.getFullYear(),now.getMonth(),1).getTime();
+    const thirtyDaysAgo=new Date(now.getTime()-30*24*60*60*1000).getTime();
+
+    const filtered=ledgerEntries.filter(tx=>{
+      const deltaForView=walletFilter==="bank"?tx._bankDelta:walletFilter==="cash"?tx._cashDelta:(tx._bankDelta+tx._cashDelta);
+      if(ledgerFlow==="spending" && !(tx.type==="PURCHASE"||tx.type==="EXPENSE"||tx.type==="REVERSAL")) return false;
+      if(ledgerFlow==="income" && !(tx.type==="INCOME"||tx.type==="SALE")) return false;
+      if(ledgerFlow==="transfers" && tx.type!=="TRANSFER") return false;
+      if((ledgerFlow==="spending"||ledgerFlow==="income")&&deltaForView===0)return false;
+      if(ledgerRange!=="all") {
+        const ms=new Date(tx.date||0).getTime();
+        if(Number.isNaN(ms)) return false;
+        if(ledgerRange==="today" && ms<startOfToday) return false;
+        if(ledgerRange==="month" && ms<startOfMonth) return false;
+        if(ledgerRange==="30days" && ms<thirtyDaysAgo) return false;
+      }
+      return true;
+    });
+
+    return ledgerSort==="oldest"?filtered:filtered.reverse();
+  },[ledgerEntries,ledgerFlow,ledgerRange,ledgerSort]);
 
   const filtered=allSales.filter(s=>{
     if(s.writeOff)return false;
@@ -3267,14 +3639,14 @@ function History({state,dispatch,toast,openLightbox,jumpRequest}) {
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
         <div style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:11,padding:14}}>
-          <div style={{fontSize:10.5,color:t.textMuted,fontWeight:600,marginBottom:5}}>Business wallet</div>
+          <div style={{fontSize:10.5,color:t.textMuted,fontWeight:600,marginBottom:5}}>Business Bank</div>
           <div style={{fontSize:18,fontWeight:700,color:t.positive,fontFamily:FONT_MONO}}>{fmt(state.businessCash||0)}</div>
-          <div style={{fontSize:10.5,color:t.textFaint,marginTop:4}}>for parts & builds</div>
+          <div style={{fontSize:10.5,color:t.textFaint,marginTop:4}}>actual business bank balance</div>
         </div>
         <div style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:11,padding:14}}>
-          <div style={{fontSize:10.5,color:t.textMuted,fontWeight:600,marginBottom:5}}>Personal wallet</div>
-          <div style={{fontSize:18,fontWeight:700,color:t.info,fontFamily:FONT_MONO}}>{fmt(state.personalCash||0)}</div>
-          <div style={{fontSize:10.5,color:t.textFaint,marginTop:4}}>your separate personal funds</div>
+          <div style={{fontSize:10.5,color:t.textMuted,fontWeight:600,marginBottom:5}}>Cash</div>
+          <div style={{fontSize:18,fontWeight:700,color:t.info,fontFamily:FONT_MONO}}>{fmt(state.cashOnHand||0)}</div>
+          <div style={{fontSize:10.5,color:t.textFaint,marginTop:4}}>physical cash on hand</div>
         </div>
       </div>
 
@@ -3322,23 +3694,71 @@ function History({state,dispatch,toast,openLightbox,jumpRequest}) {
         </>
       ):view==="ledger"?(
         <>
-          <Segmented ariaLabel="Wallet" value={walletFilter} onChange={setWalletFilter} options={[["business","Business wallet",Wallet],["personal","Personal wallet",User]]}/>
+          <Segmented ariaLabel="Account" value={walletFilter} onChange={setWalletFilter} options={[["all","All accounts",ArrowLeftRight],["bank","Business Bank",Wallet],["cash","Cash",Banknote]]}/>
 
-          {ledgerEntries.length===0?(
-            <Card style={{textAlign:"center",padding:36}}><div style={{color:t.textFaint}}>No {walletFilter} wallet activity yet.</div></Card>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div>
+                <div style={{fontSize:10.5,color:t.textFaint,fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:5}}><ArrowDownUp size={11}/> Sort</div>
+                <Segmented ariaLabel="Ledger sort" value={ledgerSort} onChange={setLedgerSort} options={[["newest","Latest first",ArrowDownUp],["oldest","Oldest first",HistoryIcon]]}/>
+              </div>
+              <div>
+                <div style={{fontSize:10.5,color:t.textFaint,fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:5}}><CalendarDays size={11}/> Date</div>
+                <Segmented ariaLabel="Ledger date range" value={ledgerRange} onChange={setLedgerRange} options={[["all","All",CalendarDays],["month","This month",CalendarDays],["30days","30 days",CalendarDays]]}/>
+              </div>
+            </div>
+
+            <div>
+              <div style={{fontSize:10.5,color:t.textFaint,fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:5}}><SlidersHorizontal size={11}/> Flow</div>
+              <Segmented ariaLabel="Ledger flow" value={ledgerFlow} onChange={setLedgerFlow} options={[
+                ["all","All",Banknote],["spending","Spending",Minus],["income","Income",Plus],["transfers","Transfers",ArrowLeftRight],
+              ]}/>
+            </div>
+          </div>
+
+          <div style={{fontSize:10.5,color:t.textFaint,marginTop:2}}>Showing {filteredLedgerEntries.length} {filteredLedgerEntries.length===1?"entry":"entries"} · newest entries appear first by default</div>
+
+          {filteredLedgerEntries.length===0?(
+            <Card style={{textAlign:"center",padding:36}}><div style={{color:t.textFaint}}>No {walletFilter=== "all" ? "business funds" : accountLabel(walletFilter)} activity matches these filters.</div></Card>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {ledgerEntries.map((tx,i)=>(
-                <div key={tx.id} style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:11,padding:"12px 14px",
-                  display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,
+              {filteredLedgerEntries.map((tx,i)=>(
+                <div key={tx.id} style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:11,padding:"13px 14px",
                   animation:`blFadeUp 0.18s ease ${Math.min(i*0.02,0.3)}s both`}}>
-                  <div style={{minWidth:0}}>
-                    <div style={{color:t.text,fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{tx.description}</div>
-                    <div style={{color:t.textFaint,fontSize:10.5,marginTop:2}}>{tx.date}</div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
+                    <div style={{minWidth:0,flex:1}}>
+                      <div style={{display:"flex",alignItems:"center",gap:7}}>
+                        <div style={{width:7,height:7,borderRadius:"50%",background:tx._delta>0?t.positive:t.negative,flexShrink:0}}/>
+                        <div style={{color:t.text,fontSize:13,fontWeight:650,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{tx.description}</div>
+                      </div>
+                      <div style={{color:t.textFaint,fontSize:10.5,marginTop:3}}>{tx.date}{tx.type?` · ${tx.type}`:""}</div>
+                    </div>
+                    <div style={{fontFamily:FONT_MONO,fontWeight:700,fontSize:13,color:(walletFilter==="bank"?tx._bankDelta:walletFilter==="cash"?tx._cashDelta:tx._bankDelta+tx._cashDelta)>=0?t.positive:t.negative,whiteSpace:"nowrap",textAlign:"right"}}>
+                      {tx.type==="TRANSFER"&&walletFilter==="all" ? <span style={{fontSize:10.5,display:"block",lineHeight:1.6}}>Bank {tx._bankDelta<0?"−":"+"}{fmt(Math.abs(tx._bankDelta))}<br/>Cash {tx._cashDelta<0?"−":"+"}{fmt(Math.abs(tx._cashDelta))}</span> : <>{(walletFilter==="bank"?tx._bankDelta:walletFilter==="cash"?tx._cashDelta:tx._bankDelta+tx._cashDelta)>=0?"+":"−"}{fmt(Math.abs(walletFilter==="bank"?tx._bankDelta:walletFilter==="cash"?tx._cashDelta:tx._bankDelta+tx._cashDelta))}</>}
+                    </div>
                   </div>
-                  <div style={{fontFamily:FONT_MONO,fontWeight:700,fontSize:14,color:tx._positive?t.positive:t.negative,whiteSpace:"nowrap"}}>
-                    {tx._positive?"+":"-"}{fmt(tx.amount)}
-                  </div>
+
+                  {tx.type==="TRANSFER"&&walletFilter==="all" ? (
+                    <div style={{marginTop:11,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,paddingTop:10,borderTop:`1px solid ${t.border}`}}>
+                      {[["Business Bank",tx._bankBefore,tx._bankAfter],["Cash",tx._cashBefore,tx._cashAfter]].map(([label,before,after])=>(
+                        <div key={label} style={{background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:8,padding:9}}>
+                          <div style={{fontSize:9.5,color:t.textFaint,fontWeight:700}}>{label}</div>
+                          <div style={{fontSize:9.5,color:t.textFaint,marginTop:5}}>Before</div><div style={{fontFamily:FONT_MONO,fontSize:11.5,color:t.text}}>{fmt(before)}</div>
+                          <div style={{fontSize:9.5,color:t.textFaint,marginTop:4}}>After</div><div style={{fontFamily:FONT_MONO,fontSize:11.5,fontWeight:700,color:t.text}}>{fmt(after)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (()=>{
+                    const isBank=walletFilter==="bank"||(walletFilter==="all"&&tx._bankDelta!==0);
+                    const before=isBank?tx._bankBefore:tx._cashBefore;
+                    const after=isBank?tx._bankAfter:tx._cashAfter;
+                    const label=isBank?"Business Bank":"Cash";
+                    return <div style={{marginTop:11,display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:8,alignItems:"center",paddingTop:10,borderTop:`1px solid ${t.border}`}}>
+                      <div><div style={{fontSize:9.5,color:t.textFaint,textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:700}}>{label} before</div><div style={{fontFamily:FONT_MONO,fontSize:12.5,color:t.text,marginTop:3}}>{fmt(before)}</div></div>
+                      <div style={{color:t.textFaint,fontSize:14}}>→</div>
+                      <div style={{textAlign:"right"}}><div style={{fontSize:9.5,color:t.textFaint,textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:700}}>{label} after</div><div style={{fontFamily:FONT_MONO,fontSize:12.5,fontWeight:700,color:t.text,marginTop:3}}>{fmt(after)}</div></div>
+                    </div>;
+                  })()}
                 </div>
               ))}
             </div>
@@ -3753,17 +4173,17 @@ function Settings({state,dispatch,toast,theme,setTheme}) {
       )}
       <PageHeader title="Settings" sub="App preferences."/>
       <Card>
-        <SectionHeader icon={Wallet} title="Wallet balances"/>
+        <SectionHeader icon={Wallet} title="Business funds"/>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
           <div style={{background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:11,padding:14}}>
-            <div style={{fontSize:10.5,color:t.textMuted,fontWeight:600,marginBottom:5}}>Business wallet</div>
+            <div style={{fontSize:10.5,color:t.textMuted,fontWeight:600,marginBottom:5}}>Business Bank</div>
             <div style={{fontSize:18,fontWeight:700,color:t.positive,fontFamily:FONT_MONO}}>{fmt(state.businessCash||0)}</div>
-            <div style={{fontSize:10.5,color:t.textFaint,marginTop:4}}>Used for buying & selling parts</div>
+            <div style={{fontSize:10.5,color:t.textFaint,marginTop:4}}>Actual business bank balance</div>
           </div>
           <div style={{background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:11,padding:14}}>
-            <div style={{fontSize:10.5,color:t.textMuted,fontWeight:600,marginBottom:5}}>Personal wallet</div>
-            <div style={{fontSize:18,fontWeight:700,color:t.info,fontFamily:FONT_MONO}}>{fmt(state.personalCash||0)}</div>
-            <div style={{fontSize:10.5,color:t.textFaint,marginTop:4}}>Your separate personal funds</div>
+            <div style={{fontSize:10.5,color:t.textMuted,fontWeight:600,marginBottom:5}}>Cash</div>
+            <div style={{fontSize:18,fontWeight:700,color:t.info,fontFamily:FONT_MONO}}>{fmt(state.cashOnHand||0)}</div>
+            <div style={{fontSize:10.5,color:t.textFaint,marginTop:4}}>Physical cash on hand</div>
           </div>
         </div>
       </Card>
@@ -3844,6 +4264,7 @@ function QuickBuyModal({state,dispatch,toast,onClose}) {
   const [cat,setCat]=useState("Other");
   const [cost,setCost]=useState("");
   const [qty,setQty]=useState("1");
+  const [purchaseAccount,setPurchaseAccount]=usePersistentState("pctrader:lastPurchaseAccount","bank");
 
   const submit=()=>{
     if(!name||!cost){toast("Enter a name and cost","error");return;}
@@ -3852,7 +4273,7 @@ function QuickBuyModal({state,dispatch,toast,onClose}) {
     const newParts=Array.from({length:n},()=>({id:uid(),name,category:cat,marketValue:c,allocatedCost:c,
       source:"Quick Buy",bundleId:null,status:"available",notes:"",soldTo:"",photoUrl:"",photoRecordId:"",
       history:[{date:today(),event:`Quick Buy — bought for ${fmt(c)}`}]}));
-    dispatch({type:"ADD_PARTS",parts:newParts});
+    dispatch({type:"ADD_PARTS",paymentAccount:purchaseAccount,parts:newParts});
     toast(n>1?`${n}× ${name} added — add photos/details later via Edit`:`${name} added — add photos/details later via Edit`);
     onClose();
   };
@@ -3863,11 +4284,12 @@ function QuickBuyModal({state,dispatch,toast,onClose}) {
       <div style={{fontSize:12,color:t.textFaint,marginBottom:16}}>Lock it in fast — fill in the rest later.</div>
       <div style={{display:"flex",flexDirection:"column",gap:11}}>
         <Inp label="Name" value={name} onChange={e=>setName(e.target.value)} placeholder="RX 580"/>
-        <CategoryPicker label="Category" value={cat} onChange={setCat} customCategories={state.customCategories} dispatch={dispatch}/>
+        <CategoryPicker label="Category" value={cat} onChange={setCat} customCategories={state.customCategories} hiddenCategories={state.hiddenCategories||[]} dispatch={dispatch}/>
         <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:10}}>
           <Inp label="Cost (₱, per unit)" type="number" value={cost} onChange={e=>setCost(e.target.value)} placeholder="3000"/>
           <Inp label="Qty" type="number" min="1" value={qty} onChange={e=>setQty(e.target.value)} placeholder="1"/>
         </div>
+        <div><div style={{fontSize:12.5,color:t.textMuted,fontWeight:500,marginBottom:6}}>Payment source</div><Segmented ariaLabel="Payment source" value={purchaseAccount} onChange={setPurchaseAccount} options={[["bank","Business Bank",Wallet],["cash","Cash",Banknote]]}/></div>
         <div style={{display:"flex",gap:8,marginTop:4}}>
           <Btn onClick={submit} style={{flex:1}}>{parseInt(qty,10)>1?`Add ${Math.max(1,parseInt(qty,10)||1)} to inventory`:"Add to inventory"}</Btn>
           <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
@@ -3883,6 +4305,7 @@ function QuickSellPickerModal({state,dispatch,toast,onClose}) {
   const [selId,setSelId]=useState("");
   const [salePrice,setSalePrice]=useState("");
   const [buyer,setBuyer]=useState("");
+  const [paymentAccount,setPaymentAccount]=usePersistentState("pctrader:lastSaleAccount","bank");
 
   const avail=state.parts.filter(p=>p.status==="available");
   const builds=state.builds.filter(b=>!b.dissolved&&!b.sold);
@@ -3902,7 +4325,7 @@ function QuickSellPickerModal({state,dispatch,toast,onClose}) {
       :undefined;
     dispatch({type:"SELL",mode:selected.mode,id:selected.id,sale:{id:uid(),
       partId:selected.mode==="part"?selected.id:null,buildId:selected.mode==="build"?selected.id:null,
-      name:selected.name,cost:selected.cost,salePrice:sp,profit,buyerName:buyer,date:today(),buildPartsSnapshot}});
+      name:selected.name,cost:selected.cost,salePrice:sp,profit,buyerName:buyer,date:today(),paymentAccount,buildPartsSnapshot}});
     toast(`${selected.name} sold for ${fmt(sp)} — profit ${fmt(profit)}`,profit>=0?"success":"warn");
     onClose();
   };
@@ -3940,6 +4363,7 @@ function QuickSellPickerModal({state,dispatch,toast,onClose}) {
               <Btn small variant="ghost" onClick={()=>setSelId("")}>Change</Btn>
             </div>
             <Inp label="Sale price (₱)" type="number" value={salePrice} onChange={e=>setSalePrice(e.target.value)} placeholder="5000"/>
+            <div><div style={{fontSize:12.5,color:t.textMuted,fontWeight:500,marginBottom:6}}>Receive payment into</div><Segmented ariaLabel="Receive payment into" value={paymentAccount} onChange={setPaymentAccount} options={[["bank","Business Bank",Wallet],["cash","Cash",Banknote]]}/></div>
             <Inp label="Buyer name (optional)" value={buyer} onChange={e=>setBuyer(e.target.value)} placeholder="Juan dela Cruz"/>
             {sp>0&&(
               <div style={{fontSize:12,color:profit>=0?t.positive:t.negative,fontWeight:600}}>
@@ -3984,66 +4408,53 @@ function QuickNoteModal({dispatch,toast,onClose}) {
   );
 }
 
-function AddIncomeModal({onClose, dispatch, toast}) {
+function AddIncomeModal({onClose,dispatch,toast}) {
   const t=useTheme();
-  const [wallet, setWallet] = usePersistentState("pctrader:lastIncomeWallet","business");
-  const [desc, setDesc] = useState("");
-  const [amount, setAmount] = useState("");
-
-  const handleAdd = () => {
-    const amt = parseFloat(amount);
-    if(!amt || !desc) return toast("Fill all fields", "error");
-    dispatch({type: "ADD_INCOME", wallet, amount: amt, description: desc});
-    toast(`+${fmt(amt)} added to ${wallet} wallet`);
+  const [account,setAccount]=usePersistentState("pctrader:lastIncomeAccount","bank");
+  const [desc,setDesc]=useState("");
+  const [amount,setAmount]=useState("");
+  const handleAdd=()=>{
+    const amt=Number(amount);
+    if(!amt||!desc.trim())return toast("Fill all fields","error");
+    dispatch({type:"ADD_INCOME",account,amount:amt,description:desc.trim()});
+    toast(`+${fmt(amt)} added to ${accountLabel(account)}`);
     onClose();
   };
-
-  return (
-    <ModalShell onClose={onClose} label="Add income">
-      <div style={{fontWeight:700,fontSize:16,color:t.text,marginBottom:4,fontFamily:FONT_DISPLAY}}>Add income</div>
-      <div style={{fontSize:12,color:t.textFaint,marginBottom:14}}>Money coming in that isn't from selling inventory — a repair job, a service fee, anything like that.</div>
-      <Segmented ariaLabel="Wallet" value={wallet} onChange={setWallet} options={[["business","Business",Wallet],["personal","Personal",User]]}/>
-      <div style={{display:"flex",flexDirection:"column",gap:12,marginTop:12}}>
-        <Inp label="Description" value={desc} onChange={e=>setDesc(e.target.value)} placeholder="e.g. Fixed a PC for a client" />
-        <Inp label="Amount (₱)" type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0" />
-      </div>
-      <div style={{marginTop:16, display:"flex", gap:8}}>
-        <Btn variant="success" icon={Plus} onClick={handleAdd} style={{flex:1}}>Log income</Btn>
-        <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-      </div>
-    </ModalShell>
-  );
+  return <ModalShell onClose={onClose} label="Add income">
+    <div style={{fontWeight:700,fontSize:16,color:t.text,marginBottom:4,fontFamily:FONT_DISPLAY}}>Add income</div>
+    <div style={{fontSize:12,color:t.textFaint,marginBottom:14}}>Money coming in outside of an inventory sale.</div>
+    <div style={{fontSize:12.5,color:t.textMuted,fontWeight:500,marginBottom:6}}>Deposit into</div>
+    <Segmented ariaLabel="Deposit into" value={account} onChange={setAccount} options={[["bank","Business Bank",Wallet],["cash","Cash",Banknote]]}/>
+    <div style={{display:"flex",flexDirection:"column",gap:12,marginTop:12}}>
+      <Inp label="Description" value={desc} onChange={e=>setDesc(e.target.value)} placeholder="e.g. Fixed a PC for a client"/>
+      <Inp label="Amount (₱)" type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0"/>
+    </div>
+    <div style={{marginTop:16,display:"flex",gap:8}}><Btn variant="success" icon={Plus} onClick={handleAdd} style={{flex:1}}>Log income</Btn><Btn variant="ghost" onClick={onClose}>Cancel</Btn></div>
+  </ModalShell>;
 }
 
-function AddExpenseModal({onClose, dispatch, toast}) {
+function AddExpenseModal({onClose,dispatch,toast}) {
   const t=useTheme();
-  const [wallet, setWallet] = usePersistentState("pctrader:lastExpenseWallet","business");
-  const [desc, setDesc] = useState("");
-  const [amount, setAmount] = useState("");
-
-  const handleAdd = () => {
-    const amt = parseFloat(amount);
-    if(!amt || !desc) return toast("Fill all fields", "error");
-    const expenseType = wallet === "personal" ? "personal_draw" : "business";
-    dispatch({type: "ADD_EXPENSE", wallet, expenseType, amount: amt, description: desc});
-    toast(`Added ${wallet} expense for ${fmt(amt)}`);
+  const [account,setAccount]=usePersistentState("pctrader:lastExpenseAccount","bank");
+  const [desc,setDesc]=useState("");
+  const [amount,setAmount]=useState("");
+  const handleAdd=()=>{
+    const amt=Number(amount);
+    if(!amt||!desc.trim())return toast("Fill all fields","error");
+    dispatch({type:"ADD_EXPENSE",account,amount:amt,description:desc.trim()});
+    toast(`Added ${fmt(amt)} expense from ${accountLabel(account)}`);
     onClose();
   };
-
-  return (
-    <ModalShell onClose={onClose} label="Add expense">
-      <div style={{fontWeight:700,fontSize:16,color:t.text,marginBottom:14,fontFamily:FONT_DISPLAY}}>Add expense</div>
-      <Segmented ariaLabel="Wallet" value={wallet} onChange={setWallet} options={[["business","Business",Wallet],["personal","Personal",User]]}/>
-      <div style={{display:"flex",flexDirection:"column",gap:12,marginTop:12}}>
-        <Inp label="Description" value={desc} onChange={e=>setDesc(e.target.value)} placeholder="e.g. Tools, Lunch, Gas" />
-        <Inp label="Amount (₱)" type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0" />
-      </div>
-      <div style={{marginTop:16, display:"flex", gap:8}}>
-        <Btn variant="danger" icon={Minus} onClick={handleAdd} style={{flex:1}}>Log expense</Btn>
-        <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-      </div>
-    </ModalShell>
-  );
+  return <ModalShell onClose={onClose} label="Add expense">
+    <div style={{fontWeight:700,fontSize:16,color:t.text,marginBottom:14,fontFamily:FONT_DISPLAY}}>Add expense</div>
+    <div style={{fontSize:12.5,color:t.textMuted,fontWeight:500,marginBottom:6}}>Pay from</div>
+    <Segmented ariaLabel="Pay from" value={account} onChange={setAccount} options={[["bank","Business Bank",Wallet],["cash","Cash",Banknote]]}/>
+    <div style={{display:"flex",flexDirection:"column",gap:12,marginTop:12}}>
+      <Inp label="Description" value={desc} onChange={e=>setDesc(e.target.value)} placeholder="e.g. Tools, transport, supplies"/>
+      <Inp label="Amount (₱)" type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0"/>
+    </div>
+    <div style={{marginTop:16,display:"flex",gap:8}}><Btn variant="danger" icon={Minus} onClick={handleAdd} style={{flex:1}}>Log expense</Btn><Btn variant="ghost" onClick={onClose}>Cancel</Btn></div>
+  </ModalShell>;
 }
 const ALL_TABS=["Dashboard","Buy","Inventory","Builds","Sell","History","Settings"];
 const TAB_ICON={Dashboard:LayoutDashboard,Buy:ShoppingCart,Inventory:Boxes,Builds:Wrench,Sell:Banknote,History:HistoryIcon,Settings:SettingsIcon};
@@ -4193,10 +4604,18 @@ export default function App() {
     fetch("/data")
       .then(r=>{if(!r.ok)throw new Error(`Server returned ${r.status}`);return r.json();})
       .then(json=>{
-        const loadedState = json&&Object.keys(json).length?{...initialState,...json}:initialState;
+        let loadedState = json&&Object.keys(json).length?{...initialState,...json}:initialState;
         if(loadedState.businessCash===undefined && loadedState.liquidCash!==undefined) {
           loadedState.businessCash = loadedState.liquidCash;
         }
+        // Existing Business wallet is now Business Bank; new physical cash starts at zero.
+        // Old personal balances and transaction history remain stored but are hidden from the UI.
+        loadedState.businessCash=Number(loadedState.businessCash||loadedState.businessBank||0);
+        loadedState.cashOnHand=Number(loadedState.cashOnHand||loadedState.cash||0);
+        loadedState=normalizeCategoryRegistry(loadedState);
+        // Start the historical series immediately. Existing accounts will have a current-day
+        // baseline created on first load; future changes update that day's snapshot automatically.
+        loadedState = recordNetWorthSnapshot(loadedState);
         setState(loadedState);
         setLoadStatus("ready");
         hasLoaded.current=true;
@@ -4207,7 +4626,24 @@ export default function App() {
       });
   },[]);
 
-  const dispatch=useCallback(action=>setState(prev=>reducer(prev,action)),[]);
+  // Keep a daily snapshot even when the app stays open across midnight without a business action.
+  useEffect(()=>{
+    const timer=setInterval(()=>{
+      setState(prev=>{
+        if(!hasLoaded.current || !prev) return prev;
+        const todayKey=localISODate();
+        const existing=(prev.netWorthSnapshots||[]).find(s=>s.date===todayKey);
+        return existing ? prev : recordNetWorthSnapshot(prev);
+      });
+    },60*60*1000);
+    return()=>clearInterval(timer);
+  },[]);
+
+  const dispatch=useCallback(action=>setState(prev=>{
+    const next=reducer(prev,action);
+    if(next===prev || !SNAPSHOT_ACTIONS.has(action?.type)) return next;
+    return recordNetWorthSnapshot(next);
+  }),[]);
 
   // Debounced save to the server whenever state changes (skip the initial load)
   useEffect(()=>{
