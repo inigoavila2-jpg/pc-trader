@@ -511,6 +511,68 @@ const THEME = {
     shadow:"0 12px 32px rgba(40,30,10,0.14)", shadowSm:"0 2px 10px rgba(40,30,10,0.09)",
   },
 };
+
+// User-editable color tokens. Colors are persisted in localStorage and applied on top
+// of the selected base theme; soft fills/focus rings are derived automatically.
+const THEME_COLOR_FIELDS = [
+  { key:"bg", label:"Main Background", group:"Surfaces" },
+  { key:"bgElevated", label:"Elevated Background", group:"Surfaces" },
+  { key:"surface", label:"Surface / Cards", group:"Surfaces" },
+  { key:"surfaceSunken", label:"Sunken Surface / Inputs", group:"Surfaces" },
+  { key:"surfaceHover", label:"Hover Surface", group:"Surfaces" },
+  { key:"border", label:"Border", group:"Surfaces" },
+  { key:"borderStrong", label:"Strong Border", group:"Surfaces" },
+  { key:"text", label:"Primary Text", group:"Text" },
+  { key:"textMuted", label:"Muted Text", group:"Text" },
+  { key:"textFaint", label:"Faint Text", group:"Text" },
+  { key:"accent", label:"Main Accent", group:"Accents & Status" },
+  { key:"accentStrong", label:"Strong Accent", group:"Accents & Status" },
+  { key:"accentContrast", label:"Text on Accent", group:"Accents & Status" },
+  { key:"positive", label:"Positive / Profit", group:"Accents & Status" },
+  { key:"positiveStrong", label:"Strong Positive", group:"Accents & Status" },
+  { key:"info", label:"Information", group:"Accents & Status" },
+  { key:"infoStrong", label:"Strong Information", group:"Accents & Status" },
+  { key:"negative", label:"Negative / Loss", group:"Accents & Status" },
+  { key:"negativeStrong", label:"Strong Negative", group:"Accents & Status" },
+  { key:"warning", label:"Warning", group:"Accents & Status" },
+];
+
+function normalizeHex(value) {
+  const raw=String(value||"").trim();
+  const withHash=raw.startsWith("#")?raw:`#${raw}`;
+  if(/^#[0-9a-fA-F]{6}$/.test(withHash)) return withHash.toUpperCase();
+  if(/^#[0-9a-fA-F]{3}$/.test(withHash)) return `#${withHash.slice(1).split("").map(c=>c+c).join("")}`.toUpperCase();
+  return null;
+}
+
+function hexToRgba(hex, alpha) {
+  const normalized=normalizeHex(hex);
+  if(!normalized) return `rgba(232,163,61,${alpha})`;
+  const n=parseInt(normalized.slice(1),16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${alpha})`;
+}
+
+function buildTheme(base, overrides={}) {
+  const valid={};
+  for(const field of THEME_COLOR_FIELDS){
+    const candidate=overrides?.[field.key];
+    const normalized=normalizeHex(candidate);
+    if(normalized) valid[field.key]=normalized;
+  }
+  const t={...base,...valid};
+  t.accentSoft=hexToRgba(t.accent,0.14);
+  t.accentSoftBorder=hexToRgba(t.accent,0.4);
+  t.infoSoft=hexToRgba(t.info,0.13);
+  t.infoSoftBorder=hexToRgba(t.info,0.36);
+  t.positiveSoft=hexToRgba(t.positive,0.13);
+  t.positiveSoftBorder=hexToRgba(t.positive,0.36);
+  t.negativeSoft=hexToRgba(t.negative,0.13);
+  t.negativeSoftBorder=hexToRgba(t.negative,0.36);
+  t.warningSoft=hexToRgba(t.warning,0.13);
+  t.warningSoftBorder=hexToRgba(t.warning,0.36);
+  t.focusRing=hexToRgba(t.accent,0.45);
+  return t;
+}
 const STATUS_TONE = { available:"positive", in_build:"info", sold:"neutral", defective:"negative" };
 
 // Font stacks — Space Grotesk (headings/hero numbers), Inter (UI/body), IBM Plex Mono (money/ledger figures)
@@ -4149,10 +4211,51 @@ function ReturnReasonModal({title,sale,onConfirm,onCancel}) {
     </ModalShell>
   );
 }
-function Settings({state,dispatch,toast,theme,setTheme}) {
+function Settings({state,dispatch,toast,theme,setTheme,themeColors,setThemeColors}) {
   const t=useTheme();
   const [margin,setMargin]=useState(String(state.settings?.targetMargin||30));
   const [confirmingClear,setConfirmingClear]=useState(false);
+  const [colorDraft,setColorDraft]=useState(()=>({...((themeColors||{})[theme]||{})}));
+  const [colorDraftErrors,setColorDraftErrors]=useState({});
+
+  useEffect(()=>{
+    setColorDraft({...((themeColors||{})[theme]||{})});
+    setColorDraftErrors({});
+  },[theme,themeColors]);
+
+  const baseTheme=THEME[theme]||THEME.dark;
+  const getDraftColor=(key)=>normalizeHex(colorDraft[key])||baseTheme[key]||THEME.dark[key]||"#000000";
+  const updateDraftColor=(key,value)=>{
+    setColorDraft(prev=>({...prev,[key]:value}));
+    setColorDraftErrors(prev=>({...prev,[key]:value.trim()&&!normalizeHex(value)?"Enter a valid HEX value, e.g. #E8A33D":""}));
+  };
+
+  const applyColors=()=>{
+    const normalized={};
+    const errors={};
+    for(const field of THEME_COLOR_FIELDS){
+      const value=colorDraft[field.key] ?? baseTheme[field.key];
+      const hex=normalizeHex(value);
+      if(!hex) errors[field.key]="Enter a valid HEX value, e.g. #E8A33D";
+      else normalized[field.key]=hex;
+    }
+    if(Object.keys(errors).length){setColorDraftErrors(errors);toast("Fix the invalid HEX values before applying","error");return;}
+    setThemeColors(prev=>({...prev,[theme]:normalized}));
+    setColorDraft(normalized);
+    setColorDraftErrors({});
+    toast("Website colors applied and saved on this browser");
+  };
+
+  const resetColors=()=>{
+    setThemeColors(prev=>{
+      const next={...(prev||{})};
+      delete next[theme];
+      return next;
+    });
+    setColorDraft({});
+    setColorDraftErrors({});
+    toast("Colors reset to the default palette");
+  };
 
   const save=()=>{
     dispatch({type:"SET_SETTING",key:"targetMargin",value:parseFloat(margin)||30});
@@ -4198,7 +4301,43 @@ function Settings({state,dispatch,toast,theme,setTheme}) {
 
       <Card>
         <SectionHeader icon={Sun} title="Appearance"/>
+        <div style={{fontSize:12,color:t.textMuted,marginBottom:8}}>Choose a base theme. Your custom colors are saved separately for Dark and Light mode.</div>
         <Segmented ariaLabel="Theme" value={theme} onChange={setTheme} options={[["dark","Dark",Moon],["light","Light",Sun]]}/>
+      </Card>
+
+      <Card>
+        <SectionHeader icon={SlidersHorizontal} title="Theme color editor"/>
+        <div style={{fontSize:12,color:t.textMuted,lineHeight:1.55,marginBottom:14}}>
+          Edit any color by typing its HEX value or using the color picker. Changes are only applied after you press Apply; your palette is saved in this browser and remains after you revisit the website.
+        </div>
+        {[["Surfaces","Surface colors"],["Text","Text colors"],["Accents & Status","Accent and status colors"]].map(([group,title])=>{
+          const fields=THEME_COLOR_FIELDS.filter(f=>f.group===group);
+          return <div key={group} style={{marginBottom:18}}>
+            <div style={{fontSize:12,fontWeight:700,color:t.text,marginBottom:9}}>{title}</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,260px),1fr))",gap:9}}>
+              {fields.map(field=>{
+                const hex=getDraftColor(field.key);
+                const draftValue=colorDraft[field.key]??(themeColors?.[theme]?.[field.key]||baseTheme[field.key]||THEME.dark[field.key]);
+                const invalid=!!colorDraftErrors[field.key] || (!!draftValue&&!normalizeHex(draftValue));
+                return <div key={field.key} style={{display:"grid",gridTemplateColumns:"38px minmax(0,1fr)",alignItems:"center",gap:10,padding:10,border:`1px solid ${t.border}`,borderRadius:10,background:t.surfaceSunken}}>
+                  <input type="color" value={hex} onChange={e=>updateDraftColor(field.key,e.target.value)} aria-label={`${field.label} color picker`} title={`Pick ${field.label}`} style={{width:38,height:38,padding:2,border:`1px solid ${t.borderStrong}`,borderRadius:8,background:t.surface,cursor:"pointer"}}/>
+                  <div style={{minWidth:0}}>
+                    <label htmlFor={`theme-color-${theme}-${field.key}`} style={{fontSize:11.5,color:t.textMuted,fontWeight:600,display:"block",marginBottom:5}}>{field.label}</label>
+                    <input id={`theme-color-${theme}-${field.key}`} value={draftValue||""} spellCheck={false} autoCapitalize="characters" onChange={e=>updateDraftColor(field.key,e.target.value)} placeholder="#RRGGBB" aria-invalid={invalid}
+                      style={{width:"100%",boxSizing:"border-box",minHeight:35,padding:"7px 9px",border:`1px solid ${invalid?t.negative:t.border}`,borderRadius:7,background:t.surface,color:t.text,fontFamily:FONT_MONO,fontSize:12,outline:"none"}}/>
+                    {invalid&&<div style={{fontSize:10,color:t.negative,marginTop:4}}>Use #RGB or #RRGGBB</div>}
+                  </div>
+                </div>;
+              })}
+            </div>
+          </div>;
+        })}
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",borderTop:`1px solid ${t.border}`,paddingTop:14}}>
+          <Btn icon={Check} onClick={applyColors}>Apply colors</Btn>
+          <Btn variant="ghost" onClick={()=>{setColorDraft({...((themeColors||{})[theme]||{})});setColorDraftErrors({});}}>Discard changes</Btn>
+          <Btn variant="ghost" icon={Undo2} onClick={resetColors}>Reset to defaults</Btn>
+        </div>
+        <div style={{marginTop:11,fontSize:10.5,color:t.textFaint}}>Soft accent backgrounds, borders, and focus rings automatically follow their matching accent colors.</div>
       </Card>
 
       <Card>
@@ -4660,7 +4799,8 @@ export default function App() {
 
   const [tab,setTab]=useState("Dashboard");
   const {toasts,toast}=useToast();
-  const [theme,setTheme]=useState("dark");
+  const [theme,setTheme]=usePersistentState("pc-trader-theme-mode","dark");
+  const [themeColors,setThemeColors]=usePersistentState("pc-trader-theme-colors",{});
   const [lightboxUrl,setLightboxUrl]=useState(null);
   const openLightbox=useCallback(url=>setLightboxUrl(url),[]);
   const [searchOpen,setSearchOpen]=useState(false);
@@ -4691,7 +4831,7 @@ export default function App() {
   },[toast]);
 
   const isDesktop=useMediaQuery("(min-width: 1024px)");
-  const t=theme==="dark"?THEME.dark:THEME.light;
+  const t=buildTheme(theme==="dark"?THEME.dark:THEME.light,themeColors?.[theme]||{});
 
   if(loadStatus==="loading")return <LoadingScreen t={t}/>;
   if(loadStatus==="error")return <ErrorScreen t={t}/>;
@@ -4710,7 +4850,7 @@ export default function App() {
       <div style={{display:tab==="Builds"?"block":"none"}}><Builds state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/></div>
       <div style={{display:tab==="Sell"?"block":"none"}}><Sell state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/></div>
       <div style={{display:tab==="History"?"block":"none"}}><History state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox} jumpRequest={historyJump}/></div>
-      <div style={{display:tab==="Settings"?"block":"none"}}><Settings state={state} dispatch={dispatch} toast={toast} theme={theme} setTheme={setTheme}/></div>
+      <div style={{display:tab==="Settings"?"block":"none"}}><Settings state={state} dispatch={dispatch} toast={toast} theme={theme} setTheme={setTheme} themeColors={themeColors} setThemeColors={setThemeColors}/></div>
     </>
   );
 
@@ -4847,7 +4987,7 @@ export default function App() {
         )}
 
         <QuickActionsFab state={state} dispatch={dispatch} toast={toast}/>
-        <AIAgentChatbox state={state} dispatch={dispatch} setTab={setTab} setFormData={setFormData} toast={toast}/>
+        <AIAgentChatbox state={state} dispatch={dispatch} setTab={setTab} setFormData={setFormData} toast={toast} theme={t}/>
         <Lightbox url={lightboxUrl} onClose={()=>setLightboxUrl(null)}/>
         {searchOpen&&<GlobalSearchModal state={state} onClose={()=>setSearchOpen(false)} onJump={jumpTo}/>}
       </div>
