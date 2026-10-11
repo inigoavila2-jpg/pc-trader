@@ -4840,6 +4840,11 @@ export default function App() {
   const [saveStatus,setSaveStatus]=useState("idle"); // idle | saving | error
   const saveTimer=useRef(null);
   const hasLoaded=useRef(false);
+  // Theme edits originate on one device; ordinary data writes from another device must not
+  // overwrite that shared palette with stale theme values. Incoming theme sync updates also
+  // must not trigger an unnecessary full-state POST back to the server.
+  const themeWritePending=useRef(false);
+  const skipNextStateSave=useRef(false);
 
   // Load once from the server (which is backed by PocketBase)
   useEffect(()=>{
@@ -4867,6 +4872,9 @@ export default function App() {
             if(migrated&&Object.keys(migrated).length){
               loadedState.themePaletteSlots[2]={name:"Migrated Theme",mode:legacyMode,colors:migrated,updatedAt:new Date().toISOString()};
               loadedState.activeThemeSlot=2;
+              // Preserve this device's one-time legacy migration long enough to save it to /data
+              // before the first cross-device poll can replace it with the still-empty server slot.
+              themeWritePending.current=true;
             }
             loadedState.themeMode=json?.themeMode||legacyMode||"dark";
           }catch{loadedState.themeMode=json?.themeMode||loadedState.themeMode||"dark";}
@@ -4874,8 +4882,18 @@ export default function App() {
         loadedState.activeThemeSlot=Number(loadedState.activeThemeSlot||1);
         loadedState.themePaletteSlots={2:null,3:null,4:null,5:null,...(loadedState.themePaletteSlots||{})};
         if(!json?.themeMode){
-          try{loadedState.themeMode=JSON.parse(window.localStorage.getItem("pc-trader-theme-mode")||"\"dark\"");}
-          catch{loadedState.themeMode="dark";}
+          const activeSavedMode=loadedState.activeThemeSlot!==1
+            ? loadedState.themePaletteSlots?.[loadedState.activeThemeSlot]?.mode
+            : null;
+          if(activeSavedMode==="light"||activeSavedMode==="dark"){
+            loadedState.themeMode=activeSavedMode;
+          }else{
+            try{loadedState.themeMode=JSON.parse(window.localStorage.getItem("pc-trader-theme-mode")||"\"dark\"");}
+            catch{loadedState.themeMode="dark";}
+          }
+          // If the server has no mode yet, persist the chosen fallback once so other devices
+          // don't independently pick their own browser-local theme mode.
+          themeWritePending.current=true;
         }
         loadedState.themeMode=loadedState.themeMode||"dark";
         // Start the historical series immediately. Existing accounts will have a current-day
@@ -4904,24 +4922,113 @@ export default function App() {
     return()=>clearInterval(timer);
   },[]);
 
-  const dispatch=useCallback(action=>setState(prev=>{
-    const next=reducer(prev,action);
-    if(next===prev || !SNAPSHOT_ACTIONS.has(action?.type)) return next;
-    return recordNetWorthSnapshot(next);
-  }),[]);
+  const dispatch=useCallback(action=>{
+    if(["SET_THEME_MODE","SET_ACTIVE_THEME_SLOT","SAVE_THEME_PALETTE_SLOT"].includes(action?.type)){
+      themeWritePending.current=true;
+    }
+    setState(prev=>{
+      const next=reducer(prev,action);
+      if(next===prev || !SNAPSHOT_ACTIONS.has(action?.type)) return next;
+      return recordNetWorthSnapshot(next);
+    });
+  },[]);
 
-  // Debounced save to the server whenever state changes (skip the initial load)
+  // Keep the shared theme as server-owned state. When this device saves unrelated business
+  // changes, merge in the latest server theme first so an old phone tab cannot roll back the PC's
+  // active slot or saved palettes. Explicit theme edits on this device are allowed to win.
   useEffect(()=>{
     if(!hasLoaded.current||state===null)return;
-    setSaveStatus("saving");
+    if(skipNextStateSave.current){
+      skipNextStateSave.current=false;
+      return;
+    }
     clearTimeout(saveTimer.current);
-    saveTimer.current=setTimeout(()=>{
-      fetch("/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(state)})
-        .then(r=>{if(!r.ok)throw new Error(`Server returned ${r.status}`);setSaveStatus("idle");})
-        .catch(err=>{console.error("Failed to save data:",err);setSaveStatus("error");});
+    saveTimer.current=setTimeout(async()=>{
+      setSaveStatus("saving");
+      try{
+        let payload=state;
+        if(!themeWritePending.current){
+          try{
+            const latestRes=await fetch(`/data?themeSync=${Date.now()}`,{cache:"no-store"});
+            if(latestRes.ok){
+              const latest=await latestRes.json();
+              payload={
+                ...state,
+                themeMode:latest.themeMode||state.themeMode||"dark",
+                activeThemeSlot:Number(latest.activeThemeSlot||state.activeThemeSlot||1),
+                themePaletteSlots:latest.themePaletteSlots||state.themePaletteSlots||{2:null,3:null,4:null,5:null},
+              };
+            }
+          }catch(mergeError){
+            console.warn("Could not merge latest shared theme before saving:",mergeError);
+          }
+        }
+        const response=await fetch("/data",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify(payload),
+        });
+        if(!response.ok)throw new Error(`Server returned ${response.status}`);
+        setSaveStatus("idle");
+        if(themeWritePending.current)themeWritePending.current=false;
+      }catch(err){
+        console.error("Failed to save data:",err);
+        setSaveStatus("error");
+      }
     },500);
     return()=>clearTimeout(saveTimer.current);
   },[state]);
+
+  // Sync theme changes from other devices while this page is open, and when returning to the tab.
+  // Only the theme fields are merged so a polling response never replaces this device's inventory.
+  useEffect(()=>{
+    if(loadStatus!=="ready"||!hasLoaded.current)return undefined;
+    let disposed=false;
+    let syncing=false;
+    const syncSharedTheme=async()=>{
+      if(disposed||syncing||themeWritePending.current||document.visibilityState==="hidden")return;
+      syncing=true;
+      try{
+        const response=await fetch(`/data?themeSync=${Date.now()}`,{cache:"no-store"});
+        if(!response.ok)return;
+        const remote=await response.json();
+        if(disposed)return;
+        const remoteMode=remote.themeMode==="light"?"light":"dark";
+        const remoteSlot=Number(remote.activeThemeSlot||1);
+        const remotePalettes=remote.themePaletteSlots||{2:null,3:null,4:null,5:null};
+        setState(prev=>{
+          if(!prev)return prev;
+          const sameMode=(prev.themeMode||"dark")===remoteMode;
+          const sameSlot=Number(prev.activeThemeSlot||1)===remoteSlot;
+          const samePalettes=JSON.stringify(prev.themePaletteSlots||{})===JSON.stringify(remotePalettes||{});
+          if(sameMode&&sameSlot&&samePalettes)return prev;
+          skipNextStateSave.current=true;
+          return {
+            ...prev,
+            themeMode:remoteMode,
+            activeThemeSlot:remoteSlot,
+            themePaletteSlots:remotePalettes,
+          };
+        });
+      }catch(err){
+        console.warn("Shared theme sync unavailable:",err);
+      }finally{
+        syncing=false;
+      }
+    };
+    const interval=setInterval(syncSharedTheme,4000);
+    const onFocus=()=>syncSharedTheme();
+    const onVisibility=()=>{if(document.visibilityState==="visible")syncSharedTheme();};
+    window.addEventListener("focus",onFocus);
+    document.addEventListener("visibilitychange",onVisibility);
+    syncSharedTheme();
+    return()=>{
+      disposed=true;
+      clearInterval(interval);
+      window.removeEventListener("focus",onFocus);
+      document.removeEventListener("visibilitychange",onVisibility);
+    };
+  },[loadStatus]);
 
   const [tab,setTab]=useState("Dashboard");
   const {toasts,toast}=useToast();
