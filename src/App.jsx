@@ -4238,7 +4238,7 @@ function ReturnReasonModal({title,sale,onConfirm,onCancel}) {
     </ModalShell>
   );
 }
-function Settings({state,dispatch,toast,theme,setTheme,themeColors,setThemeColors,themePreviewColors,setThemePreviewColors}) {
+function Settings({state,dispatch,toast,theme,setTheme,themeColors,themePreviewColors,setThemePreviewColors}) {
   const t=useTheme();
   const [margin,setMargin]=useState(String(state.settings?.targetMargin||30));
   const [confirmingClear,setConfirmingClear]=useState(false);
@@ -4989,7 +4989,7 @@ export default function App() {
       <div style={{display:tab==="Builds"?"block":"none"}}><Builds state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/></div>
       <div style={{display:tab==="Sell"?"block":"none"}}><Sell state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/></div>
       <div style={{display:tab==="History"?"block":"none"}}><History state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox} jumpRequest={historyJump}/></div>
-      <div style={{display:tab==="Settings"?"block":"none"}}><Settings state={state} dispatch={dispatch} toast={toast} theme={theme} setTheme={setTheme} themeColors={themeColors} setThemeColors={setThemeColors} themePreviewColors={themePreviewColors} setThemePreviewColors={setThemePreviewColors}/></div>
+      <div style={{display:tab==="Settings"?"block":"none"}}><Settings state={state} dispatch={dispatch} toast={toast} theme={theme} setTheme={setTheme} themeColors={themeColors} themePreviewColors={themePreviewColors} setThemePreviewColors={setThemePreviewColors}/></div>
     </>
   );
 
