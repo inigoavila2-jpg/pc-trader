@@ -1362,21 +1362,11 @@ function Segmented({options,value,onChange,ariaLabel}) {
 }
 function HeroNumber({children,color}) {
   const t=useTheme();
-  // Use a solid text fill for reliable rendering across browsers/mobile WebViews.
-  // The previous background-clip:text gradient could render as a blank gradient
-  // rectangle on some browsers, hiding the actual net-worth number.
-  const numberColor = color || t.text;
   return (
     <span style={{
-      display:"inline-block",
-      background:"none",
-      WebkitBackgroundClip:"initial",
-      backgroundClip:"initial",
-      color:numberColor,
-      WebkitTextFillColor:numberColor,
-      fontFamily:FONT_MONO,
-      fontWeight:700,
-      letterSpacing:"-0.02em",
+      background: color || (t.mode==="dark"?`linear-gradient(135deg,${t.text} 0%,${t.textMuted} 100%)`:`linear-gradient(135deg,${t.text} 0%,${t.textMuted} 100%)`),
+      WebkitBackgroundClip:"text", backgroundClip:"text", color:"transparent",
+      fontFamily:FONT_MONO, fontWeight:700, letterSpacing:"-0.02em",
     }}>{children}</span>
   );
 }
@@ -4221,7 +4211,7 @@ function ReturnReasonModal({title,sale,onConfirm,onCancel}) {
     </ModalShell>
   );
 }
-function Settings({state,dispatch,toast,theme,setTheme,themeColors,setThemeColors}) {
+function Settings({state,dispatch,toast,theme,setTheme,themeColors,setThemeColors,themePreviewColors,setThemePreviewColors}) {
   const t=useTheme();
   const [margin,setMargin]=useState(String(state.settings?.targetMargin||30));
   const [confirmingClear,setConfirmingClear]=useState(false);
@@ -4237,7 +4227,16 @@ function Settings({state,dispatch,toast,theme,setTheme,themeColors,setThemeColor
   const getDraftColor=(key)=>normalizeHex(colorDraft[key])||baseTheme[key]||THEME.dark[key]||"#000000";
   const updateDraftColor=(key,value)=>{
     setColorDraft(prev=>({...prev,[key]:value}));
-    setColorDraftErrors(prev=>({...prev,[key]:value.trim()&&!normalizeHex(value)?"Enter a valid HEX value, e.g. #E8A33D":""}));
+    const normalized=normalizeHex(value);
+    setColorDraftErrors(prev=>({...prev,[key]:value.trim()&&!normalized?"Enter a valid HEX value, e.g. #E8A33D":""}));
+    // Preview valid colors immediately without persisting them. Invalid partial HEX input
+    // stays in the editor but does not apply until it becomes a valid color.
+    if(normalized){
+      setThemePreviewColors(prev=>({
+        ...(prev||{}),
+        [theme]:{...((prev||{})[theme]||(themeColors||{})[theme]||{}),[key]:normalized}
+      }));
+    }
   };
 
   const applyColors=()=>{
@@ -4251,20 +4250,35 @@ function Settings({state,dispatch,toast,theme,setTheme,themeColors,setThemeColor
     }
     if(Object.keys(errors).length){setColorDraftErrors(errors);toast("Fix the invalid HEX values before applying","error");return;}
     setThemeColors(prev=>({...prev,[theme]:normalized}));
+    setThemePreviewColors(prev=>{
+      const next={...(prev||{})};
+      delete next[theme];
+      return next;
+    });
     setColorDraft(normalized);
     setColorDraftErrors({});
     toast("Website colors applied and saved on this browser");
   };
 
   const resetColors=()=>{
-    setThemeColors(prev=>{
+    // Reset is also a live preview. Press Apply colors to persist the defaults.
+    const defaults={};
+    for(const field of THEME_COLOR_FIELDS) defaults[field.key]=baseTheme[field.key]||THEME.dark[field.key];
+    setColorDraft(defaults);
+    setColorDraftErrors({});
+    setThemePreviewColors(prev=>({...((prev)||{}),[theme]:defaults}));
+    toast("Default palette previewed. Click Apply colors to save it.");
+  };
+
+  const discardColorChanges=()=>{
+    setColorDraft({...((themeColors||{})[theme]||{})});
+    setColorDraftErrors({});
+    setThemePreviewColors(prev=>{
       const next={...(prev||{})};
       delete next[theme];
       return next;
     });
-    setColorDraft({});
-    setColorDraftErrors({});
-    toast("Colors reset to the default palette");
+    toast("Unsaved color preview discarded");
   };
 
   const save=()=>{
@@ -4318,7 +4332,7 @@ function Settings({state,dispatch,toast,theme,setTheme,themeColors,setThemeColor
       <Card>
         <SectionHeader icon={SlidersHorizontal} title="Theme color editor"/>
         <div style={{fontSize:12,color:t.textMuted,lineHeight:1.55,marginBottom:14}}>
-          Edit any color by typing its HEX value or using the color picker. Changes are only applied after you press Apply; your palette is saved in this browser and remains after you revisit the website.
+          Edit a HEX value or use the color picker to preview the change across the website immediately. Apply saves the preview so it remains when you revisit this website in this browser. Discard changes restores the last saved palette.
         </div>
         {[["Surfaces","Surface colors"],["Text","Text colors"],["Accents & Status","Accent and status colors"]].map(([group,title])=>{
           const fields=THEME_COLOR_FIELDS.filter(f=>f.group===group);
@@ -4344,10 +4358,10 @@ function Settings({state,dispatch,toast,theme,setTheme,themeColors,setThemeColor
         })}
         <div style={{display:"flex",gap:8,flexWrap:"wrap",borderTop:`1px solid ${t.border}`,paddingTop:14}}>
           <Btn icon={Check} onClick={applyColors}>Apply colors</Btn>
-          <Btn variant="ghost" onClick={()=>{setColorDraft({...((themeColors||{})[theme]||{})});setColorDraftErrors({});}}>Discard changes</Btn>
-          <Btn variant="ghost" icon={Undo2} onClick={resetColors}>Reset to defaults</Btn>
+          <Btn variant="ghost" onClick={discardColorChanges}>Discard changes</Btn>
+          <Btn variant="ghost" icon={Undo2} onClick={resetColors}>Preview defaults</Btn>
         </div>
-        <div style={{marginTop:11,fontSize:10.5,color:t.textFaint}}>Soft accent backgrounds, borders, and focus rings automatically follow their matching accent colors.</div>
+        <div style={{marginTop:11,fontSize:10.5,color:t.textFaint}}>Soft accent backgrounds, borders, and focus rings automatically follow their matching accent colors. Preview is temporary until you press Apply colors.</div>
       </Card>
 
       <Card>
@@ -4811,6 +4825,7 @@ export default function App() {
   const {toasts,toast}=useToast();
   const [theme,setTheme]=usePersistentState("pc-trader-theme-mode","dark");
   const [themeColors,setThemeColors]=usePersistentState("pc-trader-theme-colors",{});
+  const [themePreviewColors,setThemePreviewColors]=useState(null);
   const [lightboxUrl,setLightboxUrl]=useState(null);
   const openLightbox=useCallback(url=>setLightboxUrl(url),[]);
   const [searchOpen,setSearchOpen]=useState(false);
@@ -4841,7 +4856,10 @@ export default function App() {
   },[toast]);
 
   const isDesktop=useMediaQuery("(min-width: 1024px)");
-  const t=buildTheme(theme==="dark"?THEME.dark:THEME.light,themeColors?.[theme]||{});
+  const activeThemeColors = themePreviewColors && Object.prototype.hasOwnProperty.call(themePreviewColors,theme)
+    ? (themePreviewColors[theme]||{})
+    : (themeColors?.[theme]||{});
+  const t=buildTheme(theme==="dark"?THEME.dark:THEME.light,activeThemeColors);
 
   if(loadStatus==="loading")return <LoadingScreen t={t}/>;
   if(loadStatus==="error")return <ErrorScreen t={t}/>;
@@ -4860,7 +4878,7 @@ export default function App() {
       <div style={{display:tab==="Builds"?"block":"none"}}><Builds state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/></div>
       <div style={{display:tab==="Sell"?"block":"none"}}><Sell state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/></div>
       <div style={{display:tab==="History"?"block":"none"}}><History state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox} jumpRequest={historyJump}/></div>
-      <div style={{display:tab==="Settings"?"block":"none"}}><Settings state={state} dispatch={dispatch} toast={toast} theme={theme} setTheme={setTheme} themeColors={themeColors} setThemeColors={setThemeColors}/></div>
+      <div style={{display:tab==="Settings"?"block":"none"}}><Settings state={state} dispatch={dispatch} toast={toast} theme={theme} setTheme={setTheme} themeColors={themeColors} setThemeColors={setThemeColors} themePreviewColors={themePreviewColors} setThemePreviewColors={setThemePreviewColors}/></div>
     </>
   );
 
