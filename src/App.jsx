@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext, Fragment } from "react";
+import { useState, useEffect, useRef, useCallback, createContext, useContext, Fragment } from "react";
 import { GoogleGenAI } from "@google/genai";
 import { AIAgentChatbox } from "./components/AIAgentChatbox";
 import {
@@ -8,7 +8,7 @@ import {
   User, Link as LinkIcon, Info, ArrowRight, Loader2,
   CheckCircle2, XCircle, PackageX, ClipboardList, StickyNote, Undo2,
   Monitor, Cpu, ClipboardCopy, PackageCheck,
-  Tag, FileDown, Sparkles, ArrowDownUp, CalendarDays, SlidersHorizontal,
+  Tag, FileDown, Sparkles,
 } from "lucide-react";
 
 /* ═══════════════════════════════════════════
@@ -30,60 +30,7 @@ function domainOf(category, customCategories){
   const custom=customCategories?.find(c=>c.name===category);
   return custom?custom.domain:"pc_part"; // safe default — never silently misfile into General Assets
 }
-const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ targetMargin:30 }, customCategories:[], quickNotes:[], businessCash:14500, personalCash:0, expenses:[], transactions:[], netWorthSnapshots:[], outstandingReceivables:0, totalDebt:0 };
-
-// Historical financial snapshots are the source of truth for net-worth-over-time analysis.
-// One snapshot is kept per local calendar day; when the business changes during the day,
-// that day's snapshot is replaced with the newest state. This keeps the history compact while
-// still ensuring that a daily snapshot always reflects the latest business position.
-const localISODate = (date=new Date()) => {
-  const y=date.getFullYear();
-  const m=String(date.getMonth()+1).padStart(2,'0');
-  const d=String(date.getDate()).padStart(2,'0');
-  return `${y}-${m}-${d}`;
-};
-
-const calculateNetWorthSnapshot = (state, date=localISODate()) => {
-  const parts=Array.isArray(state?.parts)?state.parts:[];
-  const activeInventory=parts.filter(p=>p.status==='available'||p.status==='in_build');
-  const inventoryMarketValue=activeInventory.reduce((sum,p)=>{
-    const market=Number(p?.marketValue||0);
-    const cost=Number(p?.allocatedCost||0);
-    return sum+(market>0?market:cost);
-  },0);
-  const inventoryCost=activeInventory.reduce((sum,p)=>sum+Number(p?.allocatedCost||0),0);
-  const businessCash=Number(state?.businessCash||0);
-  const outstandingReceivables=Number(state?.outstandingReceivables||0);
-  const totalDebt=Number(state?.totalDebt||0);
-  const netWorth=businessCash+inventoryMarketValue+outstandingReceivables-totalDebt;
-
-  return {
-    id:`nw_${date}`,
-    date,
-    capturedAt:new Date().toISOString(),
-    businessCash,
-    inventoryCost,
-    inventoryMarketValue,
-    outstandingReceivables,
-    totalDebt,
-    netWorth,
-    activeInventoryCount:activeInventory.length,
-  };
-};
-
-const recordNetWorthSnapshot = (state) => {
-  const snapshot=calculateNetWorthSnapshot(state);
-  const existing=Array.isArray(state?.netWorthSnapshots)?state.netWorthSnapshots:[];
-  const next=[...existing.filter(s=>s.date!==snapshot.date),snapshot]
-    .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
-  return {...state,netWorthSnapshots:next};
-};
-
-const SNAPSHOT_ACTIONS = new Set([
-  'ADD_BUNDLE','ADD_PARTS','UPDATE_PART','SELL','ADD_EXPENSE','ADD_INCOME','TRANSFER_FUNDS',
-  'UPDATE_LIQUID_CASH','UNDO_SALE','DELETE_SALE','DELETE_PART','DUPLICATE_PART','DELETE_BUILD',
-  'DELETE_BUNDLE','MARK_DEFECTIVE'
-]);
+const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ targetMargin:30 }, customCategories:[], quickNotes:[], businessCash:14500, personalCash:0, expenses:[], transactions:[] };
 
 /* ═══════════════════════════════════════════
    REDUCER
@@ -1252,46 +1199,6 @@ function ProfitAreaChart({points,positive}) {
   );
 }
 
-function NetWorthHistoryChart({rows}) {
-  const t=useTheme();
-  if(!rows?.length)return null;
-  if(rows.length===1){
-    return <div style={{fontFamily:FONT_MONO,fontSize:17,fontWeight:700,color:t.text,padding:"16px 0 8px"}}>{fmt(rows[0].value)}</div>;
-  }
-  const values=rows.map(r=>Number(r.value||0));
-  const min=Math.min(...values),max=Math.max(...values);
-  const span=Math.max(1,max-min);
-  const toXY=(v,i)=>{
-    const x=(i/(rows.length-1))*100;
-    const y=33-((v-min)/span)*27;
-    return [x,y];
-  };
-  const path=rows.map((r,i)=>{const [x,y]=toXY(r.value,i);return `${i===0?"M":"L"}${x.toFixed(2)},${y.toFixed(2)}`;}).join(" ");
-  const [fx]=toXY(values[0],0),[lx]=toXY(values[values.length-1],values.length-1);
-  const area=`M${fx},33 ${path.replace(/^M/,"L")} L${lx},33 Z`;
-  const trend=values[values.length-1]-values[0];
-  const color=trend>=0?t.positive:t.negative;
-  const gid=`nwh-${t.mode}`;
-  return (
-    <div>
-      <svg viewBox="0 0 100 42" style={{width:"100%",height:112,display:"block"}} preserveAspectRatio="none" role="img" aria-label="Net worth history chart">
-        <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity="0.24"/><stop offset="100%" stopColor={color} stopOpacity="0"/></linearGradient></defs>
-        {[7,14,21,28,35].map(y=><line key={y} x1="0" y1={y} x2="100" y2={y} stroke={t.border} strokeWidth="0.4"/>)}
-        <path d={area} fill={`url(#${gid})`} stroke="none"/>
-        <path d={path} fill="none" stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke"/>
-        {rows.map((r,i)=>{const [x,y]=toXY(r.value,i);return <circle key={r.key} cx={x} cy={y} r="1.6" fill={color}/>;})}
-      </svg>
-      <div style={{display:"flex",justifyContent:"space-between",gap:8,marginTop:4}}>
-        {rows.map(r=><div key={r.key} style={{fontSize:9.5,color:t.textFaint,textAlign:"center",flex:1,whiteSpace:"nowrap"}}>{r.label}</div>)}
-      </div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:12}}>
-        <span style={{fontSize:11,color:t.textFaint}}>First → latest saved monthly value</span>
-        <span style={{fontSize:12,fontFamily:FONT_MONO,fontWeight:700,color}}>{trend>=0?"+":"−"}{fmt(Math.abs(trend))}</span>
-      </div>
-    </div>
-  );
-}
-
 function HealthScoreRing({score,tier}) {
   const t=useTheme();
   const r=42, c=2*Math.PI*r;
@@ -1362,30 +1269,7 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
   const inventoryCost=activeInventory.reduce((s,p)=>s+p.allocatedCost,0);
   const cashOnHand=state.businessCash||0;
   const personalCash=state.personalCash||0;
-  const outstandingReceivables=Number(state.outstandingReceivables||0);
-  const totalDebt=Number(state.totalDebt||0);
-  const netWorth=cashOnHand+inventoryMarketValue+outstandingReceivables-totalDebt;
-  const netWorthSnapshots=Array.isArray(state.netWorthSnapshots)?state.netWorthSnapshots:[];
-
-  // Last six calendar months, using the latest saved snapshot available in each month.
-  const sixMonthNetWorthRows=Array.from({length:6},(_,idx)=>{
-    const d=new Date(now.getFullYear(),now.getMonth()-(5-idx),1);
-    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-    const monthSnaps=netWorthSnapshots
-      .filter(s=>String(s.date||"").slice(0,7)===key)
-      .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
-    const latest=monthSnaps[monthSnaps.length-1];
-    return {
-      key,
-      label:d.toLocaleDateString("en-PH",{month:"short",year:"numeric"}),
-      value:latest?Number(latest.netWorth||0):null,
-      date:latest?.date||null,
-    };
-  }).filter(r=>r.value!==null);
-  const previousNetWorth=netWorthSnapshots
-    .filter(s=>s.date!==localISODate())
-    .sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]?.netWorth;
-  const netWorthDailyChange=previousNetWorth!==undefined?netWorth-Number(previousNetWorth):null;
+  const netWorth=cashOnHand+inventoryMarketValue;
   const fundsToRecover=(state.expenses||[]).filter(e=>e.type==="personal_draw").reduce((s,e)=>s+e.amount,0);
   const isUnderCapital=cashOnHand<14500;
   const available=parts.filter(p=>p.status==="available").length;
@@ -1548,30 +1432,8 @@ function Dashboard({state,dispatch,toast,setTab,openLightbox}) {
         border:`1px solid ${t.border}`,borderRadius:16,padding:"24px 24px"}}>
         <div style={{fontSize:12,color:t.textMuted,fontWeight:600,marginBottom:9}}>Total business net worth</div>
         <div style={{fontSize:40,lineHeight:1}}><HeroNumber><AnimNum value={netWorth}/></HeroNumber></div>
-        <div style={{fontSize:12,color:t.textFaint,marginTop:11}}>Business cash ({fmt(cashOnHand)}) + inventory at market value ({fmt(inventoryMarketValue)}) + receivables ({fmt(outstandingReceivables)}) − debt ({fmt(totalDebt)}) · excludes personal wallet</div>
-        {netWorthDailyChange!==null&&(
-          <div style={{fontSize:11.5,color:netWorthDailyChange>=0?t.positive:t.negative,marginTop:8,fontFamily:FONT_MONO,fontWeight:600}}>
-            {netWorthDailyChange>=0?"▲":"▼"} {fmt(Math.abs(netWorthDailyChange))} vs. previous saved snapshot
-          </div>
-        )}
+        <div style={{fontSize:12,color:t.textFaint,marginTop:11}}>Business cash ({fmt(cashOnHand)}) + inventory at market value ({fmt(inventoryMarketValue)}) · excludes personal wallet</div>
       </div>
-
-      {/* Historical net-worth snapshots */}
-      <Card>
-        <SectionHeader icon={TrendingUp} title="Net worth history" sub="Saved financial snapshots — latest value captured for each calendar month" action={
-          <div style={{fontFamily:FONT_MONO,fontSize:12,color:t.textMuted}}>{netWorthSnapshots.length} snapshot{netWorthSnapshots.length===1?"":"s"}</div>
-        }/>
-        {sixMonthNetWorthRows.length>=2
-          ? <NetWorthHistoryChart rows={sixMonthNetWorthRows}/>
-          : <div style={{padding:"18px 0 6px",textAlign:"center",fontSize:12.5,color:t.textFaint}}>
-              Your financial history starts with today’s baseline. Keep using the app and this chart will build automatically day by day.
-            </div>}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:14,marginTop:16,paddingTop:14,borderTop:`1px solid ${t.border}`}}>
-          <div><div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Current net worth</div><div style={{fontSize:15,fontWeight:700,fontFamily:FONT_MONO,color:t.text}}>{fmt(netWorth)}</div></div>
-          <div><div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Saved snapshots</div><div style={{fontSize:15,fontWeight:700,fontFamily:FONT_MONO,color:t.info}}>{netWorthSnapshots.length}</div></div>
-          <div><div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Latest snapshot</div><div style={{fontSize:15,fontWeight:700,fontFamily:FONT_MONO,color:t.text}}>{netWorthSnapshots.length?netWorthSnapshots[netWorthSnapshots.length-1].date:"—"}</div></div>
-        </div>
-      </Card>
 
       {/* KPI Row */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10}}>
@@ -3291,54 +3153,9 @@ function History({state,dispatch,toast,openLightbox,jumpRequest}) {
   const allSales=state.sales;
   const activeSales=allSales.filter(s=>!s.deleted&&!s.returned&&!s.writeOff);
 
-  const ledgerEntries=useMemo(()=>{
-    const all=(state.transactions||[])
-      .filter(t=>t.type==="TRANSFER"?(t.from===walletFilter||t.to===walletFilter):t.wallet===walletFilter)
-      .map(t=>{
-        const positive=t.type==="TRANSFER"?t.to===walletFilter:(t.type==="INCOME"||t.type==="SALE");
-        return {...t,_positive:positive,_delta:positive?Number(t.amount||0):-Number(t.amount||0)};
-      });
-
-    // Compute historical balances from the current wallet balance by walking the complete
-    // wallet ledger backwards. This stays correct even though old transactions did not
-    // explicitly store a "balance before/after" field.
-    const chronological=[...all].sort((a,b)=>new Date(a.date||0)-new Date(b.date||0) || String(a.id).localeCompare(String(b.id)));
-    let runningAfter=Number(walletFilter==="business"?state.businessCash:state.personalCash)||0;
-    const withBalances=[...chronological].reverse().map(tx=>{
-      const after=runningAfter;
-      const before=after-tx._delta;
-      runningAfter=before;
-      return {...tx,_balanceBefore:before,_balanceAfter:after};
-    }).reverse();
-    return withBalances;
-  },[state.transactions,state.businessCash,state.personalCash,walletFilter]);
-
-  const [ledgerSort,setLedgerSort]=useState("newest");
-  const [ledgerFlow,setLedgerFlow]=useState("all");
-  const [ledgerRange,setLedgerRange]=useState("all");
-
-  const filteredLedgerEntries=useMemo(()=>{
-    const now=new Date();
-    const startOfToday=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
-    const startOfMonth=new Date(now.getFullYear(),now.getMonth(),1).getTime();
-    const thirtyDaysAgo=new Date(now.getTime()-30*24*60*60*1000).getTime();
-
-    const filtered=ledgerEntries.filter(tx=>{
-      if(ledgerFlow==="spending" && tx._delta>=0) return false;
-      if(ledgerFlow==="income" && tx._delta<=0) return false;
-      if(ledgerFlow==="transfers" && tx.type!=="TRANSFER") return false;
-      if(ledgerRange!=="all") {
-        const ms=new Date(tx.date||0).getTime();
-        if(Number.isNaN(ms)) return false;
-        if(ledgerRange==="today" && ms<startOfToday) return false;
-        if(ledgerRange==="month" && ms<startOfMonth) return false;
-        if(ledgerRange==="30days" && ms<thirtyDaysAgo) return false;
-      }
-      return true;
-    });
-
-    return ledgerSort==="oldest"?filtered:filtered.reverse();
-  },[ledgerEntries,ledgerFlow,ledgerRange,ledgerSort]);
+  const ledgerEntries=(state.transactions||[])
+    .filter(t=>t.type==="TRANSFER"?(t.from===walletFilter||t.to===walletFilter):t.wallet===walletFilter)
+    .map(t=>({...t,_positive: t.type==="TRANSFER"?t.to===walletFilter:(t.type==="INCOME"||t.type==="SALE")}));
 
   const filtered=allSales.filter(s=>{
     if(s.writeOff)return false;
@@ -3507,58 +3324,20 @@ function History({state,dispatch,toast,openLightbox,jumpRequest}) {
         <>
           <Segmented ariaLabel="Wallet" value={walletFilter} onChange={setWalletFilter} options={[["business","Business wallet",Wallet],["personal","Personal wallet",User]]}/>
 
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-              <div>
-                <div style={{fontSize:10.5,color:t.textFaint,fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:5}}><ArrowDownUp size={11}/> Sort</div>
-                <Segmented ariaLabel="Ledger sort" value={ledgerSort} onChange={setLedgerSort} options={[["newest","Latest first",ArrowDownUp],["oldest","Oldest first",HistoryIcon]]}/>
-              </div>
-              <div>
-                <div style={{fontSize:10.5,color:t.textFaint,fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:5}}><CalendarDays size={11}/> Date</div>
-                <Segmented ariaLabel="Ledger date range" value={ledgerRange} onChange={setLedgerRange} options={[["all","All",CalendarDays],["month","This month",CalendarDays],["30days","30 days",CalendarDays]]}/>
-              </div>
-            </div>
-
-            <div>
-              <div style={{fontSize:10.5,color:t.textFaint,fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:5}}><SlidersHorizontal size={11}/> Flow</div>
-              <Segmented ariaLabel="Ledger flow" value={ledgerFlow} onChange={setLedgerFlow} options={[
-                ["all","All",Banknote],["spending","Spending",Minus],["income","Income",Plus],["transfers","Transfers",ArrowLeftRight],
-              ]}/>
-            </div>
-          </div>
-
-          <div style={{fontSize:10.5,color:t.textFaint,marginTop:2}}>Showing {filteredLedgerEntries.length} {filteredLedgerEntries.length===1?"entry":"entries"} · newest entries appear first by default</div>
-
-          {filteredLedgerEntries.length===0?(
-            <Card style={{textAlign:"center",padding:36}}><div style={{color:t.textFaint}}>No {walletFilter} wallet activity matches these filters.</div></Card>
+          {ledgerEntries.length===0?(
+            <Card style={{textAlign:"center",padding:36}}><div style={{color:t.textFaint}}>No {walletFilter} wallet activity yet.</div></Card>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {filteredLedgerEntries.map((tx,i)=>(
-                <div key={tx.id} style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:11,padding:"13px 14px",
+              {ledgerEntries.map((tx,i)=>(
+                <div key={tx.id} style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:11,padding:"12px 14px",
+                  display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,
                   animation:`blFadeUp 0.18s ease ${Math.min(i*0.02,0.3)}s both`}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
-                    <div style={{minWidth:0,flex:1}}>
-                      <div style={{display:"flex",alignItems:"center",gap:7}}>
-                        <div style={{width:7,height:7,borderRadius:"50%",background:tx._delta>0?t.positive:t.negative,flexShrink:0}}/>
-                        <div style={{color:t.text,fontSize:13,fontWeight:650,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{tx.description}</div>
-                      </div>
-                      <div style={{color:t.textFaint,fontSize:10.5,marginTop:3}}>{tx.date}{tx.type?` · ${tx.type}`:""}</div>
-                    </div>
-                    <div style={{fontFamily:FONT_MONO,fontWeight:700,fontSize:14,color:tx._delta>=0?t.positive:t.negative,whiteSpace:"nowrap"}}>
-                      {tx._delta>=0?"+":"-"}{fmt(Math.abs(tx._delta))}
-                    </div>
+                  <div style={{minWidth:0}}>
+                    <div style={{color:t.text,fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{tx.description}</div>
+                    <div style={{color:t.textFaint,fontSize:10.5,marginTop:2}}>{tx.date}</div>
                   </div>
-
-                  <div style={{marginTop:11,display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:8,alignItems:"center",paddingTop:10,borderTop:`1px solid ${t.border}`}}>
-                    <div>
-                      <div style={{fontSize:9.5,color:t.textFaint,textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:700}}>Balance before</div>
-                      <div style={{fontFamily:FONT_MONO,fontSize:12.5,color:t.text,marginTop:3}}>{fmt(tx._balanceBefore)}</div>
-                    </div>
-                    <div style={{color:t.textFaint,fontSize:14}}>→</div>
-                    <div style={{textAlign:"right"}}>
-                      <div style={{fontSize:9.5,color:t.textFaint,textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:700}}>Balance after</div>
-                      <div style={{fontFamily:FONT_MONO,fontSize:12.5,fontWeight:700,color:t.text,marginTop:3}}>{fmt(tx._balanceAfter)}</div>
-                    </div>
+                  <div style={{fontFamily:FONT_MONO,fontWeight:700,fontSize:14,color:tx._positive?t.positive:t.negative,whiteSpace:"nowrap"}}>
+                    {tx._positive?"+":"-"}{fmt(tx.amount)}
                   </div>
                 </div>
               ))}
@@ -4414,13 +4193,10 @@ export default function App() {
     fetch("/data")
       .then(r=>{if(!r.ok)throw new Error(`Server returned ${r.status}`);return r.json();})
       .then(json=>{
-        let loadedState = json&&Object.keys(json).length?{...initialState,...json}:initialState;
+        const loadedState = json&&Object.keys(json).length?{...initialState,...json}:initialState;
         if(loadedState.businessCash===undefined && loadedState.liquidCash!==undefined) {
           loadedState.businessCash = loadedState.liquidCash;
         }
-        // Start the historical series immediately. Existing accounts will have a current-day
-        // baseline created on first load; future changes update that day's snapshot automatically.
-        loadedState = recordNetWorthSnapshot(loadedState);
         setState(loadedState);
         setLoadStatus("ready");
         hasLoaded.current=true;
@@ -4431,24 +4207,7 @@ export default function App() {
       });
   },[]);
 
-  // Keep a daily snapshot even when the app stays open across midnight without a business action.
-  useEffect(()=>{
-    const timer=setInterval(()=>{
-      setState(prev=>{
-        if(!hasLoaded.current || !prev) return prev;
-        const todayKey=localISODate();
-        const existing=(prev.netWorthSnapshots||[]).find(s=>s.date===todayKey);
-        return existing ? prev : recordNetWorthSnapshot(prev);
-      });
-    },60*60*1000);
-    return()=>clearInterval(timer);
-  },[]);
-
-  const dispatch=useCallback(action=>setState(prev=>{
-    const next=reducer(prev,action);
-    if(next===prev || !SNAPSHOT_ACTIONS.has(action?.type)) return next;
-    return recordNetWorthSnapshot(next);
-  }),[]);
+  const dispatch=useCallback(action=>setState(prev=>reducer(prev,action)),[]);
 
   // Debounced save to the server whenever state changes (skip the initial load)
   useEffect(()=>{
