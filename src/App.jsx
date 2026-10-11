@@ -35,7 +35,7 @@ function domainOf(category, customCategories){
   const custom=findCustomCategory(category,customCategories);
   return custom?custom.domain:"pc_part";
 }
-const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ targetMargin:30 }, customCategories:[], quickNotes:[], hiddenCategories:[], businessCash:14500, cashOnHand:0, personalCash:0, expenses:[], transactions:[], netWorthSnapshots:[], outstandingReceivables:0, totalDebt:0 };
+const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ targetMargin:30 }, customCategories:[], quickNotes:[], hiddenCategories:[], businessCash:14500, cashOnHand:0, personalCash:0, expenses:[], transactions:[], netWorthSnapshots:[], outstandingReceivables:0, totalDebt:0, themeMode:"dark", activeThemeSlot:1, themePaletteSlots:{2:null,3:null,4:null,5:null} };
 
 // New account model: businessCash is retained as the storage field for Business Bank.
 // cashOnHand is physical cash. Legacy personal records remain stored but are hidden from UI.
@@ -226,6 +226,29 @@ function reducer(state, action) {
         builds:state.builds.map(b=>b.id===id?{...b,sold:true}:b),
         parts:state.parts.map(p=>build?.partIds.includes(p.id)?{...p,status:"sold",soldTo:sale.buyerName,history:[...p.history,{date:today(),event:`Sold in build "${build.name}" to ${sale.buyerName||"buyer"} for ${fmt(amount)}` }]}:p)};
       return withAccountDelta(base,account,amount);
+    }
+    case "SET_THEME_MODE":
+      return {...state, themeMode:action.mode === "light" ? "light" : "dark"};
+    case "SET_ACTIVE_THEME_SLOT": {
+      const slot=Number(action.slot);
+      if(!Number.isInteger(slot)||slot<1||slot>5)return state;
+      if(slot!==1&&!state.themePaletteSlots?.[slot])return state;
+      return {...state,activeThemeSlot:slot};
+    }
+    case "SAVE_THEME_PALETTE_SLOT": {
+      const slot=Number(action.slot);
+      if(!Number.isInteger(slot)||slot<2||slot>5||!action.colors)return state;
+      return {
+        ...state,
+        activeThemeSlot:slot,
+        themeMode:action.mode === "light" ? "light" : "dark",
+        themePaletteSlots:{...(state.themePaletteSlots||{}),[slot]:{
+          name:String(action.name||`Theme ${slot}`),
+          mode:action.mode === "light" ? "light" : "dark",
+          colors:action.colors,
+          updatedAt:new Date().toISOString(),
+        }}
+      };
     }
     case "SET_SETTING":
       return {...state, settings:{...state.settings,[action.key]:action.value}};
@@ -1362,10 +1385,14 @@ function Segmented({options,value,onChange,ariaLabel}) {
 }
 function HeroNumber({children,color}) {
   const t=useTheme();
+  // Solid theme-aware text avoids the gradient-clip rendering bug on some browsers.
   return (
     <span style={{
-      background: color || (t.mode==="dark"?`linear-gradient(135deg,${t.text} 0%,${t.textMuted} 100%)`:`linear-gradient(135deg,${t.text} 0%,${t.textMuted} 100%)`),
-      WebkitBackgroundClip:"text", backgroundClip:"text", color:"transparent",
+      display:"inline-block",
+      background:"none",
+      WebkitBackgroundClip:"initial",
+      backgroundClip:"initial",
+      color:color||t.text,
       fontFamily:FONT_MONO, fontWeight:700, letterSpacing:"-0.02em",
     }}>{children}</span>
   );
@@ -4215,69 +4242,98 @@ function Settings({state,dispatch,toast,theme,setTheme,themeColors,setThemeColor
   const t=useTheme();
   const [margin,setMargin]=useState(String(state.settings?.targetMargin||30));
   const [confirmingClear,setConfirmingClear]=useState(false);
+  const activeSlot=Number(state.activeThemeSlot||1);
+  const [targetSlot,setTargetSlot]=useState(activeSlot);
   const [colorDraft,setColorDraft]=useState(()=>({...((themeColors||{})[theme]||{})}));
   const [colorDraftErrors,setColorDraftErrors]=useState({});
 
+  const baseTheme=THEME[theme]||THEME.dark;
+  const paletteSlots=state.themePaletteSlots||{2:null,3:null,4:null,5:null};
+  const activeSlotColors=activeSlot===1?{}:(paletteSlots[activeSlot]?.colors||{});
+
   useEffect(()=>{
+    setTargetSlot(activeSlot);
     setColorDraft({...((themeColors||{})[theme]||{})});
     setColorDraftErrors({});
-  },[theme,themeColors]);
+  },[theme,themeColors,activeSlot]);
 
-  const baseTheme=THEME[theme]||THEME.dark;
   const getDraftColor=(key)=>normalizeHex(colorDraft[key])||baseTheme[key]||THEME.dark[key]||"#000000";
   const updateDraftColor=(key,value)=>{
     setColorDraft(prev=>({...prev,[key]:value}));
     const normalized=normalizeHex(value);
     setColorDraftErrors(prev=>({...prev,[key]:value.trim()&&!normalized?"Enter a valid HEX value, e.g. #E8A33D":""}));
-    // Preview valid colors immediately without persisting them. Invalid partial HEX input
-    // stays in the editor but does not apply until it becomes a valid color.
     if(normalized){
-      setThemePreviewColors(prev=>({
-        ...(prev||{}),
-        [theme]:{...((prev||{})[theme]||(themeColors||{})[theme]||{}),[key]:normalized}
-      }));
+      // Instant preview only. The shared /data state is updated only when saving a slot.
+      setThemePreviewColors(prev=>({...((prev)||{}),[theme]:{
+        ...((prev||{})[theme]||activeSlotColors),[key]:normalized
+      }}));
+    }
+  };
+
+  const clearCurrentPreview=()=>setThemePreviewColors(prev=>{
+    const next={...(prev||{})};delete next[theme];return next;
+  });
+
+  const selectSlot=(slot)=>{
+    setTargetSlot(slot);
+    if(slot===1){
+      dispatch({type:"SET_ACTIVE_THEME_SLOT",slot:1});
+      clearCurrentPreview();
+      setColorDraft({});
+      setColorDraftErrors({});
+      toast("Default palette selected");
+      return;
+    }
+    const saved=paletteSlots[slot];
+    if(saved?.colors){
+      dispatch({type:"SET_ACTIVE_THEME_SLOT",slot});
+      if(saved.mode&&saved.mode!==theme)setTheme(saved.mode);
+      clearCurrentPreview();
+      setColorDraft({...saved.colors});
+      setColorDraftErrors({});
+      toast(`Theme ${slot} selected`);
+    }else{
+      // Empty slot acts as the destination for the next save; current palette remains previewed.
+      setColorDraft(prev=>({...prev}));
+      toast(`Slot ${slot} is empty. Customize colors, then save to this slot.`);
     }
   };
 
   const applyColors=()=>{
+    if(targetSlot===1){
+      toast("Slot 1 is the default and cannot be overwritten. Choose slot 2–5 to save a custom theme.","error");
+      return;
+    }
     const normalized={};
     const errors={};
     for(const field of THEME_COLOR_FIELDS){
       const value=colorDraft[field.key] ?? baseTheme[field.key];
       const hex=normalizeHex(value);
-      if(!hex) errors[field.key]="Enter a valid HEX value, e.g. #E8A33D";
+      if(!hex)errors[field.key]="Enter a valid HEX value, e.g. #E8A33D";
       else normalized[field.key]=hex;
     }
-    if(Object.keys(errors).length){setColorDraftErrors(errors);toast("Fix the invalid HEX values before applying","error");return;}
-    setThemeColors(prev=>({...prev,[theme]:normalized}));
-    setThemePreviewColors(prev=>{
-      const next={...(prev||{})};
-      delete next[theme];
-      return next;
-    });
+    if(Object.keys(errors).length){setColorDraftErrors(errors);toast("Fix invalid HEX values before saving","error");return;}
+    dispatch({type:"SAVE_THEME_PALETTE_SLOT",slot:targetSlot,mode:theme,name:`Theme ${targetSlot}`,colors:normalized});
+    clearCurrentPreview();
     setColorDraft(normalized);
     setColorDraftErrors({});
-    toast("Website colors applied and saved on this browser");
+    toast(`Theme saved to Slot ${targetSlot} and synced through the server`);
   };
 
   const resetColors=()=>{
-    // Reset is also a live preview. Press Apply colors to persist the defaults.
     const defaults={};
-    for(const field of THEME_COLOR_FIELDS) defaults[field.key]=baseTheme[field.key]||THEME.dark[field.key];
+    for(const field of THEME_COLOR_FIELDS)defaults[field.key]=baseTheme[field.key]||THEME.dark[field.key];
     setColorDraft(defaults);
     setColorDraftErrors({});
     setThemePreviewColors(prev=>({...((prev)||{}),[theme]:defaults}));
-    toast("Default palette previewed. Click Apply colors to save it.");
+    toast("Default colors previewed. Choose Slot 2–5 and save to keep them as a custom theme.");
   };
 
   const discardColorChanges=()=>{
-    setColorDraft({...((themeColors||{})[theme]||{})});
+    const saved=targetSlot===1?{}:(paletteSlots[targetSlot]?.colors||activeSlotColors);
+    setColorDraft({...saved});
     setColorDraftErrors({});
-    setThemePreviewColors(prev=>{
-      const next={...(prev||{})};
-      delete next[theme];
-      return next;
-    });
+    clearCurrentPreview();
     toast("Unsaved color preview discarded");
   };
 
@@ -4325,14 +4381,37 @@ function Settings({state,dispatch,toast,theme,setTheme,themeColors,setThemeColor
 
       <Card>
         <SectionHeader icon={Sun} title="Appearance"/>
-        <div style={{fontSize:12,color:t.textMuted,marginBottom:8}}>Choose a base theme. Your custom colors are saved separately for Dark and Light mode.</div>
+        <div style={{fontSize:12,color:t.textMuted,marginBottom:8}}>Choose a base appearance. The active palette slot is shared through your PC Trader server, so the same selected theme loads on your PC and phone.</div>
         <Segmented ariaLabel="Theme" value={theme} onChange={setTheme} options={[["dark","Dark",Moon],["light","Light",Sun]]}/>
+      </Card>
+
+      <Card>
+        <SectionHeader icon={SlidersHorizontal} title="Saved color themes"/>
+        <div style={{fontSize:12,color:t.textMuted,lineHeight:1.55,marginBottom:12}}>
+          Slot 1 is the original default palette. Save up to four custom palettes in Slots 2–5. Selecting a saved slot changes the website immediately; saving writes the palette to shared app data so it can sync across devices.
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(112px,1fr))",gap:8}}>
+          {[1,2,3,4,5].map(slot=>{
+            const saved=slot===1?{name:"Default"}:paletteSlots[slot];
+            const isActive=activeSlot===slot;
+            const isTarget=targetSlot===slot;
+            return <button key={slot} type="button" onClick={()=>selectSlot(slot)} className="bl-focusable"
+              style={{textAlign:"left",padding:11,borderRadius:10,border:`1px solid ${isActive||isTarget?t.accent:t.border}`,background:isActive?t.accentSoft:t.surfaceSunken,color:t.text,cursor:"pointer",minHeight:70}}>
+              <div style={{fontWeight:700,fontSize:12,display:"flex",justifyContent:"space-between",gap:5,alignItems:"center"}}>
+                <span>{slot===1?"1 · Default":`${slot} · Theme ${slot}`}</span>
+                {isActive&&<Check size={14} color={t.accent}/>}
+              </div>
+              <div style={{fontSize:10.5,color:t.textFaint,marginTop:6}}>{slot===1?"Built-in palette":saved?.colors?`Saved ${saved.name||`Theme ${slot}`}`:"Empty · save here"}</div>
+              {isTarget&&!isActive&&<div style={{fontSize:9.5,color:t.accent,marginTop:3}}>Save destination</div>}
+            </button>;
+          })}
+        </div>
       </Card>
 
       <Card>
         <SectionHeader icon={SlidersHorizontal} title="Theme color editor"/>
         <div style={{fontSize:12,color:t.textMuted,lineHeight:1.55,marginBottom:14}}>
-          Edit a HEX value or use the color picker to preview the change across the website immediately. Apply saves the preview so it remains when you revisit this website in this browser. Discard changes restores the last saved palette.
+          Edit a HEX value or use the color picker to preview the change across the whole website immediately. Choose an empty Slot 2–5 above as the save destination, then save the current palette there. Saved slots are stored with shared PC Trader data rather than only in this browser.
         </div>
         {[["Surfaces","Surface colors"],["Text","Text colors"],["Accents & Status","Accent and status colors"]].map(([group,title])=>{
           const fields=THEME_COLOR_FIELDS.filter(f=>f.group===group);
@@ -4357,11 +4436,11 @@ function Settings({state,dispatch,toast,theme,setTheme,themeColors,setThemeColor
           </div>;
         })}
         <div style={{display:"flex",gap:8,flexWrap:"wrap",borderTop:`1px solid ${t.border}`,paddingTop:14}}>
-          <Btn icon={Check} onClick={applyColors}>Apply colors</Btn>
-          <Btn variant="ghost" onClick={discardColorChanges}>Discard changes</Btn>
+          <Btn icon={Check} onClick={applyColors} disabled={targetSlot===1}>Save to Slot {targetSlot===1?"2–5":targetSlot}</Btn>
+          <Btn variant="ghost" onClick={discardColorChanges}>Discard preview</Btn>
           <Btn variant="ghost" icon={Undo2} onClick={resetColors}>Preview defaults</Btn>
         </div>
-        <div style={{marginTop:11,fontSize:10.5,color:t.textFaint}}>Soft accent backgrounds, borders, and focus rings automatically follow their matching accent colors. Preview is temporary until you press Apply colors.</div>
+        <div style={{marginTop:11,fontSize:10.5,color:t.textFaint}}>Soft accent backgrounds, borders, and focus rings automatically follow their matching accent colors. Preview changes are temporary until saved to Slot 2–5. Slot 1 always returns to the original palette.</div>
       </Card>
 
       <Card>
@@ -4776,6 +4855,29 @@ export default function App() {
         loadedState.businessCash=Number(loadedState.businessCash||loadedState.businessBank||0);
         loadedState.cashOnHand=Number(loadedState.cashOnHand||loadedState.cash||0);
         loadedState=normalizeCategoryRegistry(loadedState);
+        // Initialize shared theme slots. If no server-saved custom slot exists yet, allow
+        // whichever device has the legacy browser-only palette to migrate it into shared Slot 2.
+        const hasAnySavedThemeSlot=Object.values(loadedState.themePaletteSlots||{}).some(slot=>!!slot?.colors);
+        if(!hasAnySavedThemeSlot){
+          loadedState.themePaletteSlots={2:null,3:null,4:null,5:null,...(loadedState.themePaletteSlots||{})};
+          try{
+            const legacyMode=JSON.parse(window.localStorage.getItem("pc-trader-theme-mode")||"\"dark\"");
+            const legacyColors=JSON.parse(window.localStorage.getItem("pc-trader-theme-colors")||"{}");
+            const migrated=legacyColors?.[legacyMode];
+            if(migrated&&Object.keys(migrated).length){
+              loadedState.themePaletteSlots[2]={name:"Migrated Theme",mode:legacyMode,colors:migrated,updatedAt:new Date().toISOString()};
+              loadedState.activeThemeSlot=2;
+            }
+            loadedState.themeMode=json?.themeMode||legacyMode||"dark";
+          }catch{loadedState.themeMode=json?.themeMode||loadedState.themeMode||"dark";}
+        }
+        loadedState.activeThemeSlot=Number(loadedState.activeThemeSlot||1);
+        loadedState.themePaletteSlots={2:null,3:null,4:null,5:null,...(loadedState.themePaletteSlots||{})};
+        if(!json?.themeMode){
+          try{loadedState.themeMode=JSON.parse(window.localStorage.getItem("pc-trader-theme-mode")||"\"dark\"");}
+          catch{loadedState.themeMode="dark";}
+        }
+        loadedState.themeMode=loadedState.themeMode||"dark";
         // Start the historical series immediately. Existing accounts will have a current-day
         // baseline created on first load; future changes update that day's snapshot automatically.
         loadedState = recordNetWorthSnapshot(loadedState);
@@ -4823,9 +4925,15 @@ export default function App() {
 
   const [tab,setTab]=useState("Dashboard");
   const {toasts,toast}=useToast();
-  const [theme,setTheme]=usePersistentState("pc-trader-theme-mode","dark");
-  const [themeColors,setThemeColors]=usePersistentState("pc-trader-theme-colors",{});
+  const [localTheme,setLocalTheme]=usePersistentState("pc-trader-theme-mode","dark");
+  const [legacyThemeColors,setLegacyThemeColors]=usePersistentState("pc-trader-theme-colors",{});
   const [themePreviewColors,setThemePreviewColors]=useState(null);
+  const theme=state?.themeMode||localTheme;
+  const setTheme=useCallback(mode=>{
+    const nextMode=typeof mode==="function"?mode(theme):mode;
+    setLocalTheme(nextMode);
+    dispatch({type:"SET_THEME_MODE",mode:nextMode});
+  },[dispatch,theme,setLocalTheme]);
   const [lightboxUrl,setLightboxUrl]=useState(null);
   const openLightbox=useCallback(url=>setLightboxUrl(url),[]);
   const [searchOpen,setSearchOpen]=useState(false);
@@ -4856,9 +4964,12 @@ export default function App() {
   },[toast]);
 
   const isDesktop=useMediaQuery("(min-width: 1024px)");
+  const activeThemeSlot=Number(state?.activeThemeSlot||1);
+  const savedSlotColors=activeThemeSlot===1?{}:(state?.themePaletteSlots?.[activeThemeSlot]?.colors||{});
   const activeThemeColors = themePreviewColors && Object.prototype.hasOwnProperty.call(themePreviewColors,theme)
     ? (themePreviewColors[theme]||{})
-    : (themeColors?.[theme]||{});
+    : savedSlotColors;
+  const themeColors=useMemo(()=>({[theme]:savedSlotColors}),[theme,activeThemeSlot,state?.themePaletteSlots]);
   const t=buildTheme(theme==="dark"?THEME.dark:THEME.light,activeThemeColors);
 
   if(loadStatus==="loading")return <LoadingScreen t={t}/>;
