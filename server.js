@@ -1,4 +1,4 @@
-// server.js — Express server that bridges your React app to Supabase
+// server.js — Express server that bridges PC Trader to Supabase
 require("dotenv").config({ path: ".env.local" });
 require("dotenv").config();
 require("dotenv").config({ path: ".env.development" });
@@ -10,42 +10,72 @@ const cors = require("cors");
 const { createClient } = require("@supabase/supabase-js");
 
 const PORT = process.env.PORT || 3001;
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
-const FRONTEND_URL = process.env.FRONTEND_URL || process.env.CORS_ORIGIN || "http://localhost:5173";
+const SUPABASE_URL =
+  process.env.SUPABASE_URL ||
+  process.env.VITE_SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SECRET_KEY ||
+  process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+
+const FRONTEND_URL =
+  process.env.FRONTEND_URL ||
+  process.env.CORS_ORIGIN ||
+  "http://localhost:5173";
+
 const STORAGE_BUCKET = process.env.SUPABASE_BUCKET || "photos";
 
 const app = express();
+
 app.use(express.json({ limit: "5mb" }));
+
 app.use(cors({
-  origin: [FRONTEND_URL, "http://localhost:5173", "http://127.0.0.1:5173"],
+  origin: [
+    FRONTEND_URL,
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+  ],
   credentials: true,
 }));
 
-// In-memory storage for uploaded photos before forwarding to Supabase Storage.
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 6 * 1024 * 1024 } });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 6 * 1024 * 1024 },
+});
 
-const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
-  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-  : null;
+const supabase =
+  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    : null;
 
 async function ensureStorageBucketExists() {
   if (!supabase || !STORAGE_BUCKET) return;
-  const { error } = await supabase.storage.createBucket(STORAGE_BUCKET, { public: true });
+
+  const { error } = await supabase.storage.createBucket(
+    STORAGE_BUCKET,
+    { public: true }
+  );
+
   if (error && !/already exists/i.test(error.message)) {
-    console.error("Could not ensure Supabase storage bucket:", error.message);
-  } else if (!error) {
-    console.log(`Supabase storage bucket ready: ${STORAGE_BUCKET}`);
+    console.error("Storage bucket error:", error.message);
   }
 }
 
-console.log("Supabase config:", { SUPABASE_URL, STORAGE_BUCKET, hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY) });
+console.log("Supabase configuration:", {
+  configured: Boolean(supabase),
+  bucket: STORAGE_BUCKET,
+});
+
 if (!supabase) {
-  console.warn("Supabase client not configured. Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
+  console.warn(
+    "Supabase is not configured. Check your Render environment variables."
+  );
 } else {
-  ensureStorageBucketExists()
-    .then(() => console.log("Storage bucket check completed"))
-    .catch((err) => console.error("Bucket initialization failed:", err.message || err));
+  ensureStorageBucketExists().catch((err) => {
+    console.error("Storage initialization failed:", err.message);
+  });
 }
 
 const defaultState = {
@@ -56,27 +86,39 @@ const defaultState = {
   settings: { targetMargin: 30 },
   customCategories: [],
   quickNotes: [],
+
   businessCash: 14500,
+  cashOnHand: 0,
   personalCash: 0,
+
+  themeMode: "dark",
+  activeThemeSlot: 1,
+  themePaletteSlots: {
+    2: null,
+    3: null,
+    4: null,
+    5: null,
+  },
+
+  outstandingReceivables: 0,
+  totalDebt: 0,
+  netWorthSnapshots: [],
+  hiddenCategories: [],
+
   expenses: [],
   transactions: [],
 };
 
 function normalizeDate(value) {
   if (!value) return null;
-  // Previous version did `value.slice(0, 10)` on ANY string, assuming it was already an ISO
-  // timestamp like "2026-08-02T00:00:00.000Z". But the frontend's today() sends locale strings
-  // like "Aug 2, 2026" (11 chars when the day is a single digit) — slicing that to 10 chars
-  // truncates the last digit of the YEAR itself, turning "Aug 2, 2026" into "Aug 2, 202". That
-  // gets written into a Postgres DATE column, which reads "202" as a literal 3-digit year, and
-  // whatever later formats it back out zero-pads it to "0202" — this was the entire bug.
-  // Fix: always parse into a real Date first, then format from its actual fields. This works
-  // correctly regardless of what string format the value arrives in.
+
   const d = value instanceof Date ? value : new Date(value);
-  if (isNaN(d.getTime())) return null; // don't silently write a garbage date — surface it as null instead
+  if (Number.isNaN(d.getTime())) return null;
+
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
+
   return `${yyyy}-${mm}-${dd}`;
 }
 
@@ -145,10 +187,8 @@ function mapSaleRow(row) {
     returned: Boolean(row.returned),
     returnReason: row.return_reason || "",
     date: row.sale_date || null,
-    // Snapshot of the build's components at time of sale — self-contained, so the Parts
-    // Breakdown still works even if the build row is later deleted (Postgres nulls build_id
-    // via ON DELETE SET NULL when that happens, independent of this snapshot).
     buildPartsSnapshot: row.build_parts_snapshot || undefined,
+    paymentAccount: row.payment_account || row.account || "bank",
   };
 }
 
@@ -157,6 +197,7 @@ function mapExpenseRow(row) {
     id: row.id,
     type: row.expense_type || "business",
     wallet: row.wallet || "business",
+    account: row.account || (row.wallet === "personal" ? null : "bank"),
     amount: toCurrencyNumber(row.amount),
     description: row.description || "",
     date: row.expense_date || null,
@@ -164,45 +205,98 @@ function mapExpenseRow(row) {
 }
 
 function mapTransactionRow(row) {
+  const from = row.transfer_from || "";
+  const to = row.transfer_to || "";
+
   return {
     id: row.id,
     type: row.type || "EXPENSE",
     amount: toCurrencyNumber(row.amount),
     description: row.description || "",
     wallet: row.wallet || "business",
-    transferFrom: row.transfer_from || "",
-    transferTo: row.transfer_to || "",
+    account: row.account || (row.wallet === "personal" ? null : "bank"),
+    from,
+    to,
+    transferFrom: from,
+    transferTo: to,
     date: row.transaction_date || null,
   };
 }
 
 function mapQuickNoteRow(row) {
-  return { id: row.id, text: row.text || "", date: row.created_at || null };
+  return {
+    id: row.id,
+    text: row.text || "",
+    date: row.created_at || null,
+  };
 }
 
 function mapCategoryRow(row) {
-  return { id: row.id, name: row.name || "", domain: row.domain || "pc_part" };
+  return {
+    id: row.id,
+    name: row.name || "",
+    domain: row.domain || "pc_part",
+  };
 }
 
-async function loadStateFromSupabase() {
-  if (!supabase) return defaultState;
+// ---------------- LOAD APPLICATION DATA ----------------
 
-  const [settingsRes, categoriesRes, quickNotesRes, bundlesRes, buildsRes, partsRes, buildPartsRes, salesRes, expensesRes, transactionsRes, historyRes] = await Promise.all([
+async function loadStateFromSupabase() {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const [
+    settingsRes,
+    categoriesRes,
+    quickNotesRes,
+    bundlesRes,
+    buildsRes,
+    partsRes,
+    buildPartsRes,
+    salesRes,
+    expensesRes,
+    transactionsRes,
+    historyRes,
+  ] = await Promise.all([
     supabase.from("app_settings").select("*").eq("id", 1).maybeSingle(),
-    supabase.from("custom_categories").select("*").order("created_at", { ascending: true }),
-    supabase.from("quick_notes").select("*").order("created_at", { ascending: true }),
-    supabase.from("bundles").select("*").order("created_at", { ascending: true }),
-    supabase.from("builds").select("*").order("created_at", { ascending: true }),
-    supabase.from("parts").select("*").order("created_at", { ascending: true }),
+    supabase.from("custom_categories").select("*").order("created_at"),
+    supabase.from("quick_notes").select("*").order("created_at"),
+    supabase.from("bundles").select("*").order("created_at"),
+    supabase.from("builds").select("*").order("created_at"),
+    supabase.from("parts").select("*").order("created_at"),
     supabase.from("build_parts").select("*"),
-    supabase.from("sales").select("*").order("sale_date", { ascending: true }),
-    supabase.from("expenses").select("*").order("expense_date", { ascending: true }),
-    supabase.from("transactions").select("*").order("transaction_date", { ascending: true }),
-    supabase.from("part_history").select("*").order("event_date", { ascending: true }),
+    supabase.from("sales").select("*").order("sale_date"),
+    supabase.from("expenses").select("*").order("expense_date"),
+    supabase.from("transactions").select("*").order("transaction_date"),
+    supabase.from("part_history").select("*").order("event_date"),
   ]);
+
+  const requiredResults = [
+    settingsRes,
+    categoriesRes,
+    quickNotesRes,
+    bundlesRes,
+    buildsRes,
+    partsRes,
+    buildPartsRes,
+    salesRes,
+    expensesRes,
+    transactionsRes,
+    historyRes,
+  ];
+
+  for (const result of requiredResults) {
+    if (result.error) {
+      throw new Error(`Supabase read failed: ${result.error.message}`);
+    }
+  }
+
+  const settings = settingsRes.data || {};
 
   const state = {
     ...defaultState,
+
     bundles: (bundlesRes.data || []).map(mapBundleRow),
     builds: (buildsRes.data || []).map(mapBuildRow),
     parts: (partsRes.data || []).map(mapPartRow),
@@ -211,34 +305,160 @@ async function loadStateFromSupabase() {
     transactions: (transactionsRes.data || []).map(mapTransactionRow),
     customCategories: (categoriesRes.data || []).map(mapCategoryRow),
     quickNotes: (quickNotesRes.data || []).map(mapQuickNoteRow),
+
     settings: {
-      targetMargin: settingsRes.data?.target_margin ?? defaultState.settings.targetMargin,
+      targetMargin:
+        settings.target_margin ??
+        defaultState.settings.targetMargin,
     },
-    businessCash: settingsRes.data?.business_cash ?? defaultState.businessCash,
-    personalCash: settingsRes.data?.personal_cash ?? defaultState.personalCash,
+
+    businessCash:
+      settings.business_cash ?? defaultState.businessCash,
+
+    cashOnHand:
+      settings.cash_on_hand ?? defaultState.cashOnHand,
+
+    personalCash:
+      settings.personal_cash ?? defaultState.personalCash,
+
+    themeMode:
+      settings.theme_mode === "light" ? "light" : "dark",
+
+    activeThemeSlot: Math.min(
+      5,
+      Math.max(
+        1,
+        Math.floor(
+          Number(settings.active_theme_slot) ||
+          defaultState.activeThemeSlot
+        )
+      )
+    ),
+
+    themePaletteSlots: {
+      2: null,
+      3: null,
+      4: null,
+      5: null,
+      ...(settings.theme_palette_slots || {}),
+    },
+
+    outstandingReceivables:
+      toCurrencyNumber(settings.outstanding_receivables),
+
+    totalDebt:
+      toCurrencyNumber(settings.total_debt),
+
+    netWorthSnapshots:
+      settings.net_worth_snapshots || [],
+
+    hiddenCategories:
+      settings.hidden_categories || [],
   };
 
   const historyByPart = {};
+
   for (const row of historyRes.data || []) {
-    if (!historyByPart[row.part_id]) historyByPart[row.part_id] = [];
-    historyByPart[row.part_id].push({ date: row.event_date || null, event: row.event || "" });
+    if (!historyByPart[row.part_id]) {
+      historyByPart[row.part_id] = [];
+    }
+
+    historyByPart[row.part_id].push({
+      date: row.event_date || null,
+      event: row.event || "",
+    });
   }
-  state.parts = state.parts.map((part) => ({ ...part, history: historyByPart[part.id] || [] }));
+
+  state.parts = state.parts.map((part) => ({
+    ...part,
+    history: historyByPart[part.id] || [],
+  }));
 
   const buildPartsMap = {};
+
   for (const row of buildPartsRes.data || []) {
-    if (!buildPartsMap[row.build_id]) buildPartsMap[row.build_id] = [];
+    if (!buildPartsMap[row.build_id]) {
+      buildPartsMap[row.build_id] = [];
+    }
+
     buildPartsMap[row.build_id].push(row.part_id);
   }
-  state.builds = state.builds.map((build) => ({ ...build, partIds: buildPartsMap[build.id] || [] }));
+
+  state.builds = state.builds.map((build) => ({
+    ...build,
+    partIds: buildPartsMap[build.id] || [],
+  }));
 
   return state;
 }
 
+// ---------------- SAVE APPLICATION DATA ----------------
+
 async function saveStateToSupabase(state) {
-  if (!supabase) return;
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
 
   const rows = state || defaultState;
+
+  const settingsRows = {
+    id: 1,
+    target_margin: toCurrencyNumber(
+      rows.settings?.targetMargin ?? defaultState.settings.targetMargin
+    ),
+
+    // Both money balances are persisted separately.
+    business_cash: toCurrencyNumber(
+      rows.businessCash ?? defaultState.businessCash
+    ),
+    cash_on_hand: toCurrencyNumber(
+      rows.cashOnHand ?? defaultState.cashOnHand
+    ),
+    personal_cash: toCurrencyNumber(
+      rows.personalCash ?? defaultState.personalCash
+    ),
+
+    // Shared theme settings used by PC and phone.
+    theme_mode: rows.themeMode === "light" ? "light" : "dark",
+    active_theme_slot: Math.min(
+      5,
+      Math.max(1, Math.floor(Number(rows.activeThemeSlot) || 1))
+    ),
+    theme_palette_slots: {
+      2: null,
+      3: null,
+      4: null,
+      5: null,
+      ...(rows.themePaletteSlots || {}),
+    },
+
+    outstanding_receivables: toCurrencyNumber(
+      rows.outstandingReceivables
+    ),
+    total_debt: toCurrencyNumber(rows.totalDebt),
+    net_worth_snapshots: rows.netWorthSnapshots || [],
+    hidden_categories: rows.hiddenCategories || [],
+  };
+
+  // Save account balances and theme configuration first.
+  const { error: settingsError } = await supabase
+    .from("app_settings")
+    .upsert(settingsRows, { onConflict: "id" });
+
+  if (settingsError) {
+    throw new Error(
+      `Failed to save app settings, balances, or theme: ${settingsError.message}`
+    );
+  }
+
+  const check = async (query, label) => {
+    const { error } = await query;
+
+    if (error) {
+      throw new Error(`${label}: ${error.message}`);
+    }
+  };
+
   const bundlesRows = (rows.bundles || []).map((bundle) => ({
     id: bundle.id,
     name: bundle.name,
@@ -277,9 +497,13 @@ async function saveStateToSupabase(state) {
   }));
 
   const buildPartsRows = [];
+
   for (const build of rows.builds || []) {
     for (const partId of build.partIds || []) {
-      buildPartsRows.push({ build_id: build.id, part_id: partId });
+      buildPartsRows.push({
+        build_id: build.id,
+        part_id: partId,
+      });
     }
   }
 
@@ -297,16 +521,20 @@ async function saveStateToSupabase(state) {
     returned: Boolean(sale.returned),
     return_reason: sale.returnReason || null,
     sale_date: normalizeDate(sale.date || new Date()),
-    // JSONB column — the Supabase client serializes arrays/objects automatically, no need to
-    // JSON.stringify manually. null (not undefined) when there's nothing to store, since
-    // undefined fields can behave inconsistently across different Supabase client versions.
-    build_parts_snapshot: sale.buildPartsSnapshot && sale.buildPartsSnapshot.length ? sale.buildPartsSnapshot : null,
+    build_parts_snapshot:
+      sale.buildPartsSnapshot?.length
+        ? sale.buildPartsSnapshot
+        : null,
+    payment_account: sale.paymentAccount || sale.account || "bank",
   }));
 
   const expensesRows = (rows.expenses || []).map((expense) => ({
     id: expense.id,
     expense_type: expense.type || "business",
     wallet: expense.wallet || "business",
+    account:
+      expense.account ||
+      (expense.wallet === "personal" ? null : "bank"),
     amount: toCurrencyNumber(expense.amount),
     description: expense.description || null,
     expense_date: normalizeDate(expense.date || new Date()),
@@ -318,9 +546,16 @@ async function saveStateToSupabase(state) {
     amount: toCurrencyNumber(transaction.amount),
     description: transaction.description || null,
     wallet: transaction.wallet || "business",
-    transfer_from: transaction.transferFrom || null,
-    transfer_to: transaction.transferTo || null,
-    transaction_date: normalizeDate(transaction.date || new Date()),
+    account:
+      transaction.account ||
+      (transaction.wallet === "personal" ? null : "bank"),
+    transfer_from:
+      transaction.from || transaction.transferFrom || null,
+    transfer_to:
+      transaction.to || transaction.transferTo || null,
+    transaction_date: normalizeDate(
+      transaction.date || new Date()
+    ),
   }));
 
   const quickNotesRows = (rows.quickNotes || []).map((note) => ({
@@ -336,14 +571,8 @@ async function saveStateToSupabase(state) {
     created_at: normalizeDate(new Date()),
   }));
 
-  const settingsRows = {
-    id: 1,
-    target_margin: toCurrencyNumber(rows.settings?.targetMargin ?? defaultState.settings.targetMargin),
-    business_cash: toCurrencyNumber(rows.businessCash ?? defaultState.businessCash),
-    personal_cash: toCurrencyNumber(rows.personalCash ?? defaultState.personalCash),
-  };
-
   const partHistoryRows = [];
+
   for (const part of rows.parts || []) {
     for (const item of part.history || []) {
       partHistoryRows.push({
@@ -354,31 +583,83 @@ async function saveStateToSupabase(state) {
     }
   }
 
-  await supabase.from("bundles").delete().not("id", "is", null);
-  await supabase.from("parts").delete().not("id", "is", null);
-  await supabase.from("builds").delete().not("id", "is", null);
-  await supabase.from("build_parts").delete().not("build_id", "is", null);
-  await supabase.from("sales").delete().not("id", "is", null);
-  await supabase.from("expenses").delete().not("id", "is", null);
-  await supabase.from("transactions").delete().not("id", "is", null);
-  await supabase.from("quick_notes").delete().not("id", "is", null);
-  await supabase.from("custom_categories").delete().not("id", "is", null);
-  await supabase.from("part_history").delete().not("id", "is", null);
-  await supabase.from("app_settings").upsert(settingsRows, { onConflict: "id" });
+  // Only after settings have been saved do we rewrite the related tables.
+  // Every operation checks Supabase errors rather than reporting false success.
+  await check(
+    supabase.from("bundles").delete().not("id", "is", null),
+    "Delete bundles failed"
+  );
+  await check(
+    supabase.from("parts").delete().not("id", "is", null),
+    "Delete parts failed"
+  );
+  await check(
+    supabase.from("builds").delete().not("id", "is", null),
+    "Delete builds failed"
+  );
+  await check(
+    supabase.from("build_parts").delete().not("build_id", "is", null),
+    "Delete build parts failed"
+  );
+  await check(
+    supabase.from("sales").delete().not("id", "is", null),
+    "Delete sales failed"
+  );
+  await check(
+    supabase.from("expenses").delete().not("id", "is", null),
+    "Delete expenses failed"
+  );
+  await check(
+    supabase.from("transactions").delete().not("id", "is", null),
+    "Delete transactions failed"
+  );
+  await check(
+    supabase.from("quick_notes").delete().not("id", "is", null),
+    "Delete quick notes failed"
+  );
+  await check(
+    supabase.from("custom_categories").delete().not("id", "is", null),
+    "Delete categories failed"
+  );
+  await check(
+    supabase.from("part_history").delete().not("id", "is", null),
+    "Delete part history failed"
+  );
 
-  if (bundlesRows.length) await supabase.from("bundles").insert(bundlesRows);
-  if (partsRows.length) await supabase.from("parts").insert(partsRows);
-  if (buildRows.length) await supabase.from("builds").insert(buildRows);
-  if (buildPartsRows.length) await supabase.from("build_parts").insert(buildPartsRows);
-  if (salesRows.length) await supabase.from("sales").insert(salesRows);
-  if (expensesRows.length) await supabase.from("expenses").insert(expensesRows);
-  if (transactionsRows.length) await supabase.from("transactions").insert(transactionsRows);
-  if (quickNotesRows.length) await supabase.from("quick_notes").insert(quickNotesRows);
-  if (categoriesRows.length) await supabase.from("custom_categories").insert(categoriesRows);
-  if (partHistoryRows.length) await supabase.from("part_history").insert(partHistoryRows);
+  if (bundlesRows.length) {
+    await check(supabase.from("bundles").insert(bundlesRows), "Save bundles failed");
+  }
+  if (partsRows.length) {
+    await check(supabase.from("parts").insert(partsRows), "Save parts failed");
+  }
+  if (buildRows.length) {
+    await check(supabase.from("builds").insert(buildRows), "Save builds failed");
+  }
+  if (buildPartsRows.length) {
+    await check(supabase.from("build_parts").insert(buildPartsRows), "Save build parts failed");
+  }
+  if (salesRows.length) {
+    await check(supabase.from("sales").insert(salesRows), "Save sales failed");
+  }
+  if (expensesRows.length) {
+    await check(supabase.from("expenses").insert(expensesRows), "Save expenses failed");
+  }
+  if (transactionsRows.length) {
+    await check(supabase.from("transactions").insert(transactionsRows), "Save transactions failed");
+  }
+  if (quickNotesRows.length) {
+    await check(supabase.from("quick_notes").insert(quickNotesRows), "Save notes failed");
+  }
+  if (categoriesRows.length) {
+    await check(supabase.from("custom_categories").insert(categoriesRows), "Save categories failed");
+  }
+  if (partHistoryRows.length) {
+    await check(supabase.from("part_history").insert(partHistoryRows), "Save part history failed");
+  }
 }
 
-// ---- API routes ----
+// ---------------- API ROUTES ----------------
+
 app.get("/data", async (req, res) => {
   try {
     const state = await loadStateFromSupabase();
@@ -392,70 +673,97 @@ app.get("/data", async (req, res) => {
 app.post("/data", async (req, res) => {
   try {
     if (!supabase) {
-      throw new Error("Supabase client not configured");
+      throw new Error("Supabase client not configured.");
     }
-    console.log("POST /data payload size:", JSON.stringify(req.body).length);
+
     await saveStateToSupabase(req.body);
+
     console.log("POST /data saved successfully");
     res.json({ ok: true });
   } catch (err) {
-    console.error("POST /data error:", err.message, err);
+    console.error("POST /data failed:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get("/health", (req, res) => res.json({ ok: true }));
+app.get("/health", (req, res) => {
+  res.json({ ok: true });
+});
 
-// ---- Photo upload ----
-// Accepts a single image (multipart/form-data, field name "photo"), forwards it to Supabase Storage.
+// ---------------- PHOTO UPLOAD ----------------
+
 app.post("/photo", upload.single("photo"), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    if (!supabase) return res.status(500).json({ error: "Supabase client not configured" });
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+    if (!supabase) {
+      return res.status(500).json({ error: "Supabase is not configured" });
+    }
 
-    console.log("/photo upload requested", { fileName: req.file.originalname, fileSize: req.file.size, bucket: STORAGE_BUCKET });
     await ensureStorageBucketExists();
 
-    const safeName = (req.file.originalname || "photo.jpg").replace(/[^a-zA-Z0-9._-]/g, "-");
+    const safeName = (req.file.originalname || "photo.jpg")
+      .replace(/[^a-zA-Z0-9._-]/g, "-");
+
     const fileName = `${Date.now()}-${safeName}`;
-    const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(fileName, req.file.buffer, {
-      contentType: req.file.mimetype || "application/octet-stream",
-      upsert: true,
-    });
+
+    const { error } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(fileName, req.file.buffer, {
+        contentType: req.file.mimetype || "application/octet-stream",
+        upsert: true,
+      });
 
     if (error) {
-      console.error("Supabase upload returned error:", error.message, error);
       throw new Error(error.message);
     }
 
-    const { data: publicData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(fileName);
-    res.json({ url: publicData.publicUrl, recordId: fileName });
+    const { data } = supabase.storage
+      .from(STORAGE_BUCKET)
+      .getPublicUrl(fileName);
+
+    res.json({
+      url: data.publicUrl,
+      recordId: fileName,
+    });
   } catch (err) {
-    console.error("Photo upload error:", err.message, err);
+    console.error("Photo upload failed:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ---- Photo delete ----
 app.delete("/photo/:recordId", async (req, res) => {
   try {
-    if (!supabase) return res.status(500).json({ error: "Supabase client not configured" });
-    const { error } = await supabase.storage.from(STORAGE_BUCKET).remove([req.params.recordId]);
-    if (error) throw new Error(error.message);
+    if (!supabase) {
+      return res.status(500).json({ error: "Supabase is not configured" });
+    }
+
+    const { error } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .remove([req.params.recordId]);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
     res.json({ ok: true });
   } catch (err) {
-    console.error("Photo delete error:", err.message);
-    res.status(200).json({ ok: false, error: err.message });
+    console.error("Photo deletion failed:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 
-// ---- Serve the built React app ----
+// ---------------- SERVE THE REACT APP ----------------
+
 const distDir = path.join(__dirname, "dist");
+
 app.use(express.static(distDir));
+
 app.get("*", (req, res) => {
   res.sendFile(path.join(distDir, "index.html"));
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`PC Trader server running on port ${PORT}`);
 });
