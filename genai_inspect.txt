@@ -1,0 +1,1943 @@
+﻿--- d.ts search ---
+ *     "tools": [ {"type": "code_execution"} ]
+     * The tools available to the agent.
+    tools?: Array<AgentTool> | undefined;
+     * The environment configuration for the agent.
+declare type AgentOption = "deep-research-pro-preview-12-2025" | "deep-research-preview-04-2026" | "deep-research-max-preview-04-2026" | "antigravity-preview-05-2026" | (string & {});
+declare type AgentTool = interactions.CodeExecution | interactions.GoogleSearch | interactions.URLContext | interactions.MCPServer;
+declare type AllowedTools$ = AllowedTools;
+ * The configuration for allowed tools.
+declare type AllowedTools = {
+     * The names of the allowed tools.
+    tools?: Array<string> | undefined;
+ * Outbound networking configuration for the sandbox. When specified, restricts which external domains the sandbox can reach. Omit entirely to allow all outbound traffic with no header injection.
+/** The generic reusable api auth config. Deprecated. Please use AuthConfig (google/cloud/aiplatform/master/auth.proto) instead. This data type is not supported in Gemini API. */
+    apiKeyConfig?: ApiAuthApiKeyConfig;
+export declare interface ApiAuthApiKeyConfig {
+     * @param config Optional parameters specified in the `UploadFileConfig`
+     *     interface. @see {@link types.UploadFileConfig}
+    uploadFile(file: string | Blob, config?: types.UploadFileConfig): Promise<types.File>;
+     * Uploads a file to a given file search store asynchronously using Gemini API only, this is not supported
+     * @param fileSearchStoreName The name of the file search store to upload the file to.
+     * @param config Optional parameters specified in the `UploadFileConfig`
+     *     interface. @see {@link UploadFileConfig}
+    uploadFileToFileSearchStore(fileSearchStoreName: string, file: string | Blob, config?: types.UploadToFileSearchStoreConfig): Promise<types.UploadToFileSearchStoreOperation>;
+     * Optional. A set of customizable configuration for HTTP requests.
+/** Config for authentication with API key. This data type is not supported in Gemini API. */
+export declare interface ApiKeyConfig {
+     * Simple search API spec.
+    SIMPLE_SEARCH = "SIMPLE_SEARCH",
+     * Elastic search API spec.
+    ELASTIC_SEARCH = "ELASTIC_SEARCH"
+declare type Arguments$3 = GoogleSearchCallArguments;
+    /** Prompts and config used for generating this audio chunk. */
+ * Configuration for audio output format.
+/** The audio transcription configuration in Setup. */
+export declare interface AudioTranscriptionConfig {
+/** The authentication config to access the API. */
+export declare interface AuthConfig {
+    /** The authentication config to access the API. Only API key is supported. This field is not supported in Gemini API. */
+    /** Config for API key auth. */
+    apiKeyConfig?: ApiKeyConfig;
+    /** Config for Google Service Account auth. */
+    googleServiceAccountConfig?: AuthConfigGoogleServiceAccountConfig;
+    /** Config for HTTP Basic auth. */
+    httpBasicAuthConfig?: AuthConfigHttpBasicAuthConfig;
+    /** Config for user oauth. */
+    oauthConfig?: AuthConfigOauthConfig;
+    /** Config for user OIDC auth. */
+    oidcConfig?: AuthConfigOidcConfig;
+/** Config for Google Service Account Authentication. This data type is not supported in Gemini API. */
+export declare interface AuthConfigGoogleServiceAccountConfig {
+/** Config for HTTP Basic Authentication. This data type is not supported in Gemini API. */
+export declare interface AuthConfigHttpBasicAuthConfig {
+/** Config for user oauth. This data type is not supported in Gemini API. */
+export declare interface AuthConfigOauthConfig {
+    /** Access token for extension endpoint. Only used to propagate token from [[ExecuteExtensionRequest.runtime_auth_config]] at request time. */
+/** Config for user OIDC auth. This data type is not supported in Gemini API. */
+export declare interface AuthConfigOidcConfig {
+    /** OpenID Connect formatted ID token for extension endpoint. Only used to propagate token from [[ExecuteExtensionRequest.runtime_auth_config]] at request time. */
+/** Config for auth_tokens.create parameters. */
+/** Configures automatic detection of activity. */
+/** The configuration for automatic function calling. */
+export declare interface AutomaticFunctionCallingConfig {
+     whether to ignore call history to the response.
+     If not set, SDK will set ignore_call_history to false,
+     and will append the call history to
+     GenerateContentResponse.automatic_function_calling_history.
+    ignoreCallHistory?: boolean;
+/** Autorater config used for evaluation. */
+export declare interface AutoraterConfig {
+    /** Configuration options for model generation and outputs. */
+    generationConfig?: GenerationConfig;
+/** Configures the avatar to be used in the session. */
+export declare interface AvatarConfig {
+ * The environment configuration for the agent.
+     * const batchJobs = await ai.batches.list({config: {'pageSize': 2}});
+     * const response = await ai.batches.create({
+     *   config: {
+     * Gets batch job configurations.
+/** Config for batches.create return value. */
+    /** The time when the BatchJob was completed. This field is for Gemini Enterprise Agent Platform only.
+    /** Configuration for the input data. This field is for Gemini Enterprise Agent Platform only.
+    /** Configuration for the output data.
+    /** Statistics on completed and failed prediction instances. This field is for Gemini Enterprise Agent Platform only.
+/** Config for `dest` parameter. */
+/** Config for `src` parameter. */
+    /** Optional. The display name of the blob. Used to provide a label or filename to distinguish blobs. This field is only returned in `PromptMessage` for prompt management. It is used in the Gemini calls only when server-side tools (`code_execution`, `google_search`, and `url_context`) are enabled. This field is not supported in Gemini API. */
+     * const cachedContents = await ai.caches.list({config: {'pageSize': 2}});
+     * and [Gemini Enterprise Agent Platform reference](https://cloud.google.com/vertex-ai/generative-ai/docs/context-cache/context-cache-overview#supported_models)
+     * const response = await ai.caches.create({
+     *   config: {
+     *    'systemInstruction': 'What is the sum of the two pdfs?',
+    create(params: types.CreateCachedContentParameters): Promise<types.CachedContent>;
+     * Gets cached content configurations.
+     * Updates cached content configurations.
+     *   config: {'ttl': '7600s'}
+ * CallableToolConfig is the configuration for a callable tool.
+export declare interface CallableToolConfig {
+export declare interface CancelBatchJobConfig {
+/** Config for batches.cancel parameters. */
+    config?: CancelBatchJobConfig;
+export declare interface CancelTuningJobConfig {
+    config?: CancelTuningJobConfig;
+    private readonly config;
+    private history;
+    constructor(apiClient: ApiClient, modelsModule: Models, model: string, config?: types.GenerateContentConfig, history?: types.Content[]);
+     * const chat = ai.chats.create({model: 'gemini-2.0-flash'});
+     * const chat = ai.chats.create({model: 'gemini-2.0-flash'});
+     * Returns the chat history.
+     * The history is a list of contents alternating between user and model.
+     * There are two types of history:
+     * - The `curated history` contains only the valid turns between user and
+     * - The `comprehensive history` contains all turns, including invalid or
+     *   empty model outputs, providing a complete record of the history.
+     * The history is updated after receiving the response from the model,
+     * The `comprehensive history` is returned by default. To get the `curated
+     * history`, set the `curated` parameter to `true`.
+     * @param curated - whether to return the curated history or the comprehensive
+     *     history.
+     * @return History contents alternating between user and model for the entire
+    getHistory(curated?: boolean): types.Content[];
+    private recordHistory;
+export declare class Chats {
+     * The config in the params will be used for all requests within the chat
+     * session unless overridden by a per-request `config` in
+     * @see {@link types.SendMessageParameters#config}.
+     * const chat = ai.chats.create({
+     *   config: {
+    create(params: types.CreateChatParameters): Chat;
+/** Config for telling the service how to chunk the file. */
+export declare interface ChunkingConfig {
+    /** White space chunking configuration. */
+    whiteSpaceConfig?: WhiteSpaceConfig;
+/** Composite reinforcement tuning reward config. */
+export declare interface CompositeReinforcementTuningRewardConfig {
+    weightedRewardConfigs?: CompositeReinforcementTuningRewardConfigWeightedRewardConfig[];
+/** Composite reinforcement tuning reward config weighted reward config. */
+export declare interface CompositeReinforcementTuningRewardConfigWeightedRewardConfig {
+    rewardConfig?: SingleReinforcementTuningRewardConfig;
+export declare interface ComputeTokensConfig {
+    config?: ComputeTokensConfig;
+    /** Gemini Enterprise Agent Platform only. Statistics of the input text associated with this
+    /** Gemini Enterprise Agent Platform only. If the input text was truncated due to having
+    /** Gemini Enterprise Agent Platform only. Number of tokens of the input text.
+export declare interface ContextWindowCompressionConfig {
+/** Configuration for a Control reference image. */
+export declare interface ControlReferenceConfig {
+ enable_control_image_computation field in the config should be set to True.
+    /** Configuration for the control reference image. */
+    config?: ControlReferenceConfig;
+/** Config for the count_tokens method. */
+export declare interface CountTokensConfig {
+    systemInstruction?: ContentUnion;
+    tools?: Tool[];
+    /** Configuration that the model uses to generate the response. Not
+    generationConfig?: GenerationConfig;
+    /** Configuration for counting tokens. */
+    config?: CountTokensConfig;
+    tools?: Array<Tool_2> | undefined;
+     * Message for configuring webhook events for a request.
+    webhook_config?: WebhookConfig_2 | undefined;
+     * The environment configuration for the interaction. Can be an object specifying remote environment sources or a string referencing an existing environment ID.
+     * Configuration parameters for the agent interaction.
+    agent_config?: DynamicAgentConfig | DeepResearchAgentConfig | undefined;
+ * Configuration parameters for the agent interaction.
+declare type CreateAgentInteractionAgentConfig = DynamicAgentConfig | DeepResearchAgentConfig;
+ * The environment configuration for the interaction. Can be an object specifying remote environment sources or a string referencing an existing environment ID.
+export declare interface CreateAuthTokenConfig {
+    /** Configuration specific to Live API connections created using this token. */
+/** Config for auth_tokens.create parameters. */
+    config?: CreateAuthTokenConfig;
+/** Config for optional parameters. */
+export declare interface CreateBatchJobConfig {
+    /** Webhook configuration for receiving notifications when the batch
+    webhookConfig?: WebhookConfig;
+/** Config for batches.create parameters. */
+    config?: CreateBatchJobConfig;
+/** Optional configuration for cached content creation. */
+export declare interface CreateCachedContentConfig {
+    systemInstruction?: ContentUnion;
+    /** A list of `Tools` the model may use to generate the next response.
+    tools?: Tool[];
+    /** Configuration for the tools to use. This config is shared for all tools.
+    toolConfig?: ToolConfig;
+    /** Configuration that contains optional parameters.
+    config?: CreateCachedContentConfig;
+ `chats.create()` method. */
+    /** Config for the entire chat session.
+     This config applies to all requests within the session
+     unless overridden by a per-request `config` in `SendMessageParameters`.
+    config?: GenerateContentConfig;
+    /** The initial conversation history for the chat session.
+     This allows you to start the chat with a pre-existing history. The history
+    history?: Content[];
+/** Config for optional parameters. */
+export declare interface CreateEmbeddingsBatchJobConfig {
+/** Config for batches.create parameters. */
+    config?: CreateEmbeddingsBatchJobConfig;
+/** Used to override the default configuration. */
+export declare interface CreateFileConfig {
+    /** Used to override the default configuration. */
+    config?: CreateFileConfig;
+/** Optional parameters for creating a file search store. */
+export declare interface CreateFileSearchStoreConfig {
+    /** The human-readable display name for the file search store.
+    /** The embedding model to use for the FileSearchStore.
+/** Config for file_search_stores.create parameters. */
+export declare interface CreateFileSearchStoreParameters {
+    /** Optional parameters for creating a file search store.
+    config?: CreateFileSearchStoreConfig;
+    tools?: Array<Tool_2> | undefined;
+     * Message for configuring webhook events for a request.
+    webhook_config?: WebhookConfig_2 | undefined;
+     * The environment configuration for the interaction. Can be an object specifying remote environment sources or a string referencing an existing environment ID.
+     * Configuration parameters for model interactions.
+    generation_config?: GenerationConfig_2 | undefined;
+ * The environment configuration for the interaction. Can be an object specifying remote environment sources or a string referencing an existing environment ID.
+export declare interface CreateTuningJobConfig {
+    /** Custom base model for tuning. This is only supported for OSS models in Gemini Enterprise Agent Platform. */
+    /** The batch size hyperparameter for tuning. This is only supported for OSS models in Gemini Enterprise Agent Platform. */
+    /** Reward function configuration for reinforcement tuning. Reinforcement tuning only. */
+    rewardConfig?: SingleReinforcementTuningRewardConfig;
+    /** Composite reward function configuration for reinforcement tuning. Reinforcement tuning only. */
+    compositeRewardConfig?: CompositeReinforcementTuningRewardConfig;
+    /** Configuration for the tuning job. */
+    config?: CreateTuningJobConfig;
+    /** Configuration for the tuning job. */
+    config?: CreateTuningJobConfig;
+/** Configures the customized avatar to be used in the session. */
+declare type DeepResearchAgentConfig$ = DeepResearchAgentConfig;
+ * Configuration for the Deep Research agent.
+declare type DeepResearchAgentConfig = {
+    type: "deep-research";
+     * Enables human-in-the-loop planning for the Deep Research agent. If set to
+     * true, the Deep Research agent will provide a research plan in its response.
+     * Enables bigquery tool for the Deep Research agent.
+export declare interface DeleteBatchJobConfig {
+/** Config for batches.delete parameters. */
+    config?: DeleteBatchJobConfig;
+export declare interface DeleteCachedContentConfig {
+    config?: DeleteCachedContentConfig;
+/** Config for optional parameters. */
+export declare interface DeleteDocumentConfig {
+/** Config for documents.delete parameters. */
+     Example: fileSearchStores/file-search-store-foo/documents/documents-bar */
+    config?: DeleteDocumentConfig;
+/** Used to override the default configuration. */
+export declare interface DeleteFileConfig {
+    /** Used to override the default configuration. */
+    config?: DeleteFileConfig;
+/** Optional parameters for deleting a FileSearchStore. */
+export declare interface DeleteFileSearchStoreConfig {
+    /** If set to true, any Documents and objects related to this FileSearchStore will also be deleted.
+     the FileSearchStore contains any Documents.
+/** Config for file_search_stores.delete parameters. */
+export declare interface DeleteFileSearchStoreParameters {
+    /** The resource name of the FileSearchStore. Example: `fileSearchStores/my-file-search-store-123` */
+    config?: DeleteFileSearchStoreConfig;
+/** Configuration for deleting a tuned model. */
+export declare interface DeleteModelConfig {
+    config?: DeleteModelConfig;
+    /** Generation config for Distillation teacher model sampling. Only the
+     - thinking_config */
+    generationConfig?: GenerationConfig;
+    /** Immutable. Identifier. The `Document` resource name. The ID (name excluding the "fileSearchStores/&#42;/documents/" prefix) can contain up to 40 characters that are lowercase alphanumeric or dashes (-). The ID cannot start or end with a dash. If the name is empty on create, a unique name will be derived from `display_name` along with a 12 character random suffix. Example: `fileSearchStores/{file_search_store_id}/documents/my-awesome-doc-123a456b789c` */
+     * const documents = await ai.documents.list({parent:'rag_store_name', config: {'pageSize': 2}});
+/** Used to override the default configuration. */
+export declare interface DownloadFileConfig {
+    /** Configuration to for the download operation. */
+    config?: DownloadFileConfig;
+/** Used to override the default configuration. */
+export declare interface DownloadMediaConfig {
+declare type DynamicAgentConfig$ = DynamicAgentConfig;
+ * Configuration for dynamic agents.
+declare type DynamicAgentConfig = {
+export declare interface DynamicRetrievalConfig {
+    mode?: DynamicRetrievalConfigMode;
+export declare enum DynamicRetrievalConfigMode {
+/** Configuration for editing an image. */
+export declare interface EditImageConfig {
+    /** Configuration for editing. */
+    config?: EditImageConfig;
+    /** Configuration that contains optional parameters.
+    config?: EmbedContentConfig;
+export declare interface EmbedContentConfig {
+    /** Gemini Enterprise Agent Platform only. The MIME type of the input.
+    /** Gemini Enterprise Agent Platform only. Whether to silently truncate inputs longer than
+    /** Gemini Enterprise Agent Platform only. Whether to enable OCR for document content.
+    /** Gemini Enterprise Agent Platform only. Whether to extract audio from video content.
+/** Request-level metadata for the Gemini Enterprise Agent Platform Embed Content API. */
+    /** Gemini Enterprise Agent Platform only. The total number of billable characters included
+    /** Configuration that contains optional parameters.
+    config?: EmbedContentConfig;
+    /** The Gemini Enterprise Agent Platform embedding API to use.
+    /** Configuration that contains optional parameters.
+    config?: EmbedContentConfig;
+    /** Gemini Enterprise Agent Platform only. Metadata about the request.
+/** Enum representing the Gemini Enterprise Agent Platform embedding API to use. */
+     * The default is END_SENSITIVITY_LOW for Gemini Enterprise Agent Platform and END_SENSITIVITY_HIGH for Gemini Live.
+/** Tool to search public web data, powered by Vertex AI Search and Sec4 compliance. This data type is not supported in Gemini API. */
+export declare interface EnterpriseWebSearch {
+    /** Optional. Sites with confidence level chosen & above this value will be blocked from the search results. */
+    /** Optional. List of domains to be excluded from the search results. The default limit is 2000 domains. */
+ * Configuration for a custom environment.
+     * Network configuration for the environment.
+ * Outbound networking configuration for the sandbox. Accepts an object with an 'allowlist' array to restrict traffic, or the string 'disabled' to turn off all network access. Omit entirely to allow all outbound traffic with no header injection.
+ * Used to specify configuration for ExaAISearch.
+declare type ExaAISearchConfig = {
+     * Required. The API key for ExaAiSearch.
+     * Optional. This field can be used to pass any parameter from the Exa.ai Search API.
+    custom_config?: {
+    /** The authentication config to access the API. Deprecated. Please use auth_config instead. */
+    /** The authentication config to access the API. */
+    authConfig?: AuthConfig;
+    /** Parameters for the elastic search API. */
+    elasticSearchParams?: ExternalApiElasticSearchParams;
+    /** The endpoint of the external API. The system will call the API at this endpoint to retrieve the data for grounding. Example: https://acme.com:443/search */
+    /** Parameters for the simple search API. */
+    simpleSearchParams?: ExternalApiSimpleSearchParams;
+/** The search parameters to use for the ELASTIC_SEARCH spec. This data type is not supported in Gemini API. */
+export declare interface ExternalApiElasticSearchParams {
+    /** The ElasticSearch index to use. */
+    /** Optional. Number of hits (chunks) to request. When specified, it is passed to Elasticsearch as the `num_hits` param. */
+    /** The ElasticSearch search template to use. */
+    searchTemplate?: string;
+/** The search parameters to use for SIMPLE_SEARCH spec. This data type is not supported in Gemini API. */
+export declare interface ExternalApiSimpleSearchParams {
+export declare interface FetchPredictOperationConfig {
+    /** Used to override the default configuration. */
+    config?: FetchPredictOperationConfig;
+    /** Optional. The display name of the file. Used to provide a label or filename to distinguish files. This field is only returned in `PromptMessage` for prompt management. It is used in the Gemini calls only when server side tools (`code_execution`, `google_search`, and `url_context`) are enabled. This field is not supported in Gemini API. */
+     * const files = await ai.files.list({config: {'pageSize': 2}});
+     * This method is not available in Gemini Enterprise Agent Platform (previously known as Vertex AI).
+     * The `mimeType` can be specified in the `config` parameter. If omitted:
+     *         @see {@link types.UploadFileParameters#config} for the optional
+     *         config in the parameters.
+     * @throws An error if called on a Gemini Enterprise Agent Platform (previously known as Vertex AI) client.
+     * the `mimeType` can be provided in the `params.config` parameter.
+     * const file = await ai.files.upload({file: 'file.txt', config: {
+     * const config: GetFileParameters = {
+     * file = await ai.files.get(config);
+declare type FileSearch$ = FileSearch_2;
+/** The FileSearch tool that retrieves knowledge from Semantic Retrieval corpora. Files are imported to Semantic Retrieval corpora using the ImportFile API. This data type is not supported in Vertex AI. */
+export declare interface FileSearch {
+    /** Required. The names of the file_search_stores to retrieve from. Example: `fileSearchStores/my-file-search-store-123` */
+    fileSearchStoreNames?: string[];
+ * A tool that can be used by the model to search files.
+declare type FileSearch_2 = {
+    type: "file_search";
+     * The file search store names to search.
+    file_search_store_names?: Array<string> | undefined;
+declare type FileSearchCall$ = FileSearchCallDelta;
+declare type FileSearchCallDelta = {
+    type: "file_search_call";
+declare type FileSearchCallStep$ = FileSearchCallStep;
+ * File Search call step.
+declare type FileSearchCallStep = {
+    type: "file_search_call";
+declare type FileSearchResult$ = FileSearchResultDelta;
+ * The result of the File Search.
+declare type FileSearchResult = {};
+declare type FileSearchResultDelta = {
+    type: "file_search_result";
+    result: Array<FileSearchResult>;
+declare type FileSearchResultStep$ = FileSearchResultStep;
+ * File Search result step.
+declare type FileSearchResultStep = {
+    type: "file_search_result";
+export declare interface FileSearchStore {
+    /** Output only. Immutable. Identifier. The `FileSearchStore` resource name. It is an ID (name excluding the "fileSearchStores/" prefix) that can contain up to 40 characters that are lowercase alphanumeric or dashes (-). It is output only. The unique name will be derived from `display_name` along with a 12 character random suffix. Example: `fileSearchStores/my-awesome-file-search-store-123a456b789c` If `display_name` is not provided, the name will be randomly generated. */
+    /** Optional. The human-readable display name for the `FileSearchStore`. The display name must be no more than 512 characters in length, including spaces. Example: "Docs on Semantic Retriever". */
+    /** Output only. The Timestamp of when the `FileSearchStore` was created. */
+    /** Output only. The Timestamp of when the `FileSearchStore` was last updated. */
+    /** Output only. The number of documents in the `FileSearchStore` that are active and ready for retrieval. */
+    /** Output only. The number of documents in the `FileSearchStore` that are being processed. */
+    /** Output only. The number of documents in the `FileSearchStore` that have failed processing. */
+    /** Output only. The size of raw bytes ingested into the `FileSearchStore`. This is the total size of all the documents in the `FileSearchStore`. */
+    /** The embedding model used by the FileSearchStore. */
+declare class FileSearchStores extends BaseModule {
+     * Lists file search stores.
+     * @return - A pager of file search stores.
+     * const fileSearchStores = await ai.fileSearchStores.list({config: {'pageSize': 2}});
+     * for await (const fileSearchStore of fileSearchStores) {
+     *   console.log(fileSearchStore);
+    list: (params?: types.ListFileSearchStoresParameters) => Promise<Pager<types.FileSearchStore>>;
+     * Uploads a file asynchronously to a given File Search Store.
+     * This method is not available in Gemini Enterprise Agent Platform (previously known as Vertex AI).
+     * The `mimeType` can be specified in the `config` parameter. If omitted:
+     *        `types.UploadToFileSearchStoreParameters` interface.
+     *         @see {@link types.UploadToFileSearchStoreParameters#config} for the optional
+     *         config in the parameters.
+     * @throws An error if called on a Gemini Enterprise Agent Platform (previously known as Vertex AI) client.
+     * the `mimeType` can be provided in the `params.config` parameter.
+     * The following code uploads a file to a given file search store.
+     * const operation = await ai.fileSearchStores.upload({fileSearchStoreName: 'fileSearchStores/foo-bar', file: 'file.txt', config: {
+    uploadToFileSearchStore(params: types.UploadToFileSearchStoreParameters): Promise<types.UploadToFileSearchStoreOperation>;
+     * @param config - Optional configuration for the download.
+    downloadMedia(uri: string, config?: types.DownloadMediaConfig): Promise<Uint8Array>;
+     * Creates a File Search Store.
+     * @param params - The parameters for creating a File Search Store.
+     * @return FileSearchStore.
+    create(params: types.CreateFileSearchStoreParameters): Promise<types.FileSearchStore>;
+     * Gets a File Search Store.
+     * @param params - The parameters for getting a File Search Store.
+     * @return FileSearchStore.
+    get(params: types.GetFileSearchStoreParameters): Promise<types.FileSearchStore>;
+     * Deletes a File Search Store.
+     * @param params - The parameters for deleting a File Search Store.
+    delete(params: types.DeleteFileSearchStoreParameters): Promise<void>;
+    private uploadToFileSearchStoreInternal;
+     * Imports a File from File Service to a FileSearchStore.
+     * @param params - The parameters for importing a file to a file search store.
+ * Config for filters.
+     * Token generation reached a natural stopping point or a configured stop sequence.
+     * Token generation reached the configured maximum output tokens.
+/** Function calling config. */
+export declare interface FunctionCallingConfig {
+    mode?: FunctionCallingConfigMode;
+export declare enum FunctionCallingConfigMode {
+    /** Optional. Display name of the blob. Used to provide a label or filename to distinguish blobs. This field is only returned in PromptMessage for prompt management. It is currently used in the Gemini GenerateContent calls only when server side tools (code_execution, google_search, and url_context) are enabled. This field is not supported in Gemini API. */
+    /** Optional. Display name of the file data. Used to provide a label or filename to distinguish file datas. This field is only returned in PromptMessage for prompt management. It is currently used in the Gemini GenerateContent calls only when server side tools (code_execution, google_search, and url_context) are enabled. */
+    create(params?: CreateAgentParams | null | undefined, options?: GoogleGenAIRequestOptions): Promise<agents.Agent>;
+    create(params: CreateModelInteractionParamsNonStreaming, options?: GoogleGenAIRequestOptions): Promise<GoogleGenAIInteraction>;
+    create(params: CreateAgentInteractionParamsNonStreaming, options?: GoogleGenAIRequestOptions): Promise<GoogleGenAIInteraction>;
+    create(params: CreateModelInteractionParamsStreaming, options?: GoogleGenAIRequestOptions): Promise<Stream<GoogleGenAIInteractionSSEEvent>>;
+    create(params: CreateAgentInteractionParamsStreaming, options?: GoogleGenAIRequestOptions): Promise<Stream<GoogleGenAIInteractionSSEEvent>>;
+    create(params: InteractionCreateParamsStreaming, options?: GoogleGenAIRequestOptions): Promise<Stream<GoogleGenAIInteractionSSEEvent>>;
+    create(params: InteractionCreateParamsNonStreaming, options?: GoogleGenAIRequestOptions): Promise<GoogleGenAIInteraction>;
+    create(params: InteractionCreateParams, options?: GoogleGenAIRequestOptions): Promise<GoogleGenAIInteraction | Stream<GoogleGenAIInteractionSSEEvent>>;
+    create(params: webhooks.WebhookInput & {
+/** Optional model configuration parameters.
+export declare interface GenerateContentConfig {
+    systemInstruction?: ContentUnion;
+    /** Configuration for model router requests.
+    routingConfig?: GenerationConfigRoutingConfig;
+    /** Configuration for model selection.
+    modelSelectionConfig?: ModelSelectionConfig;
+    tools?: ToolListUnion;
+    toolConfig?: ToolConfig;
+    /** The speech generation configuration.
+    speechConfig?: SpeechConfigUnion;
+    /** The configuration for automatic function calling.
+    automaticFunctionCalling?: AutomaticFunctionCallingConfig;
+    /** The thinking features configuration.
+    thinkingConfig?: ThinkingConfig;
+    /** The image generation configuration.
+    imageConfig?: ImageConfig;
+     models. This field is not supported in Gemini Enterprise Agent Platform.
+    modelArmorConfig?: ModelArmorConfig;
+/** Config for models.generate_content parameters. */
+    /** Configuration that contains optional model parameters.
+    config?: GenerateContentConfig;
+    /** The history of automatic function calling.
+    automaticFunctionCallingHistory?: Content[];
+     *     config: {
+     *       tools: [{functionDeclarations: [controlLightFunctionDeclaration]}],
+     *       toolConfig: {
+     *         functionCallingConfig: {
+     *           mode: FunctionCallingConfigMode.ANY,
+     *   config: {
+     *     tools: [{codeExecution: {}}],
+     *   config: {
+     *     tools: [{codeExecution: {}}],
+/** The config for generating an images. */
+export declare interface GenerateImagesConfig {
+    /** Configuration for generating images.
+    config?: GenerateImagesConfig;
+/** Configuration for generating videos. */
+export declare interface GenerateVideosConfig {
+    /** Webhook configuration for receiving notifications when the
+    webhookConfig?: WebhookConfig;
+    /** Configuration for generating videos. */
+    config?: GenerateVideosConfig;
+declare type GenerationConfig$ = GenerationConfig_2;
+/** Generation config. */
+export declare interface GenerationConfig {
+    /** Optional. Config for model selection. */
+    modelSelectionConfig?: ModelSelectionConfig;
+    /** Optional. Routing configuration. This field is not supported in Gemini API. */
+    routingConfig?: GenerationConfigRoutingConfig;
+    /** Optional. The speech generation config. */
+    speechConfig?: SpeechConfig;
+    /** Optional. Configuration for thinking features. An error will be returned if this field is set for models that don't support thinking. */
+    thinkingConfig?: ThinkingConfig;
+ * Configuration parameters for model interactions.
+declare type GenerationConfig_2 = {
+     * Configuration for speech interaction.
+    speech_config?: Array<SpeechConfig_2> | undefined;
+     * The configuration for image interaction.
+    image_config?: ImageConfig_2 | undefined;
+     * Configuration options for video generation.
+    video_config?: VideoConfig | undefined;
+     * The tool choice configuration.
+    tool_choice?: ToolChoiceType | ToolChoiceConfig | undefined;
+/** The configuration for routing the request to a specific model. This can be used to control which model is used for the generation, either automatically or by specifying a model name. This data type is not supported in Gemini API. */
+export declare interface GenerationConfigRoutingConfig {
+    autoMode?: GenerationConfigRoutingConfigAutoRoutingMode;
+    manualMode?: GenerationConfigRoutingConfigManualRoutingMode;
+/** The configuration for automated routing. When automated routing is specified, the routing will be determined by the pretrained routing model and customer provided model routing preference. This data type is not supported in Gemini API. */
+export declare interface GenerationConfigRoutingConfigAutoRoutingMode {
+/** The configuration for manual routing. When manual routing is specified, the model will be selected based on the model name provided. This data type is not supported in Gemini API. */
+export declare interface GenerationConfigRoutingConfigManualRoutingMode {
+ * Config for thinking feature.
+ * @deprecated This interface will be deprecated. Please use `ThinkingConfig` instead.
+export declare interface GenerationConfigThinkingConfig extends ThinkingConfig {
+export declare interface GetBatchJobConfig {
+/** Config for batches.get parameters. */
+    config?: GetBatchJobConfig;
+export declare interface GetCachedContentConfig {
+    config?: GetCachedContentConfig;
+/** Optional Config. */
+export declare interface GetDocumentConfig {
+     Example: fileSearchStores/file-search-store-foo/documents/documents-bar */
+    config?: GetDocumentConfig;
+/** Used to override the default configuration. */
+export declare interface GetFileConfig {
+    /** Used to override the default configuration. */
+    config?: GetFileConfig;
+/** Optional parameters for getting a FileSearchStore. */
+export declare interface GetFileSearchStoreConfig {
+/** Config for file_search_stores.get parameters. */
+export declare interface GetFileSearchStoreParameters {
+    /** The resource name of the FileSearchStore. Example: `fileSearchStores/my-file-search-store-123` */
+    config?: GetFileSearchStoreConfig;
+export declare interface GetModelConfig {
+    config?: GetModelConfig;
+export declare interface GetOperationConfig {
+    /** Used to override the default configuration. */
+    config?: GetOperationConfig;
+export declare interface GetTuningJobConfig {
+    config?: GetTuningJobConfig;
+    readonly fileSearchStores: FileSearchStores;
+ * Google Gen AI SDK's configuration options.
+     * When true, the {@link https://cloud.google.com/vertex-ai/docs/reference/rest | Gemini Enterprise Agent Platform API} will used.
+     * When both enterprise and vertexai are set, and they have different values,
+    enterprise?: boolean;
+     * Optional. Determines whether to use the Vertex AI (now Gemini Enterprise Agent Platform) or the Gemini API.
+     * The `enterprise` flag is recommended instead.
+     * When both enterprise and vertexai are set, and they have different values,
+     * Optional. A set of customizable configuration for HTTP requests.
+    /** The authentication config to access the API. Only API key is supported. This field is not supported in Gemini API. */
+    authConfig?: AuthConfig;
+declare type GoogleSearch$ = GoogleSearch_2;
+/** GoogleSearch tool type. Tool to support Google Search in Model. Powered by Google. */
+export declare interface GoogleSearch {
+    /** Optional. The set of search types to enable. If not set, web search is enabled by default. */
+    searchTypes?: SearchTypes;
+    /** Optional. Sites with confidence level chosen & above this value will be blocked from the search results. This field is not supported in Gemini API. */
+    /** Optional. List of domains to be excluded from the search results. The default limit is 2000 domains. Example: ["amazon.com", "facebook.com"]. This field is not supported in Gemini API. */
+    /** Optional. Filter search results to a specific time range. If customers set a start time, they must set an end time (and vice versa). This field is not supported in Vertex AI. */
+ * A tool that can be used by the model to search Google.
+declare type GoogleSearch_2 = {
+    type: "google_search";
+     * The types of search grounding to enable.
+    search_types?: Array<GoogleSearchSearchType> | undefined;
+declare type GoogleSearchCall$ = GoogleSearchCallDelta;
+declare type GoogleSearchCallArguments$ = GoogleSearchCallArguments;
+ * The arguments to pass to Google Search.
+declare type GoogleSearchCallArguments = {
+     * Web search queries for the following-up web search.
+declare type GoogleSearchCallDelta = {
+    type: "google_search_call";
+     * The arguments to pass to Google Search.
+    arguments: GoogleSearchCallArguments;
+declare type GoogleSearchCallStep$ = GoogleSearchCallStep;
+ * Google Search call step.
+declare type GoogleSearchCallStep = {
+    type: "google_search_call";
+     * The arguments to pass to Google Search.
+    arguments: GoogleSearchCallArguments;
+     * The type of search grounding enabled.
+    search_type?: GoogleSearchCallStepSearchType | undefined;
+ * The type of search grounding enabled.
+declare type GoogleSearchCallStepSearchType = "web_search" | "image_search" | "enterprise_web_search" | (string & {});
+declare type GoogleSearchResult$ = GoogleSearchResult;
+declare type GoogleSearchResult$2 = GoogleSearchResultDelta;
+ * The result of the Google Search.
+declare type GoogleSearchResult = {
+    search_suggestions?: string | undefined;
+declare type GoogleSearchResultDelta = {
+    type: "google_search_result";
+    result: Array<GoogleSearchResult>;
+declare type GoogleSearchResultStep$ = GoogleSearchResultStep;
+ * Google Search result step.
+declare type GoogleSearchResultStep = {
+    type: "google_search_result";
+     * Required. The results of the Google Search.
+    result: Array<GoogleSearchResult>;
+     * Whether the Google Search resulted in an error.
+export declare interface GoogleSearchRetrieval {
+    /** Specifies the dynamic retrieval configuration for the given source. */
+    dynamicRetrievalConfig?: DynamicRetrievalConfig;
+declare type GoogleSearchSearchType = "web_search" | "image_search" | "enterprise_web_search" | (string & {});
+    /** A grounding chunk from an image search result. See the `Image` message for details. */
+    /** A grounding chunk from a data source retrieved by a retrieval tool, such as Vertex AI Search. See the `RetrievedContext` message for details */
+    /** A grounding chunk from a web page, typically from Google Search. See the `Web` message for details. */
+/** An `Image` chunk is a piece of evidence that comes from an image search result. It contains the URI of the image search result and the URI of the image. This is used to provide the user with a link to the source of the information. */
+    /** The URI of the image search result page. */
+    /** The title of the image search result page. */
+    /** The domain of the image search result page. */
+    /** Output only. The full resource name of the referenced Vertex AI Search document. This is used to identify the specific document that was retrieved. The format is `projects/{project}/locations/{location}/collections/{collection}/dataStores/{data_store}/branches/{branch}/documents/{document}`. This field is not supported in Gemini API. */
+    /** Optional. Name of the `FileSearchStore` containing the document. Example: `fileSearchStores/123`. This field is not supported in Vertex AI. */
+    fileSearchStore?: string;
+    /** Optional. The media blob resource name for multimodal file search results. Format: fileSearchStores/{file_search_store_id}/media/{blob_id}. This field is not supported in Vertex AI. */
+    /** Optional. The image search queries that were used to generate the content. This field is populated only when the grounding source is Google Search with the Image Search search_type enabled. */
+    imageSearchQueries?: string[];
+     Search, Vertex AI Search, or Google Maps.
+    /** Optional. Google search entry for the following-up web
+     searches. */
+    searchEntryPoint?: SearchEntryPoint;
+    /** Web search queries for the following-up web search. */
+    webSearchQueries?: string[];
+    /** Optional. The queries that were executed by the retrieval tools. This field is populated only when the grounding source is a retrieval tool, such as Vertex AI Search. This field is not supported in Gemini API. */
+declare type GroundingToolCountType = "google_search" | "google_maps" | "retrieval" | (string & {});
+     - Gemini Enterprise Agent Platform backend API docs: https://cloud.google.com/vertex-ai/docs/reference/rest
+     * Optional set of customizable configuration for HTTP requests.
+ * Config for Hybrid Search.
+declare type HybridSearch = {
+     * Optional. Alpha value controls the weight between dense and sparse vector search
+declare type ImageConfig$ = ImageConfig_2;
+/** The image generation configuration to be used in GenerateContentConfig. */
+export declare interface ImageConfig {
+    imageOutputOptions?: ImageConfigImageOutputOptions;
+ * The configuration for image interaction.
+declare type ImageConfig_2 = {
+    aspect_ratio?: ImageConfigAspectRatio | undefined;
+    image_size?: ImageConfigImageSize | undefined;
+declare type ImageConfigAspectRatio = "1:1" | "2:3" | "3:2" | "3:4" | "4:3" | "4:5" | "5:4" | "9:16" | "16:9" | "21:9" | "1:8" | "8:1" | "1:4" | "4:1" | (string & {});
+export declare interface ImageConfigImageOutputOptions {
+declare type ImageConfigImageSize = "1K" | "2K" | "4K" | "512" | (string & {});
+ * Configuration for image output format.
+/** Image search for grounding and related configurations. */
+export declare interface ImageSearch {
+export declare interface ImportFileConfig {
+    /** Config for telling the service how to chunk the file. */
+    chunkingConfig?: ChunkingConfig;
+/** Long-running operation for importing a file to a FileSearchStore. */
+/** Config for file_search_stores.import_file parameters. */
+    /** The resource name of the FileSearchStore. Example: `fileSearchStores/my-file-search-store-123` */
+    fileSearchStoreName: string;
+    config?: ImportFileConfig;
+/** Response for ImportFile to import a File API file with a file search store. */
+    /** The name of the FileSearchStore containing Documents. */
+/** Config for `inlined_embedding_responses` parameter. */
+/** Config for inlined request. */
+    /** Configuration that contains optional model parameters.
+    config?: GenerateContentConfig;
+/** Config for `inlined_responses` parameter. */
+    tools?: Array<Tool_2> | undefined;
+     * config is set in the request.
+     * Message for configuring webhook events for a request.
+    webhook_config?: WebhookConfig_2 | undefined;
+     * The environment configuration for the interaction. Can be an object specifying remote environment sources or a string referencing an existing environment ID.
+     * Configuration parameters for model interactions.
+    generation_config?: GenerationConfig_2 | undefined;
+     * Configuration parameters for the agent interaction.
+    agent_config?: DynamicAgentConfig | DeepResearchAgentConfig | undefined;
+ * Configuration parameters for the agent interaction.
+declare type InteractionAgentConfig = DynamicAgentConfig | DeepResearchAgentConfig;
+ * The environment configuration for the interaction. Can be an object specifying remote environment sources or a string referencing an existing environment ID.
+    export type AllowedTools = AllowedTools$;
+    export type DeepResearchAgentConfig = DeepResearchAgentConfig$;
+    export type DynamicAgentConfig = DynamicAgentConfig$;
+    export type FileSearchCallStep = FileSearchCallStep$;
+    export type FileSearchResultStep = FileSearchResultStep$;
+    export type GenerationConfig = GenerationConfig$;
+    export type GoogleSearchCallArguments = GoogleSearchCallArguments$;
+    export interface GoogleSearchCallStep extends GoogleSearchCallStep$ {
+    export type GoogleSearchResult = GoogleSearchResult$;
+    export interface GoogleSearchResultStep extends GoogleSearchResultStep$ {
+    export type ImageConfig = ImageConfig$;
+    export type SpeechConfig = SpeechConfig$;
+    export type ToolChoiceConfig = ToolChoiceConfig$;
+    export type VideoConfig = VideoConfig$;
+    export type WebhookConfig = WebhookConfig$;
+    export namespace GoogleSearchCallStep {
+    export namespace GoogleSearchResultStep {
+        export type FileSearchCall = FileSearchCall$;
+        export type FileSearchResult = FileSearchResult$;
+        export type GoogleSearchCall = GoogleSearchCall$;
+        export type GoogleSearchResult = GoogleSearchResult$2;
+        export type FileSearch = FileSearch$;
+        export type GoogleSearch = GoogleSearch$;
+            export type VertexAISearchConfig = VertexAISearchConfig$;
+        AllowedTools,
+        CreateAgentInteractionAgentConfig,
+        DeepResearchAgentConfig,
+        DynamicAgentConfig,
+        ExaAISearchConfig,
+        FileSearchCallDelta,
+        FileSearchCallStep,
+        FileSearchResultDelta,
+        FileSearchResultStep,
+        FileSearchResult,
+        FileSearch_2 as FileSearch,
+        GenerationConfig_2 as GenerationConfig,
+        GoogleSearchCallArguments,
+        GoogleSearchCallDelta,
+        GoogleSearchCallStepSearchType,
+        GoogleSearchCallStep,
+        GoogleSearchResultDelta,
+        GoogleSearchResultStep,
+        GoogleSearchResult,
+        GoogleSearchSearchType,
+        GoogleSearch_2 as GoogleSearch,
+        HybridSearch,
+        ImageConfigAspectRatio,
+        ImageConfigImageSize,
+        ImageConfig_2 as ImageConfig,
+        InteractionAgentConfig,
+        ParallelAISearchConfig,
+        RagRetrievalConfig_2 as RagRetrievalConfig,
+        RagStoreConfig,
+        SpeechConfig_2 as SpeechConfig,
+        ToolChoiceConfig,
+        VertexAISearchConfig,
+        VideoConfig,
+        WebhookConfig_2 as WebhookConfig
+    /** Used to override the default configuration. */
+    config?: RegisterFilesConfig;
+/** Config for optional parameters. */
+export declare interface ListBatchJobsConfig {
+/** Config for batches.list parameters. */
+    config?: ListBatchJobsConfig;
+/** Config for batches.list return value. */
+/** Config for caches.list method. */
+export declare interface ListCachedContentsConfig {
+    /** Configuration that contains optional parameters.
+    config?: ListCachedContentsConfig;
+/** Config for optional parameters. */
+export declare interface ListDocumentsConfig {
+/** Config for documents.list parameters. */
+    /** The resource name of the FileSearchStores. Example: `fileSearchStore/file-search-store-foo` */
+    config?: ListDocumentsConfig;
+/** Config for documents.list return value. */
+export declare interface ListFilesConfig {
+/** Optional parameters for listing FileSearchStore. */
+export declare interface ListFileSearchStoresConfig {
+/** Config for file_search_stores.list parameters. */
+export declare interface ListFileSearchStoresParameters {
+    config?: ListFileSearchStoresConfig;
+/** Config for file_search_stores.list return value. */
+export declare class ListFileSearchStoresResponse {
+    /** The returned file search stores. */
+    fileSearchStores?: FileSearchStore[];
+    /** Used to override the default configuration. */
+    config?: ListFilesConfig;
+export declare interface ListModelsConfig {
+    config?: ListModelsConfig;
+/** Configuration for the list tuning jobs method. */
+export declare interface ListTuningJobsConfig {
+    config?: ListTuningJobsConfig;
+ Live class encapsulates the configuration for live interaction with the
+     configuration and returns a Session object representing that connection.
+     config: {
+ history and used as part of the prompt to the model to generate content.
+     queries, this is a repeated field that contains conversation history and
+ conversation history). */
+/** Message contains configuration that will apply for the duration of the streaming session. */
+    /** The generation configuration for the session.
+    generationConfig?: GenerationConfig;
+    systemInstruction?: ContentUnion;
+    /**  A list of `Tools` the model may use to generate the next response.
+    tools?: ToolListUnion;
+    /** Configures the realtime input behavior in BidiGenerateContent. */
+    realtimeInputConfig?: RealtimeInputConfig;
+    /** Configures session resumption mechanism.
+    sessionResumption?: SessionResumptionConfig;
+    /** Configures context window compression mechanism.
+    contextWindowCompression?: ContextWindowCompressionConfig;
+    inputAudioTranscription?: AudioTranscriptionConfig;
+    outputAudioTranscription?: AudioTranscriptionConfig;
+    /** Configures the proactivity of the model. This allows the model to respond proactively to
+    proactivity?: ProactivityConfig;
+    /** Configures the explicit VAD signal. If enabled, the client will send
+    /** Configures the avatar model behavior. */
+    avatarConfig?: AvatarConfig;
+/** Session config for the API connection. */
+export declare interface LiveConnectConfig {
+    /** The generation configuration for the session. */
+    generationConfig?: GenerationConfig;
+    /** The speech generation configuration.
+    speechConfig?: SpeechConfig;
+    /** Config for thinking features.
+    thinkingConfig?: ThinkingConfig;
+    systemInstruction?: ContentUnion;
+    /** A list of `Tools` the model may use to generate the next response.
+    tools?: ToolListUnion;
+    /** Configures session resumption mechanism.
+    sessionResumption?: SessionResumptionConfig;
+    inputAudioTranscription?: AudioTranscriptionConfig;
+    outputAudioTranscription?: AudioTranscriptionConfig;
+    /** Configures the realtime input behavior in BidiGenerateContent. */
+    realtimeInputConfig?: RealtimeInputConfig;
+    /** Configures context window compression mechanism.
+    contextWindowCompression?: ContextWindowCompressionConfig;
+    /** Configures the proactivity of the model. This allows the model to respond proactively to
+    proactivity?: ProactivityConfig;
+    /** Configures the explicit VAD signal. If enabled, the client will send
+    /** Configures the avatar model behavior. */
+    avatarConfig?: AvatarConfig;
+    /** Config for translation. */
+    translationConfig?: TranslationConfig;
+/** Config for LiveConnectConstraints for Auth Token creation. */
+    /** ID of the model to configure in the ephemeral token for Live API.
+    /** Configuration specific to Live API connections created using this token. */
+    config?: LiveConnectConfig;
+    /** Optional configuration parameters for the request.
+    config?: LiveConnectConfig;
+ LiveMusic class encapsulates the configuration for live music
+    /** Configuration for music generation. */
+    musicGenerationConfig?: LiveMusicGenerationConfig;
+/** Configuration for music generation. */
+export declare interface LiveMusicGenerationConfig {
+     Retains the current prompts and config.
+     Sets a configuration to the model. Updates the session's current
+     music generation config.
+     @param params - Contains one property, `musicGenerationConfig`.
+     - `musicGenerationConfig` to set in the model. Passing an empty or
+     undefined config to the model will reset the config to defaults.
+    setMusicGenerationConfig(params: types.LiveMusicSetConfigParameters): Promise<void>;
+     * and config.
+     * Retains the current prompts and config.
+/** Parameters for setting config for the live music API. */
+export declare interface LiveMusicSetConfigParameters {
+    /** Configuration for music generation. */
+    musicGenerationConfig: LiveMusicGenerationConfig;
+/** Prompts and config used for generating this audio chunk. */
+    /** Music generation config for generating this audio chunk. */
+    musicGenerationConfig?: LiveMusicGenerationConfig;
+ Only sent if `session_resumption` was set in the connection config. */
+    /** Index of last message sent by client that is included in state represented by this SessionResumptionToken. Only sent when `SessionResumptionConfig.transparent` is set.
+/** Configuration for a Mask reference image. */
+export declare interface MaskReferenceConfig {
+ This encapsulates either a mask image provided by the user and configs for
+ the user provided mask, or only config parameters for the model to generate
+    /** Configuration for the mask reference image. */
+    config?: MaskReferenceConfig;
+     * The allowed tools.
+    allowed_tools?: Array<AllowedTools> | undefined;
+ * Creates a McpCallableTool from MCP clients and an optional config.
+ * Use the config to modify tool parameters such as behavior.
+export declare function mcpToTool(...args: [...Client[], CallableToolConfig | Client]): CallableTool;
+/** Configuration for Model Armor. Model Armor is a Google Cloud service that provides safety and security filtering for prompts and responses. It helps protect your AI applications from risks such as harmful content, sensitive data leakage, and prompt injection attacks. This data type is not supported in Gemini API. */
+export declare interface ModelArmorConfig {
+     *  config: {
+     * For the `model` parameter, supported formats for Gemini Enterprise Agent Platform API include:
+     *   config: {
+     * This logic is needed for GenerateContentConfig only.
+     * Previously we made GenerateContentConfig.responseSchema field to accept
+     * For the `model` parameter, supported formats for Gemini Enterprise Agent Platform API include:
+     *   config: {
+     * Transforms the CallableTools in the parameters to be simply Tools, it
+     * copies the params into a new object and replaces the tools, it does not
+     * MCP tools in the parameters.
+    private initAfcToolsMap;
+     * Generates an image based on a text description and configuration.
+     *  config: {
+     * Edits an image based on a prompt, list of reference images, and configuration.
+     *  config: {
+     * Upscales an image based on an image, upscale factor, and configuration.
+     * Only supported in Gemini Enterprise Agent Platform currently.
+     *  config: {
+     *  Generates videos based on a text description and configuration.
+     *  config: {
+     *  config: {
+     *  config: {
+     *  config: {
+     *   config: {
+/** Config for model selection. */
+export declare interface ModelSelectionConfig {
+/** Configuration for a multi-speaker text-to-speech request. */
+export declare interface MultiSpeakerVoiceConfig {
+    /** Required. A list of configurations for the voices of the speakers. Exactly two speaker voice configurations must be provided. */
+    speakerVoiceConfigs?: SpeakerVoiceConfig[];
+ * Network configuration for the environment.
+    /** Used to override the default configuration. */
+    config?: GetOperationConfig;
+    PAGED_ITEM_FILE_SEARCH_STORES = "fileSearchStores",
+declare interface PagedItemConfig {
+    config?: {
+    fileSearchStores?: T[];
+    protected requestInternal: (params: PagedItemConfig) => Promise<PagedItemResponse<T>>;
+    constructor(name: PagedItem, request: (params: PagedItemConfig) => Promise<PagedItemResponse<T>>, response: PagedItemResponse<T>, params: PagedItemConfig);
+     * Parameters contain a set of optional configs that can be
+    get params(): PagedItemConfig;
+     * const pager = await ai.files.list({config: {pageSize: 10}});
+     * const pager = await ai.files.list({config: {pageSize: 10}});
+ * Used to specify configuration for ParallelAISearch.
+declare type ParallelAISearchConfig = {
+     * Optional. The API key for ParallelAiSearch.
+     * Optional. Custom configs for ParallelAiSearch.
+    custom_config?: {
+/** Sites with confidence level chosen & above this value will be blocked from the search results. This enum is not supported in Gemini API. */
+/** Configuration for a prebuilt voice. */
+export declare interface PrebuiltVoiceConfig {
+/** Config for proactivity features. */
+export declare interface ProactivityConfig {
+/** Specifies the context retrieval config. This data type is not supported in Gemini API. */
+export declare interface RagRetrievalConfig {
+    /** Optional. Config for filters. */
+    filter?: RagRetrievalConfigFilter;
+    /** Optional. Config for Hybrid Search. */
+    hybridSearch?: RagRetrievalConfigHybridSearch;
+    /** Optional. Config for ranking and reranking. */
+    ranking?: RagRetrievalConfigRanking;
+ * Specifies the context retrieval config.
+declare type RagRetrievalConfig_2 = {
+     * Config for Hybrid Search.
+    hybrid_search?: HybridSearch | undefined;
+     * Config for filters.
+     * Config for Rank Service.
+/** Config for filters. This data type is not supported in Gemini API. */
+export declare interface RagRetrievalConfigFilter {
+/** Config for Hybrid Search. This data type is not supported in Gemini API. */
+export declare interface RagRetrievalConfigHybridSearch {
+    /** Optional. Alpha value controls the weight between dense and sparse vector search results. The range is [0, 1], while 0 means sparse vector search only and 1 means dense vector search only. The default value is 0.5 which balances sparse and dense vector search equally. */
+/** Config for ranking and reranking. This data type is not supported in Gemini API. */
+export declare interface RagRetrievalConfigRanking {
+    /** Optional. Config for LlmRanker. */
+    llmRanker?: RagRetrievalConfigRankingLlmRanker;
+    /** Optional. Config for Rank Service. */
+    rankService?: RagRetrievalConfigRankingRankService;
+/** Config for LlmRanker. This data type is not supported in Gemini API. */
+export declare interface RagRetrievalConfigRankingLlmRanker {
+/** Config for Rank Service. This data type is not supported in Gemini API. */
+export declare interface RagRetrievalConfigRankingRankService {
+ * Use to specify configuration for RAG Store.
+declare type RagStoreConfig = {
+     * Specifies the context retrieval config.
+    rag_retrieval_config?: RagRetrievalConfig_2 | undefined;
+ * Config for Rank Service.
+    ranking_config: "rank_service";
+export declare interface RealtimeInputConfig {
+/** Configuration for recontextualizing an image. */
+export declare interface RecontextImageConfig {
+    /** Configuration for image recontextualization. */
+    config?: RecontextImageConfig;
+    /** Configuration for the mask reference image. */
+    maskImageConfig?: types.MaskReferenceConfig;
+    /** Configuration for the control reference image. */
+    controlImageConfig?: types.ControlReferenceConfig;
+    /** Configuration for the style reference image. */
+    styleImageConfig?: types.StyleReferenceConfig;
+    /** Configuration for the subject reference image. */
+    subjectImageConfig?: types.SubjectReferenceConfig;
+/** Used to override the default configuration. */
+export declare interface RegisterFilesConfig {
+    /** Used to override the default configuration. */
+    config?: RegisterFilesConfig;
+    /** Autorater config for evaluation. */
+    autoraterConfig?: AutoraterConfig;
+    autoraterResponseParseConfig?: ReinforcementTuningParseResponseConfig;
+    systemInstruction?: Content;
+export declare class ReinforcementTuningParseResponseConfig {
+    compositeRewardConfig?: CompositeReinforcementTuningRewardConfig;
+    /** Single reward function configuration for reinforcement tuning. */
+    singleRewardConfig?: SingleReinforcementTuningRewardConfig;
+/** The configuration for the replicated voice to use. */
+export declare interface ReplicatedVoiceConfig {
+    retries?: RetryConfig;
+     * When setting base_url, this value configures resource scope to be the collection.
+declare type Result$2 = GoogleSearchResult;
+    /** Set to use data source powered by Vertex AI Search. */
+    vertexAiSearch?: VertexAISearch;
+     * Used to specify configuration for VertexAISearch.
+    vertex_ai_search_config?: VertexAISearchConfig | undefined;
+     * Used to specify configuration for ExaAISearch.
+    exa_ai_search_config?: ExaAISearchConfig | undefined;
+     * Used to specify configuration for ParallelAISearch.
+    parallel_ai_search_config?: ParallelAISearchConfig | undefined;
+     * Use to specify configuration for RAG Store.
+    rag_store_config?: RagStoreConfig | undefined;
+/** Retrieval config. */
+export declare interface RetrievalConfig {
+     search could help answer the prompt. The score is in the range [0, 1],
+     populated when google search grounding and dynamic retrieval is enabled.
+     Google search. */
+    googleSearchDynamicRetrievalScore?: number;
+declare type RetrievalType = "vertex_ai_search" | "rag_store" | "exa_ai_search" | "parallel_ai_search" | (string & {});
+declare type RetryConfig = {
+     * Safety policy for communication tools (e.g. Gmail, Chat, Meet).
+/** The entry point used to search for grounding sources. */
+export declare interface SearchEntryPoint {
+/** Different types of search that can be enabled on the GoogleSearch tool. */
+export declare interface SearchTypes {
+    /** Optional. Setting this field enables web search. Only text results are returned. */
+    webSearch?: WebSearch;
+    /** Optional. Setting this field enables image search. Image bytes are returned. */
+    imageSearch?: ImageSearch;
+/** Configuration for segmenting an image. */
+export declare interface SegmentImageConfig {
+    /** Configuration for image segmentation. */
+    config?: SegmentImageConfig;
+    /**  Config for this specific request.
+     Please note that the per-request config does not change the chat level
+     config, nor inherit from it. If you intend to use some values from the
+     chat's default config, you must explicitly copy them into this per-request
+     config.
+    config?: GenerateContentConfig;
+     the `chat` history is stored on the API server instead of locally.
+     Use {@link types.LiveConnectConfig#tools} to configure the callable functions.
+     config: {
+/** Configuration of session resumption mechanism.
+ Included in `LiveConnectConfig.session_resumption`. If included server
+export declare interface SessionResumptionConfig {
+/** Config for `response` parameter. */
+/** Single reinforcement tuning reward config. */
+export declare interface SingleReinforcementTuningRewardConfig {
+    parseResponseConfig?: ReinforcementTuningParseResponseConfig;
+/** Configuration for a single speaker in a multi-speaker setup. */
+export declare interface SpeakerVoiceConfig {
+    /** Required. The configuration for the voice of this speaker. */
+    voiceConfig?: VoiceConfig;
+declare type SpeechConfig$ = SpeechConfig_2;
+/** Config for speech generation and transcription. */
+export declare interface SpeechConfig {
+    /** The configuration in case of single-voice output. */
+    voiceConfig?: VoiceConfig;
+    /** The configuration for a multi-speaker text-to-speech request. This field is mutually exclusive with `voice_config`. */
+    multiSpeakerVoiceConfig?: MultiSpeakerVoiceConfig;
+ * The configuration for speech interaction.
+declare type SpeechConfig_2 = {
+export declare type SpeechConfigUnion = SpeechConfig | string;
+     * The default is START_SENSITIVITY_LOW for Gemini Enterprise Agent Platform and START_SENSITIVITY_HIGH for Gemini Live.
+declare type Step = UserInputStep | ModelOutputStep | ThoughtStep | FunctionCallStep | CodeExecutionCallStep | URLContextCallStep | MCPServerToolCallStep | GoogleSearchCallStep | FileSearchCallStep | GoogleMapsCallStep | FunctionResultStep | CodeExecutionResultStep | URLContextResultStep | GoogleSearchResultStep | MCPServerToolResultStep | FileSearchResultStep | GoogleMapsResultStep;
+declare type StepDeltaData = TextDelta | ImageDelta | AudioDelta | DocumentDelta | VideoDelta | ThoughtSummaryDelta | ThoughtSignatureDelta | TextAnnotationDelta | ArgumentsDelta | CodeExecutionCallDelta | URLContextCallDelta | GoogleSearchCallDelta | MCPServerToolCallDelta | FileSearchCallDelta | GoogleMapsCallDelta | CodeExecutionResultDelta | URLContextResultDelta | GoogleSearchResultDelta | MCPServerToolResultDelta | FileSearchResultDelta | GoogleMapsResultDelta | FunctionResultDelta;
+/** Configuration for a Style reference image. */
+export declare interface StyleReferenceConfig {
+ additionally optional config parameters for the style reference image.
+    /** Configuration for the style reference image. */
+    config?: StyleReferenceConfig;
+/** Configuration for a Subject reference image. */
+export declare interface SubjectReferenceConfig {
+ additionally optional config parameters for the subject reference image.
+    /** Configuration for the subject reference image. */
+    config?: SubjectReferenceConfig;
+ * Configuration for text output format.
+/** The thinking features configuration. */
+export declare interface ThinkingConfig {
+     * // Case 1: If LiveEphemeralParameters is unset, unlock LiveConnectConfig
+     * // use a different configuration.
+     * const config: CreateAuthTokenConfig = {
+     * const token = await ai.tokens.create(config);
+     * // LiveConnectConfig when using the token in Live API sessions. For
+     * const config: CreateAuthTokenConfig =
+     *        config: {
+     *           'systemInstruction': 'Always answer in English.',
+     * const token = await ai.tokens.create(config);
+     * // set, lock LiveConnectConfig with set and additional fields (e.g.
+     * // responseModalities, systemInstruction, temperature in this example) when
+     * const config: CreateAuthTokenConfig =
+     *        config: {
+     *           'systemInstruction': 'Always answer in English.',
+     * const token = await ai.tokens.create(config);
+     * // empty array, lock LiveConnectConfig with set fields (e.g.
+     * // responseModalities, systemInstruction in this example) when using the
+     * const config: CreateAuthTokenConfig =
+     *        config: {
+     *           'systemInstruction': 'Always answer in English.',
+     * const token = await ai.tokens.create(config);
+    create(params: types.CreateAuthTokenParameters): Promise<types.AuthToken>;
+    /** Optional. FileSearch tool type. Tool to retrieve knowledge from Semantic Retrieval corpora. This field is not supported in Vertex AI. */
+    fileSearch?: FileSearch;
+    /** Optional. GoogleSearch tool type. Tool to support Google Search in Model. Powered by Google. */
+    googleSearch?: GoogleSearch;
+    /** Optional. Tool to support searching public web data, powered by Vertex AI Search and Sec4 compliance. This field is not supported in Gemini API. */
+    enterpriseWebSearch?: EnterpriseWebSearch;
+    functionDeclarations?: FunctionDeclaration[];
+    /** Optional. Specialized retrieval tool that is powered by Google Search. */
+    googleSearchRetrieval?: GoogleSearchRetrieval;
+    /** Optional. If specified, Vertex AI will use Parallel.ai to search for information to answer user queries. The search results will be grounded on Parallel.ai and presented to the model for response generation. This field is not supported in Gemini API. */
+    parallelAiSearch?: ToolParallelAiSearch;
+declare type Tool_2 = FunctionT | CodeExecution | URLContext | ComputerUse_2 | MCPServer | GoogleSearch_2 | FileSearch_2 | GoogleMaps_2 | Retrieval_2;
+ * The tool choice configuration.
+declare type ToolChoice = ToolChoiceType | ToolChoiceConfig;
+declare type ToolChoiceConfig$ = ToolChoiceConfig;
+ * The tool choice configuration containing allowed tools.
+declare type ToolChoiceConfig = {
+     * The configuration for allowed tools.
+    allowed_tools?: AllowedTools | undefined;
+/** Tool config. This config is shared for all tools provided in the request. */
+export declare interface ToolConfig {
+    /** Optional. Retrieval config. */
+    retrievalConfig?: RetrievalConfig;
+    /** Optional. Function calling config. */
+    functionCallingConfig?: FunctionCallingConfig;
+/** ParallelAiSearch tool type. A tool that uses the Parallel.ai search engine for grounding. This data type is not supported in Gemini API. */
+export declare interface ToolParallelAiSearch {
+    /** Optional. The API key for ParallelAiSearch. If an API key is not provided, the system will attempt to verify access by checking for an active Parallel.ai subscription through the Google Cloud Marketplace. See https://docs.parallel.ai/search/search-quickstart for more details. */
+    /** Optional. Custom configs for ParallelAiSearch. This field can be used to pass any parameter from the Parallel.ai Search API. See the Parallel.ai documentation for the full list of available parameters and their usage: https://docs.parallel.ai/api-reference/search-beta/search Currently only `source_policy`, `excerpts`, `max_results`, `mode`, `fetch_policy` can be set via this field. For example: { "source_policy": { "include_domains": ["google.com", "wikipedia.org"], "exclude_domains": ["example.com"] }, "fetch_policy": { "max_age_seconds": 3600 } } */
+    customConfigs?: Record<string, unknown>;
+     * Google search tool, maps to Tool.google_search.search_types.web_search.
+    GOOGLE_SEARCH_WEB = "GOOGLE_SEARCH_WEB",
+     * Image search tool, maps to Tool.google_search.search_types.image_search.
+    GOOGLE_SEARCH_IMAGE = "GOOGLE_SEARCH_IMAGE",
+     * File search tool, maps to Tool.file_search.
+    FILE_SEARCH = "FILE_SEARCH"
+/** Config for stream translation. */
+export declare interface TranslationConfig {
+    /** The resource name of the Gemini Enterprise Agent Platform (previously known as Vertex AI) Multimodal Dataset that is used as training dataset. Example: 'projects/my-project-id-or-number/locations/my-location/datasets/my-dataset-id'. */
+     * const tuningJobs = await ai.tunings.list({config: {'pageSize': 2}});
+    /** The resource name of the Gemini Enterprise Agent Platform (previously known as Vertex AI) Multimodal Dataset that is used as validation dataset. Example: 'projects/my-project-id-or-number/locations/my-location/datasets/my-dataset-id'. */
+        DynamicRetrievalConfigMode,
+        FunctionCallingConfigMode,
+        ModelSelectionConfig,
+        ApiKeyConfig,
+        AuthConfigGoogleServiceAccountConfig,
+        AuthConfigHttpBasicAuthConfig,
+        AuthConfigOauthConfig,
+        AuthConfigOidcConfig,
+        AuthConfig,
+        ApiAuthApiKeyConfig,
+        ExternalApiElasticSearchParams,
+        ExternalApiSimpleSearchParams,
+        VertexAISearchDataStoreSpec,
+        VertexAISearch,
+        RagRetrievalConfigFilter,
+        RagRetrievalConfigHybridSearch,
+        RagRetrievalConfigRankingLlmRanker,
+        RagRetrievalConfigRankingRankService,
+        RagRetrievalConfigRanking,
+        RagRetrievalConfig,
+        FileSearch,
+        WebSearch,
+        ImageSearch,
+        SearchTypes,
+        GoogleSearch,
+        EnterpriseWebSearch,
+        DynamicRetrievalConfig,
+        GoogleSearchRetrieval,
+        ToolParallelAiSearch,
+        ReplicatedVoiceConfig,
+        PrebuiltVoiceConfig,
+        VoiceConfig,
+        SpeakerVoiceConfig,
+        MultiSpeakerVoiceConfig,
+        SpeechConfig,
+        AutomaticFunctionCallingConfig,
+        ThinkingConfig,
+        ImageConfigImageOutputOptions,
+        ImageConfig,
+        GenerationConfigRoutingConfigAutoRoutingMode,
+        GenerationConfigRoutingConfigManualRoutingMode,
+        GenerationConfigRoutingConfig,
+        RetrievalConfig,
+        FunctionCallingConfig,
+        ToolConfig,
+        ModelArmorConfig,
+        GenerateContentConfig,
+        SearchEntryPoint,
+        EmbedContentConfig,
+        GenerateImagesConfig,
+        MaskReferenceConfig,
+        ControlReferenceConfig,
+        StyleReferenceConfig,
+        SubjectReferenceConfig,
+        EditImageConfig,
+        RecontextImageConfig,
+        SegmentImageConfig,
+        GetModelConfig,
+        ListModelsConfig,
+        UpdateModelConfig,
+        DeleteModelConfig,
+        GenerationConfig,
+        CountTokensConfig,
+        ComputeTokensConfig,
+        WebhookConfig,
+        GenerateVideosConfig,
+        GetTuningJobConfig,
+        AutoraterConfig,
+        ReinforcementTuningParseResponseConfig,
+        SingleReinforcementTuningRewardConfig,
+        CompositeReinforcementTuningRewardConfigWeightedRewardConfig,
+        CompositeReinforcementTuningRewardConfig,
+        ListTuningJobsConfig,
+        CancelTuningJobConfig,
+        CreateTuningJobConfig,
+        ValidateRewardConfig,
+        CreateCachedContentConfig,
+        GetCachedContentConfig,
+        DeleteCachedContentConfig,
+        UpdateCachedContentConfig,
+        ListCachedContentsConfig,
+        GetDocumentConfig,
+        DeleteDocumentConfig,
+        ListDocumentsConfig,
+        CreateFileSearchStoreConfig,
+        CreateFileSearchStoreParameters,
+        FileSearchStore,
+        GetFileSearchStoreConfig,
+        GetFileSearchStoreParameters,
+        DeleteFileSearchStoreConfig,
+        DeleteFileSearchStoreParameters,
+        ListFileSearchStoresConfig,
+        ListFileSearchStoresParameters,
+        ListFileSearchStoresResponse,
+        WhiteSpaceConfig,
+        ChunkingConfig,
+        UploadToFileSearchStoreConfig,
+        UploadToFileSearchStoreParameters,
+        UploadToFileSearchStoreResumableResponse,
+        ImportFileConfig,
+        ListFilesConfig,
+        CreateFileConfig,
+        GetFileConfig,
+        DeleteFileConfig,
+        RegisterFilesConfig,
+        CreateBatchJobConfig,
+        CreateEmbeddingsBatchJobConfig,
+        GetBatchJobConfig,
+        CancelBatchJobConfig,
+        ListBatchJobsConfig,
+        DeleteBatchJobConfig,
+        GetOperationConfig,
+        FetchPredictOperationConfig,
+        UploadFileConfig,
+        DownloadFileConfig,
+        UpscaleImageConfig,
+        GenerationConfigThinkingConfig,
+        RealtimeInputConfig,
+        SessionResumptionConfig,
+        ContextWindowCompressionConfig,
+        AudioTranscriptionConfig,
+        ProactivityConfig,
+        AvatarConfig,
+        TranslationConfig,
+        LiveConnectConfig,
+        LiveMusicGenerationConfig,
+        CallableToolConfig,
+        LiveMusicSetConfigParameters,
+        CreateAuthTokenConfig,
+        UploadToFileSearchStoreResponse,
+        UploadToFileSearchStoreOperation,
+        DownloadMediaConfig,
+        SpeechConfigUnion,
+export declare interface UpdateCachedContentConfig {
+    /** Configuration that contains optional parameters.
+    config?: UpdateCachedContentConfig;
+/** Configuration for updating a tuned model. */
+export declare interface UpdateModelConfig {
+/** Configuration for updating a tuned model. */
+    config?: UpdateModelConfig;
+     * Uploads a file to file search store via the given upload url.
+     * https://generativelanguage.googleapis.com/upload/v1beta/{file_search_store_name}:uploadToFileSearchStore endpoint
+     * @return A Promise that resolves to types.UploadToFileSearchStoreOperation.
+    uploadToFileSearchStore(file: string | Blob, uploadUrl: string, apiClient: ApiClient, httpOptions?: HttpOptions): Promise<UploadToFileSearchStoreOperation>;
+/** Used to override the default configuration. */
+export declare interface UploadFileConfig {
+    /** Configuration that contains optional parameters. */
+    config?: UploadFileConfig;
+/** Optional parameters for uploading a file to a FileSearchStore. */
+export declare interface UploadToFileSearchStoreConfig {
+    /** Config for telling the service how to chunk the file. */
+    chunkingConfig?: ChunkingConfig;
+/** Long-running operation for uploading a file to a FileSearchStore. */
+export declare class UploadToFileSearchStoreOperation implements Operation<UploadToFileSearchStoreResponse> {
+    /** The result of the UploadToFileSearchStore operation, available when the operation is done. */
+    response?: UploadToFileSearchStoreResponse;
+    _fromAPIResponse({ apiResponse, _isVertexAI, }: OperationFromAPIResponseParameters): Operation<UploadToFileSearchStoreResponse>;
+/** Generates the parameters for the private _upload_to_file_search_store method. */
+export declare interface UploadToFileSearchStoreParameters {
+    /** The resource name of the FileSearchStore. Example: `fileSearchStores/my-file-search-store-123` */
+    fileSearchStoreName: string;
+    /** Used to override the default configuration. */
+    config?: UploadToFileSearchStoreConfig;
+/** Parameters for the upload file to file search store method. */
+export declare interface UploadToFileSearchStoreParameters {
+    /** The name of the file search store to upload. */
+    fileSearchStoreName: string;
+    /** Configuration that contains optional parameters. */
+    config?: UploadToFileSearchStoreConfig;
+/** The response when long-running operation for uploading a file to a FileSearchStore complete. */
+export declare class UploadToFileSearchStoreResponse {
+    /** The name of the FileSearchStore containing Documents. */
+export declare class UploadToFileSearchStoreResumableResponse {
+/** Configuration for upscaling an image.
+ For more information on this configuration, refer to
+export declare interface UpscaleImageConfig {
+/** User-facing config UpscaleImageParameters. */
+    /** Configuration for upscaling. */
+    config?: UpscaleImageConfig;
+export declare interface ValidateRewardConfig {
+ Validates a reinforcement tuning reward configuration against a sample
+    /** Required. The sample response for validating the reward configuration. */
+    /** Required. The example to validate the reward configuration. */
+    /** Single reward function configuration for reinforcement tuning. Mutually exclusive with composite_reward_config. */
+    singleRewardConfig?: SingleReinforcementTuningRewardConfig;
+    /** Composite reward function configuration for reinforcement tuning. Mutually exclusive with single_reward_config. */
+    compositeRewardConfig?: CompositeReinforcementTuningRewardConfig;
+    config?: ValidateRewardConfig;
+ configuration. */
+    /** Output only. The overall weighted reward. For a `CompositeReinforcementTuningRewardConfig`, this is the weighted average of all rewards. For a `SingleReinforcementTuningRewardConfig`, this will be the value of the single reward. */
+/** Retrieve from Vertex AI Search datastore or engine for grounding. datastore and engine are mutually exclusive. See https://cloud.google.com/products/agent-builder. This data type is not supported in Gemini API. */
+export declare interface VertexAISearch {
+    /** Specifications that define the specific DataStores to be searched, along with configurations for those data stores. This is only considered for Engines with multiple data stores. It should only be set if engine is used. */
+    dataStoreSpecs?: VertexAISearchDataStoreSpec[];
+    /** Optional. Fully-qualified Vertex AI Search data store resource ID. Format: `projects/{project}/locations/{location}/collections/{collection}/dataStores/{dataStore}` */
+    /** Optional. Fully-qualified Vertex AI Search engine resource ID. Format: `projects/{project}/locations/{location}/collections/{collection}/engines/{engine}` */
+    /** Optional. Filter strings to be passed to the search API. */
+    /** Optional. Number of search results to return per query. The default value is 10. The maximumm allowed value is 10. */
+declare type VertexAISearchConfig$ = VertexAISearchConfig;
+ * Used to specify configuration for VertexAISearch.
+declare type VertexAISearchConfig = {
+     * Optional. Used to specify Vertex AI Search engine.
+     * Optional. Used to specify Vertex AI Search datastores.
+/** Define data stores within engine to filter on in a search call and configurations for those data stores. For more information, see https://cloud.google.com/generative-ai-app-builder/docs/reference/rpc/google.cloud.discoveryengine.v1#datastorespec. This data type is not supported in Gemini API. */
+export declare interface VertexAISearchDataStoreSpec {
+    /** Optional. Filter specification to filter documents in the data store specified by data_store field. For more information on filtering, see [Filtering](https://cloud.google.com/generative-ai-app-builder/docs/filter-search-metadata) */
+    /** Optional. The retrieval config for the Rag query. */
+    ragRetrievalConfig?: RagRetrievalConfig;
+declare type VideoConfig$ = VideoConfig;
+ * Configuration options for video generation.
+declare type VideoConfig = {
+ * Configuration for video output format.
+/** The configuration for the voice to use. */
+export declare interface VoiceConfig {
+    /** The configuration for a replicated voice, which is a clone of a
+    replicatedVoiceConfig?: ReplicatedVoiceConfig;
+    /** The configuration for a prebuilt voice. */
+    prebuiltVoiceConfig?: PrebuiltVoiceConfig;
+declare type WebhookConfig$ = WebhookConfig_2;
+/** Configuration for webhook notifications.
+ Used to configure webhook endpoints that will receive notifications
+export declare interface WebhookConfig {
+ * Message for configuring webhook events for a request.
+declare type WebhookConfig_2 = {
+/** Standard web search for grounding and related configurations. Only text results are returned. */
+export declare interface WebSearch {
+    create(url: string, headers: Record<string, string>, callbacks: WebSocketCallbacks): WebSocket_2;
+/** Configuration for a white space chunking algorithm. */
+export declare interface WhiteSpaceConfig {
+--- index.mjs search ---
+ * const ai = new GoogleGenAI({apiKey: 'GEMINI_API_KEY'});
+function uploadToFileSearchStoreOperationFromMldev(fromObject) {
+        setValueByPath(toObject, ['response'], uploadToFileSearchStoreResponseFromMldev(fromResponse));
+function uploadToFileSearchStoreResponseFromMldev(fromObject) {
+     * Simple search API spec.
+    ApiSpec["SIMPLE_SEARCH"] = "SIMPLE_SEARCH";
+     * Elastic search API spec.
+    ApiSpec["ELASTIC_SEARCH"] = "ELASTIC_SEARCH";
+/** Sites with confidence level chosen & above this value will be blocked from the search results. This enum is not supported in Gemini API. */
+     * Google search tool, maps to Tool.google_search.search_types.web_search.
+    ToolType["GOOGLE_SEARCH_WEB"] = "GOOGLE_SEARCH_WEB";
+     * Image search tool, maps to Tool.google_search.search_types.image_search.
+    ToolType["GOOGLE_SEARCH_IMAGE"] = "GOOGLE_SEARCH_IMAGE";
+     * File search tool, maps to Tool.file_search.
+    ToolType["FILE_SEARCH"] = "FILE_SEARCH";
+/** Enum representing the Gemini Enterprise Agent Platform embedding API to use. */
+     * The default is START_SENSITIVITY_LOW for Gemini Enterprise Agent Platform and START_SENSITIVITY_HIGH for Gemini Live.
+     * The default is END_SENSITIVITY_LOW for Gemini Enterprise Agent Platform and END_SENSITIVITY_HIGH for Gemini Live.
+     *       tools: [{functionDeclarations: [controlLightFunctionDeclaration]}],
+     *     tools: [{codeExecution: {}}],
+     *     tools: [{codeExecution: {}}],
+/** Config for file_search_stores.list return value. */
+class ListFileSearchStoresResponse {
+class UploadToFileSearchStoreResumableResponse {
+/** Response for ImportFile to import a File API file with a file search store. */
+/** Long-running operation for importing a file to a FileSearchStore. */
+/** The response when long-running operation for uploading a file to a FileSearchStore complete. */
+class UploadToFileSearchStoreResponse {
+/** Long-running operation for uploading a file to a FileSearchStore. */
+class UploadToFileSearchStoreOperation {
+        const operation = new UploadToFileSearchStoreOperation();
+        const response = uploadToFileSearchStoreOperationFromMldev(op);
+    if (tool.functionDeclarations) {
+        for (const functionDeclaration of tool.functionDeclarations) {
+        functionDeclarations: [
+    const functionDeclarations = [];
+        if (geminiTool.functionDeclarations) {
+            functionDeclarations.push(...geminiTool.functionDeclarations);
+    return { functionDeclarations: functionDeclarations };
+        throw new Error('apiKeyConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('authType parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('googleServiceAccountConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('httpBasicAuthConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('oauthConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('oidcConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('fileName parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('inlinedResponses parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('inlinedEmbedContentResponses parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('format parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('gcsUri parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('bigqueryUri parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('vertexDatasetName parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('fileName parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('inlinedRequests parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('displayName parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('dest parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('webhookConfig parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('mimeType parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('autoTruncate parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('documentOcr parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('audioTrackExtraction parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('displayName parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('partialArgs parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('willContinue parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('streamFunctionCallArguments parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    const fromSystemInstruction = getValueByPath(fromObject, [
+        'systemInstruction',
+    if (parentObject !== undefined && fromSystemInstruction != null) {
+        setValueByPath(parentObject, ['systemInstruction'], contentToMldev$4(tContent(fromSystemInstruction)));
+        throw new Error('routingConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('modelSelectionConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('labels parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('audioTimestamp parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('modelArmorConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+function googleSearchToMldev$4(fromObject) {
+    const fromSearchTypes = getValueByPath(fromObject, ['searchTypes']);
+    if (fromSearchTypes != null) {
+        setValueByPath(toObject, ['searchTypes'], fromSearchTypes);
+        throw new Error('blockingConfidence parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('excludeDomains parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('personGeneration parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('prominentPeople parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('outputMimeType parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('outputCompressionQuality parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('imageOutputOptions parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('filter parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('method parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('retrieval parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    const fromFileSearch = getValueByPath(fromObject, ['fileSearch']);
+    if (fromFileSearch != null) {
+        setValueByPath(toObject, ['fileSearch'], fromFileSearch);
+    const fromGoogleSearch = getValueByPath(fromObject, ['googleSearch']);
+    if (fromGoogleSearch != null) {
+        setValueByPath(toObject, ['googleSearch'], googleSearchToMldev$4(fromGoogleSearch));
+    if (getValueByPath(fromObject, ['enterpriseWebSearch']) !== undefined) {
+        throw new Error('enterpriseWebSearch parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    const fromFunctionDeclarations = getValueByPath(fromObject, [
+        'functionDeclarations',
+    if (fromFunctionDeclarations != null) {
+        let transformedList = fromFunctionDeclarations;
+        setValueByPath(toObject, ['functionDeclarations'], transformedList);
+    const fromGoogleSearchRetrieval = getValueByPath(fromObject, [
+        'googleSearchRetrieval',
+    if (fromGoogleSearchRetrieval != null) {
+        setValueByPath(toObject, ['googleSearchRetrieval'], fromGoogleSearchRetrieval);
+    if (getValueByPath(fromObject, ['parallelAiSearch']) !== undefined) {
+        throw new Error('parallelAiSearch parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    PagedItem["PAGED_ITEM_FILE_SEARCH_STORES"] = "fileSearchStores";
+                throw new Error('Gemini Enterprise Agent Platform (previously known as Vertex AI) does not support batches.createEmbeddings.');
+            if (requestDict['systemInstruction']) {
+                const systemInstructionValue = requestDict['systemInstruction'];
+                delete requestDict['systemInstruction'];
+                requestContent['systemInstruction'] = systemInstructionValue;
+                throw new Error('Unsupported source for Gemini Enterprise Agent Platform (previously known as Vertex AI): No GCS or BigQuery URI found.');
+        throw new Error('apiKeyConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('authType parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('googleServiceAccountConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('httpBasicAuthConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('oauthConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('oidcConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('displayName parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('id parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('disabledSafetyPolicies parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+    const fromSystemInstruction = getValueByPath(fromObject, [
+        'systemInstruction',
+    if (parentObject !== undefined && fromSystemInstruction != null) {
+        setValueByPath(parentObject, ['systemInstruction'], contentToMldev$3(tContent(fromSystemInstruction)));
+        throw new Error('kmsKeyName parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    const fromSystemInstruction = getValueByPath(fromObject, [
+        'systemInstruction',
+    if (parentObject !== undefined && fromSystemInstruction != null) {
+        setValueByPath(parentObject, ['systemInstruction'], contentToVertex$3(tContent(fromSystemInstruction)));
+        throw new Error('id parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('displayName parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('partialArgs parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('willContinue parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('streamFunctionCallArguments parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+function googleSearchToMldev$3(fromObject) {
+    const fromSearchTypes = getValueByPath(fromObject, ['searchTypes']);
+    if (fromSearchTypes != null) {
+        setValueByPath(toObject, ['searchTypes'], fromSearchTypes);
+        throw new Error('blockingConfidence parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('excludeDomains parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('name parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('streamableHttpTransport parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('toolCall parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('toolResponse parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('partMetadata parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('includeServerSideToolInvocations parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('retrieval parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    const fromFileSearch = getValueByPath(fromObject, ['fileSearch']);
+    if (fromFileSearch != null) {
+        setValueByPath(toObject, ['fileSearch'], fromFileSearch);
+    const fromGoogleSearch = getValueByPath(fromObject, ['googleSearch']);
+    if (fromGoogleSearch != null) {
+        setValueByPath(toObject, ['googleSearch'], googleSearchToMldev$3(fromGoogleSearch));
+    if (getValueByPath(fromObject, ['enterpriseWebSearch']) !== undefined) {
+        throw new Error('enterpriseWebSearch parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    const fromFunctionDeclarations = getValueByPath(fromObject, [
+        'functionDeclarations',
+    if (fromFunctionDeclarations != null) {
+        let transformedList = fromFunctionDeclarations;
+        setValueByPath(toObject, ['functionDeclarations'], transformedList);
+    const fromGoogleSearchRetrieval = getValueByPath(fromObject, [
+        'googleSearchRetrieval',
+    if (fromGoogleSearchRetrieval != null) {
+        setValueByPath(toObject, ['googleSearchRetrieval'], fromGoogleSearchRetrieval);
+    if (getValueByPath(fromObject, ['parallelAiSearch']) !== undefined) {
+        throw new Error('parallelAiSearch parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    if (getValueByPath(fromObject, ['fileSearch']) !== undefined) {
+        throw new Error('fileSearch parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+    const fromGoogleSearch = getValueByPath(fromObject, ['googleSearch']);
+    if (fromGoogleSearch != null) {
+        setValueByPath(toObject, ['googleSearch'], fromGoogleSearch);
+    const fromEnterpriseWebSearch = getValueByPath(fromObject, [
+        'enterpriseWebSearch',
+    if (fromEnterpriseWebSearch != null) {
+        setValueByPath(toObject, ['enterpriseWebSearch'], fromEnterpriseWebSearch);
+    const fromFunctionDeclarations = getValueByPath(fromObject, [
+        'functionDeclarations',
+    if (fromFunctionDeclarations != null) {
+        let transformedList = fromFunctionDeclarations;
+        setValueByPath(toObject, ['functionDeclarations'], transformedList);
+    const fromGoogleSearchRetrieval = getValueByPath(fromObject, [
+        'googleSearchRetrieval',
+    if (fromGoogleSearchRetrieval != null) {
+        setValueByPath(toObject, ['googleSearchRetrieval'], fromGoogleSearchRetrieval);
+    const fromParallelAiSearch = getValueByPath(fromObject, [
+        'parallelAiSearch',
+    if (fromParallelAiSearch != null) {
+        setValueByPath(toObject, ['parallelAiSearch'], fromParallelAiSearch);
+     * and [Gemini Enterprise Agent Platform reference](https://cloud.google.com/vertex-ai/generative-ai/docs/context-cache/context-cache-overview#supported_models)
+     *    'systemInstruction': 'What is the sum of the two pdfs?',
+     * const chat = ai.chats.create({
+     * const chat = ai.chats.create({model: 'gemini-2.0-flash'});
+     * const chat = ai.chats.create({model: 'gemini-2.0-flash'});
+     * There are two types of history:
+function createFileSearchStoreConfigToMldev(apiClient, fromObject, parentObject) {
+function createFileSearchStoreParametersToMldev(apiClient, fromObject) {
+        createFileSearchStoreConfigToMldev(apiClient, fromConfig, toObject);
+function deleteFileSearchStoreConfigToMldev(fromObject, parentObject) {
+function deleteFileSearchStoreParametersToMldev(fromObject) {
+        deleteFileSearchStoreConfigToMldev(fromConfig, toObject);
+function getFileSearchStoreParametersToMldev(fromObject) {
+    const fromFileSearchStoreName = getValueByPath(fromObject, [
+        'fileSearchStoreName',
+    if (fromFileSearchStoreName != null) {
+        setValueByPath(toObject, ['_url', 'file_search_store_name'], fromFileSearchStoreName);
+function listFileSearchStoresConfigToMldev(fromObject, parentObject) {
+function listFileSearchStoresParametersToMldev(fromObject) {
+        listFileSearchStoresConfigToMldev(fromConfig, toObject);
+function listFileSearchStoresResponseFromMldev(fromObject) {
+    const fromFileSearchStores = getValueByPath(fromObject, [
+        'fileSearchStores',
+    if (fromFileSearchStores != null) {
+        let transformedList = fromFileSearchStores;
+        setValueByPath(toObject, ['fileSearchStores'], transformedList);
+function uploadToFileSearchStoreConfigToMldev(fromObject, parentObject) {
+function uploadToFileSearchStoreParametersToMldev(fromObject) {
+    const fromFileSearchStoreName = getValueByPath(fromObject, [
+        'fileSearchStoreName',
+    if (fromFileSearchStoreName != null) {
+        setValueByPath(toObject, ['_url', 'file_search_store_name'], fromFileSearchStoreName);
+        uploadToFileSearchStoreConfigToMldev(fromConfig, toObject);
+function uploadToFileSearchStoreResumableResponseFromMldev(fromObject) {
+                url.searchParams.append(key, String(value));
+        if (!url.searchParams.has('alt') || url.searchParams.get('alt') !== 'sse') {
+            url.searchParams.set('alt', 'sse');
+     * Uploads a file to a given file search store asynchronously using Gemini API only, this is not supported
+     * @param fileSearchStoreName The name of the file search store to upload the file to.
+    async uploadFileToFileSearchStore(fileSearchStoreName, file, config) {
+        const path = `upload/v1beta/${fileSearchStoreName}:uploadToFileSearchStore`;
+            uploadToFileSearchStoreConfigToMldev(config, body);
+        return uploader.uploadToFileSearchStore(file, uploadUrl, this);
+    async uploadToFileSearchStore(file, uploadUrl, apiClient, httpOptions) {
+            return uploadBlobToFileSearchStore(file, uploadUrl, apiClient, httpOptions);
+async function uploadBlobToFileSearchStore(file, uploadUrl, apiClient, httpOptions) {
+    const resp = uploadToFileSearchStoreOperationFromMldev(responseJson);
+    const typedResp = new UploadToFileSearchStoreOperation();
+     * This method is not available in Gemini Enterprise Agent Platform (previously known as Vertex AI).
+     * @throws An error if called on a Gemini Enterprise Agent Platform (previously known as Vertex AI) client.
+            throw new Error('Gemini Enterprise Agent Platform (previously known as Vertex AI) does not support uploading files. You can share files through a GCS bucket.');
+class FileSearchStores extends BaseModule {
+         * Lists file search stores.
+         * @return - A pager of file search stores.
+         * const fileSearchStores = await ai.fileSearchStores.list({config: {'pageSize': 2}});
+         * for await (const fileSearchStore of fileSearchStores) {
+         *   console.log(fileSearchStore);
+            return new Pager(PagedItem.PAGED_ITEM_FILE_SEARCH_STORES, (x) => this.listInternal(x), await this.listInternal(params), params);
+     * Uploads a file asynchronously to a given File Search Store.
+     * This method is not available in Gemini Enterprise Agent Platform (previously known as Vertex AI).
+     *        `types.UploadToFileSearchStoreParameters` interface.
+     *         @see {@link types.UploadToFileSearchStoreParameters#config} for the optional
+     * @throws An error if called on a Gemini Enterprise Agent Platform (previously known as Vertex AI) client.
+     * The following code uploads a file to a given file search store.
+     * const operation = await ai.fileSearchStores.upload({fileSearchStoreName: 'fileSearchStores/foo-bar', file: 'file.txt', config: {
+    async uploadToFileSearchStore(params) {
+            throw new Error('Gemini Enterprise Agent Platform (previously known as Vertex AI) does not support uploading files to a file search store.');
+        return this.apiClient.uploadFileToFileSearchStore(params.fileSearchStoreName, params.file, params.config);
+        parsedUri.searchParams.forEach((value, key) => {
+     * Creates a File Search Store.
+     * @param params - The parameters for creating a File Search Store.
+     * @return FileSearchStore.
+            const body = createFileSearchStoreParametersToMldev(this.apiClient, params);
+            path = formatMap('fileSearchStores', body['_url']);
+     * Gets a File Search Store.
+     * @param params - The parameters for getting a File Search Store.
+     * @return FileSearchStore.
+            const body = getFileSearchStoreParametersToMldev(params);
+     * Deletes a File Search Store.
+     * @param params - The parameters for deleting a File Search Store.
+            const body = deleteFileSearchStoreParametersToMldev(params);
+            const body = listFileSearchStoresParametersToMldev(params);
+            path = formatMap('fileSearchStores', body['_url']);
+                const resp = listFileSearchStoresResponseFromMldev(apiResponse);
+                const typedResp = new ListFileSearchStoresResponse();
+    async uploadToFileSearchStoreInternal(params) {
+            const body = uploadToFileSearchStoreParametersToMldev(params);
+            path = formatMap('upload/v1beta/{file_search_store_name}:uploadToFileSearchStore', body['_url']);
+                const resp = uploadToFileSearchStoreResumableResponseFromMldev(apiResponse);
+                const typedResp = new UploadToFileSearchStoreResumableResponse();
+     * Imports a File from File Service to a FileSearchStore.
+     * @param params - The parameters for importing a file to a file search store.
+            path = formatMap('{file_search_store_name}:importFile', body['_url']);
+    const googleGenAIAuthHook = new GoogleGenAIAuthHook();
+            if (!reqURL.search && baseURL.search) {
+                reqURL.search = baseURL.search;
+        ].reduce(mergeQuery, reqURL.search.slice(1));
+            reqURL.search = `?${finalQuery}`;
+        let searchStart = 0;
+                        const match = findBoundary(buffer, bufferLen, searchStart);
+                            searchStart = Math.max(0, bufferLen - MAX_BOUNDARY_LEN + 1);
+                        searchStart = 0;
+                    error: new GoogleGenAiDefaultError("Unexpected Status or Content-Type", {
+                    error: new GoogleGenAiDefaultError("API error occurred", {
+    const sdk = new GoogleGenAI$1(Object.assign(Object.assign({}, options), { api_version: (_a = options.api_version) !== null && _a !== void 0 ? _a : getGoogleGenAIAPIVersion(parentClient), security: (_b = options.security) !== null && _b !== void 0 ? _b : new GoogleGenAISecurityProvider({
+        throw new Error('languageCodes parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('apiKeyConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('authType parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('googleServiceAccountConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('httpBasicAuthConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('oauthConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('oidcConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('displayName parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('id parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('disabledSafetyPolicies parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('id parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('displayName parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('partialArgs parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('willContinue parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('enableEnhancedCivicAnswers parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+function googleSearchToMldev$2(fromObject) {
+    const fromSearchTypes = getValueByPath(fromObject, ['searchTypes']);
+    if (fromSearchTypes != null) {
+        setValueByPath(toObject, ['searchTypes'], fromSearchTypes);
+        throw new Error('blockingConfidence parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('excludeDomains parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    const fromSystemInstruction = getValueByPath(fromObject, [
+        'systemInstruction',
+    if (parentObject !== undefined && fromSystemInstruction != null) {
+        setValueByPath(parentObject, ['setup', 'systemInstruction'], contentToMldev$2(tContent(fromSystemInstruction)));
+        throw new Error('explicitVadSignal parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    const fromSystemInstruction = getValueByPath(fromObject, [
+        'systemInstruction',
+    if (parentObject !== undefined && fromSystemInstruction != null) {
+        setValueByPath(parentObject, ['setup', 'systemInstruction'], contentToVertex$2(tContent(fromSystemInstruction)));
+        throw new Error('translationConfig parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('name parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('streamableHttpTransport parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('toolCall parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('toolResponse parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('partMetadata parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('method parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('transparent parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('retrieval parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    const fromFileSearch = getValueByPath(fromObject, ['fileSearch']);
+    if (fromFileSearch != null) {
+        setValueByPath(toObject, ['fileSearch'], fromFileSearch);
+    const fromGoogleSearch = getValueByPath(fromObject, ['googleSearch']);
+    if (fromGoogleSearch != null) {
+        setValueByPath(toObject, ['googleSearch'], googleSearchToMldev$2(fromGoogleSearch));
+    if (getValueByPath(fromObject, ['enterpriseWebSearch']) !== undefined) {
+        throw new Error('enterpriseWebSearch parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    const fromFunctionDeclarations = getValueByPath(fromObject, [
+        'functionDeclarations',
+    if (fromFunctionDeclarations != null) {
+        let transformedList = fromFunctionDeclarations;
+        setValueByPath(toObject, ['functionDeclarations'], transformedList);
+    const fromGoogleSearchRetrieval = getValueByPath(fromObject, [
+        'googleSearchRetrieval',
+    if (fromGoogleSearchRetrieval != null) {
+        setValueByPath(toObject, ['googleSearchRetrieval'], fromGoogleSearchRetrieval);
+    if (getValueByPath(fromObject, ['parallelAiSearch']) !== undefined) {
+        throw new Error('parallelAiSearch parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    if (getValueByPath(fromObject, ['fileSearch']) !== undefined) {
+        throw new Error('fileSearch parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+    const fromGoogleSearch = getValueByPath(fromObject, ['googleSearch']);
+    if (fromGoogleSearch != null) {
+        setValueByPath(toObject, ['googleSearch'], fromGoogleSearch);
+    const fromEnterpriseWebSearch = getValueByPath(fromObject, [
+        'enterpriseWebSearch',
+    if (fromEnterpriseWebSearch != null) {
+        setValueByPath(toObject, ['enterpriseWebSearch'], fromEnterpriseWebSearch);
+    const fromFunctionDeclarations = getValueByPath(fromObject, [
+        'functionDeclarations',
+    if (fromFunctionDeclarations != null) {
+        let transformedList = fromFunctionDeclarations;
+        setValueByPath(toObject, ['functionDeclarations'], transformedList);
+    const fromGoogleSearchRetrieval = getValueByPath(fromObject, [
+        'googleSearchRetrieval',
+    if (fromGoogleSearchRetrieval != null) {
+        setValueByPath(toObject, ['googleSearchRetrieval'], fromGoogleSearchRetrieval);
+    const fromParallelAiSearch = getValueByPath(fromObject, [
+        'parallelAiSearch',
+    if (fromParallelAiSearch != null) {
+        setValueByPath(toObject, ['parallelAiSearch'], fromParallelAiSearch);
+        throw new Error('apiKeyConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('authType parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('googleServiceAccountConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('httpBasicAuthConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('oauthConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('oidcConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('displayName parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('id parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('disabledSafetyPolicies parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+    if (getValueByPath(fromObject, ['systemInstruction']) !== undefined) {
+        throw new Error('systemInstruction parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('tools parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('generationConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    const fromSystemInstruction = getValueByPath(fromObject, [
+        'systemInstruction',
+    if (parentObject !== undefined && fromSystemInstruction != null) {
+        setValueByPath(parentObject, ['systemInstruction'], contentToVertex$1(tContent(fromSystemInstruction)));
+        throw new Error('mimeType parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('autoTruncate parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('documentOcr parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('audioTrackExtraction parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('id parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('displayName parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('partialArgs parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('willContinue parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('streamFunctionCallArguments parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    const fromSystemInstruction = getValueByPath(fromObject, [
+        'systemInstruction',
+    if (parentObject !== undefined && fromSystemInstruction != null) {
+        setValueByPath(parentObject, ['systemInstruction'], contentToMldev$1(tContent(fromSystemInstruction)));
+        throw new Error('routingConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('modelSelectionConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('labels parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('audioTimestamp parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('modelArmorConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    const fromSystemInstruction = getValueByPath(fromObject, [
+        'systemInstruction',
+    if (parentObject !== undefined && fromSystemInstruction != null) {
+        setValueByPath(parentObject, ['systemInstruction'], contentToVertex$1(tContent(fromSystemInstruction)));
+        throw new Error('enableEnhancedCivicAnswers parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('outputGcsUri parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('negativePrompt parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('seed parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('addWatermark parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('labels parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('enhancePrompt parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('outputGcsUri parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('fps parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('seed parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('pubsubTopic parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('generateAudio parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('mask parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('compressionQuality parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('labels parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('resizeMode parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('webhookConfig parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('enableEnhancedCivicAnswers parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+function googleSearchToMldev$1(fromObject, _rootObject) {
+    const fromSearchTypes = getValueByPath(fromObject, ['searchTypes']);
+    if (fromSearchTypes != null) {
+        setValueByPath(toObject, ['searchTypes'], fromSearchTypes);
+        throw new Error('blockingConfidence parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('excludeDomains parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('personGeneration parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('prominentPeople parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('outputMimeType parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('outputCompressionQuality parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('imageOutputOptions parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('gcsUri parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('name parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('streamableHttpTransport parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('toolCall parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('toolResponse parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('partMetadata parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('method parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('includeServerSideToolInvocations parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('retrieval parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    const fromFileSearch = getValueByPath(fromObject, ['fileSearch']);
+    if (fromFileSearch != null) {
+        setValueByPath(toObject, ['fileSearch'], fromFileSearch);
+    const fromGoogleSearch = getValueByPath(fromObject, ['googleSearch']);
+    if (fromGoogleSearch != null) {
+        setValueByPath(toObject, ['googleSearch'], googleSearchToMldev$1(fromGoogleSearch));
+    if (getValueByPath(fromObject, ['enterpriseWebSearch']) !== undefined) {
+        throw new Error('enterpriseWebSearch parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    const fromFunctionDeclarations = getValueByPath(fromObject, [
+        'functionDeclarations',
+    if (fromFunctionDeclarations != null) {
+        let transformedList = fromFunctionDeclarations;
+        setValueByPath(toObject, ['functionDeclarations'], transformedList);
+    const fromGoogleSearchRetrieval = getValueByPath(fromObject, [
+        'googleSearchRetrieval',
+    if (fromGoogleSearchRetrieval != null) {
+        setValueByPath(toObject, ['googleSearchRetrieval'], fromGoogleSearchRetrieval);
+    if (getValueByPath(fromObject, ['parallelAiSearch']) !== undefined) {
+        throw new Error('parallelAiSearch parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    if (getValueByPath(fromObject, ['fileSearch']) !== undefined) {
+        throw new Error('fileSearch parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+    const fromGoogleSearch = getValueByPath(fromObject, ['googleSearch']);
+    if (fromGoogleSearch != null) {
+        setValueByPath(toObject, ['googleSearch'], fromGoogleSearch);
+    const fromEnterpriseWebSearch = getValueByPath(fromObject, [
+        'enterpriseWebSearch',
+    if (fromEnterpriseWebSearch != null) {
+        setValueByPath(toObject, ['enterpriseWebSearch'], fromEnterpriseWebSearch);
+    const fromFunctionDeclarations = getValueByPath(fromObject, [
+        'functionDeclarations',
+    if (fromFunctionDeclarations != null) {
+        let transformedList = fromFunctionDeclarations;
+        setValueByPath(toObject, ['functionDeclarations'], transformedList);
+    const fromGoogleSearchRetrieval = getValueByPath(fromObject, [
+        'googleSearchRetrieval',
+    if (fromGoogleSearchRetrieval != null) {
+        setValueByPath(toObject, ['googleSearchRetrieval'], fromGoogleSearchRetrieval);
+    const fromParallelAiSearch = getValueByPath(fromObject, [
+        'parallelAiSearch',
+    if (fromParallelAiSearch != null) {
+        setValueByPath(toObject, ['parallelAiSearch'], fromParallelAiSearch);
+                    console.warn("Warning: The SDK's ephemeral token support is in v1alpha only. Please use const ai = new GoogleGenAI({apiKey: token.name, httpOptions: { apiVersion: 'v1alpha' }}); before session connection.");
+        if (geminiTool.functionDeclarations &&
+            geminiTool.functionDeclarations.length > 0) {
+         * For the `model` parameter, supported formats for Gemini Enterprise Agent Platform API include:
+                throw new Error(`Automatic function calling with CallableTools (or MCP objects) and basic FunctionDeclarations is not yet supported. Incompatible tools found at ${formattedIndexes}.`);
+         * For the `model` parameter, supported formats for Gemini Enterprise Agent Platform API include:
+                throw new Error(`Incompatible tools found at ${formattedIndexes}. Automatic function calling with CallableTools (or MCP objects) and basic FunctionDeclarations" is not yet supported.`);
+                        throw new Error('Filtering tuned models list is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+         * Only supported in Gemini Enterprise Agent Platform currently.
+            config: Object.assign(Object.assign({}, params.config), { tools: transformedTools }),
+                for (const declaration of (_c = toolDeclaration.functionDeclarations) !== null && _c !== void 0 ? _c : []) {
+                                            throw new Error(`Automatic function calling was requested, but not all the tools the model used implement the CallableTool interface. Available tools: ${afcTools.keys()}, missing tool: ${part.functionCall.name}`);
+            throw new Error('This method is only supported by the Gemini Enterprise Agent Platform (previously known as Vertex AI).');
+            throw new Error('This method is only supported by the Gemini Enterprise Agent Platform (previously known as Vertex AI).');
+            throw new Error('This method is only supported by the Gemini Enterprise Agent Platform (previously known as Vertex AI).');
+            throw new Error('This method is only supported by the Gemini Enterprise Agent Platform (previously known as Vertex AI).');
+            throw new Error('This method is only supported by the Gemini Enterprise Agent Platform (previously known as Vertex AI).');
+            throw new Error('This method is only supported by the Gemini Enterprise Agent Platform (previously known as Vertex AI).');
+        throw new Error('languageCodes parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('apiKeyConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('authType parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('googleServiceAccountConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('httpBasicAuthConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('oauthConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('oidcConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('displayName parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('displayName parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('partialArgs parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('willContinue parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+function googleSearchToMldev(fromObject) {
+    const fromSearchTypes = getValueByPath(fromObject, ['searchTypes']);
+    if (fromSearchTypes != null) {
+        setValueByPath(toObject, ['searchTypes'], fromSearchTypes);
+        throw new Error('blockingConfidence parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('excludeDomains parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    const fromSystemInstruction = getValueByPath(fromObject, [
+        'systemInstruction',
+    if (parentObject !== undefined && fromSystemInstruction != null) {
+        setValueByPath(parentObject, ['setup', 'systemInstruction'], contentToMldev(tContent(fromSystemInstruction)));
+        throw new Error('explicitVadSignal parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('method parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('transparent parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('retrieval parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    const fromFileSearch = getValueByPath(fromObject, ['fileSearch']);
+    if (fromFileSearch != null) {
+        setValueByPath(toObject, ['fileSearch'], fromFileSearch);
+    const fromGoogleSearch = getValueByPath(fromObject, ['googleSearch']);
+    if (fromGoogleSearch != null) {
+        setValueByPath(toObject, ['googleSearch'], googleSearchToMldev(fromGoogleSearch));
+    if (getValueByPath(fromObject, ['enterpriseWebSearch']) !== undefined) {
+        throw new Error('enterpriseWebSearch parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+    const fromFunctionDeclarations = getValueByPath(fromObject, [
+        'functionDeclarations',
+    if (fromFunctionDeclarations != null) {
+        let transformedList = fromFunctionDeclarations;
+        setValueByPath(toObject, ['functionDeclarations'], transformedList);
+    const fromGoogleSearchRetrieval = getValueByPath(fromObject, [
+        'googleSearchRetrieval',
+    if (fromGoogleSearchRetrieval != null) {
+        setValueByPath(toObject, ['googleSearchRetrieval'], fromGoogleSearchRetrieval);
+    if (getValueByPath(fromObject, ['parallelAiSearch']) !== undefined) {
+        throw new Error('parallelAiSearch parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+     * const ai = new GoogleGenAI({
+     *           'systemInstruction': 'Always answer in English.',
+     * // responseModalities, systemInstruction, temperature in this example) when
+     *           'systemInstruction': 'Always answer in English.',
+     * // responseModalities, systemInstruction in this example) when using the
+     *           'systemInstruction': 'Always answer in English.',
+        throw new Error('id parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('validationDataset parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('description parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('exportLastCheckpointOnly parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('preTunedModelCheckpointId parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('adapterSize parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('tuningMode parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('customBaseModel parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('labels parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('beta parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('baseTeacherModel parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('tunedTeacherModelSource parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('sftLossWeightMultiplier parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('outputUri parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('encryptionSpec parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('rewardConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('compositeRewardConfig parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('samplesPerPrompt parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('evaluateInterval parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('checkpointInterval parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('maxOutputTokens parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('thinkingLevel parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('validationDatasetUri parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('id parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('toolCall parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('toolResponse parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+        throw new Error('partMetadata parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+    const fromSystemInstruction = getValueByPath(fromObject, [
+        'systemInstruction',
+    if (fromSystemInstruction != null) {
+        setValueByPath(toObject, ['systemInstruction'], contentToVertex(fromSystemInstruction));
+        throw new Error('gcsUri parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('vertexDatasetResource parameter is only supported in Gemini Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+        throw new Error('examples parameter is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode.');
+            throw new Error('This method is only supported by the Gemini Enterprise Agent Platform (previously known as Vertex AI).');
+            throw new Error('This method is only supported by the Gemini Enterprise Agent Platform (previously known as Vertex AI).');
+            throw new Error('This method is only supported by the Gemini Enterprise Agent Platform (previously known as Vertex AI).');
+ * const ai = new GoogleGenAI({apiKey: 'GEMINI_API_KEY'});
+ * const ai = new GoogleGenAI({
+        if (options.enterprise !== undefined &&
+            options.enterprise !== options.vertexai) {
+            throw new Error('enterprise and vertexAI flags have conflicting values, please set enterprise value only.');
+        this.vertexai = (_b = (_a = options.enterprise) !== null && _a !== void 0 ? _a : options.vertexai) !== null && _b !== void 0 ? _b : false;
+        this.fileSearchStores = new FileSearchStores(this.apiClient);
+export { ActivityHandling, AdapterSize, AggregationMetric, ApiError, ApiSpec, AuthType, Batches, Behavior, BlockedReason, Caches, CancelTuningJobResponse, Chat, Chats, ComputeTokensResponse, ContentReferenceImage, ControlReferenceImage, ControlReferenceType, CountTokensResponse, CreateFileResponse, DeleteCachedContentResponse, DeleteFileResponse, DeleteModelResponse, DocumentState, DynamicRetrievalConfigMode, EditImageResponse, EditMode, EmbedContentResponse, EmbeddingApiType, EndSensitivity, Environment, EvaluateDatasetResponse, FeatureSelectionPreference, FileSource, FileState, Files, FinishReason, FunctionCallingConfigMode, FunctionResponse, FunctionResponseBlob, FunctionResponseFileData, FunctionResponsePart, FunctionResponseScheduling, GenerateContentResponse, GenerateContentResponsePromptFeedback, GenerateContentResponseUsageMetadata, GenerateImagesResponse, GenerateVideosOperation, GenerateVideosResponse, GoogleGenAI, HarmBlockMethod, HarmBlockThreshold, HarmCategory, HarmProbability, HarmSeverity, HttpElementLocation, HttpResponse, ImagePromptLanguage, ImageResizeMode, ImportFileOperation, ImportFileResponse, InlinedEmbedContentResponse, InlinedResponse, JobState, Language, ListBatchJobsResponse, ListCachedContentsResponse, ListDocumentsResponse, ListFileSearchStoresResponse, ListFilesResponse, ListModelsResponse, ListTuningJobsResponse, Live, LiveClientToolResponse, LiveMusicPlaybackControl, LiveMusicServerMessage, LiveSendToolResponseParameters, LiveServerMessage, MaskReferenceImage, MaskReferenceMode, MatchOperation, MediaModality, MediaResolution, Modality, ModelStage, Models, MusicGenerationMode, Operations, Outcome, PagedItem, Pager, PairwiseChoice, PartMediaResolutionLevel, PersonGeneration, PhishBlockThreshold, ProminentPeople, RawReferenceImage, RecontextImageResponse, RegisterFilesResponse, ReinforcementTuningAutoraterScorerParsedResponseConversionScorer, ReinforcementTuningParseResponseConfig, ReinforcementTuningThinkingLevel, ReplayResponse, ResourceScope, ResponseParseType, SafetyFilterLevel, SafetyPolicy, Scale, SegmentImageResponse, SegmentMode, ServiceTier, Session, SingleEmbedContentResponse, StartSensitivity, StyleReferenceImage, SubjectReferenceImage, SubjectReferenceType, ThinkingLevel, Tokens, ToolResponse, ToolType, TrafficType, TuningJobState, TuningMethod, TuningMode, TuningSpeed, TuningTask, TurnCompleteReason, TurnCoverage, Type, UploadToFileSearchStoreOperation, UploadToFileSearchStoreResponse, UploadToFileSearchStoreResumableResponse, UpscaleImageResponse, UrlRetrievalStatus, VadSignalType, ValidateRewardResponse, VideoCompressionQuality, VideoGenerationMaskMode, VideoGenerationReferenceType, VideoOrientation, VoiceActivityType, createFunctionResponsePartFromBase64, createFunctionResponsePartFromUri, createModelContent, createPartFromBase64, createPartFromCodeExecutionResult, createPartFromExecutableCode, createPartFromFunctionCall, createPartFromFunctionResponse, createPartFromText, createPartFromUri, createUserContent, mcpToTool, setDefaultBaseUrls };
+--- runtime require ---
+
+function

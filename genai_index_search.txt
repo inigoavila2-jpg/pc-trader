@@ -1,0 +1,2704 @@
+﻿
+node_modules\@google\genai\dist\index.mjs:11: * @remarks This function should 
+be called before initializing the SDK. If the
+node_modules\@google\genai\dist\index.mjs:18: * import {GoogleGenAI, 
+setDefaultBaseUrls} from '@google/genai';
+node_modules\@google\genai\dist\index.mjs:23: * setDefaultBaseUrls({vertexUrl: 
+'https://vertexai.googleapis.com'});
+node_modules\@google\genai\dist\index.mjs:25: * const ai = new 
+GoogleGenAI({apiKey: 'GEMINI_API_KEY'});
+node_modules\@google\genai\dist\index.mjs:28:function 
+setDefaultBaseUrls(baseUrlParams) {
+node_modules\@google\genai\dist\index.mjs:38:class BaseModule {
+node_modules\@google\genai\dist\index.mjs:40:function 
+formatMap(templateString, valueMap) {
+node_modules\@google\genai\dist\index.mjs:56:function setValueByPath(data, 
+keys, value) {
+node_modules\@google\genai\dist\index.mjs:132:function getValueByPath(data, 
+keys, defaultValue = undefined) {
+node_modules\@google\genai\dist\index.mjs:178:function moveValueByPath(data, 
+paths) {
+node_modules\@google\genai\dist\index.mjs:208:function 
+_moveValueRecursive(data, sourceKeys, destKeys, keyIdx, excludeKeys) {
+node_modules\@google\genai\dist\index.mjs:266:function tBytes$1(fromBytes) {
+node_modules\@google\genai\dist\index.mjs:280:function 
+fetchPredictOperationParametersToVertex(fromObject) {
+node_modules\@google\genai\dist\index.mjs:294:function 
+generateVideosOperationFromMldev$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:321:function 
+generateVideosOperationFromVertex$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:345:function 
+generateVideosResponseFromMldev$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:373:function 
+generateVideosResponseFromVertex$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:399:function 
+generatedVideoFromMldev$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:407:function 
+generatedVideoFromVertex$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:415:function 
+getOperationParametersToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:425:function 
+getOperationParametersToVertex(fromObject) {
+node_modules\@google\genai\dist\index.mjs:435:function 
+importFileOperationFromMldev$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:459:function 
+importFileResponseFromMldev$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:477:function 
+uploadToFileSearchStoreOperationFromMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:501:function 
+uploadToFileSearchStoreResponseFromMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:519:function 
+videoFromMldev$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:535:function 
+videoFromVertex$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:561:(function (Outcome) {
+node_modules\@google\genai\dist\index.mjs:581:(function (Language) {
+node_modules\@google\genai\dist\index.mjs:591:/** Specifies how the response 
+should be scheduled in the conversation. Only applicable to NON_BLOCKING 
+function calls, is ignored otherwise. Defaults to WHEN_IDLE. */
+node_modules\@google\genai\dist\index.mjs:592:var FunctionResponseScheduling;
+node_modules\@google\genai\dist\index.mjs:593:(function 
+(FunctionResponseScheduling) {
+node_modules\@google\genai\dist\index.mjs:597:    
+FunctionResponseScheduling["SCHEDULING_UNSPECIFIED"] = 
+"SCHEDULING_UNSPECIFIED";
+node_modules\@google\genai\dist\index.mjs:601:    
+FunctionResponseScheduling["SILENT"] = "SILENT";
+node_modules\@google\genai\dist\index.mjs:605:    
+FunctionResponseScheduling["WHEN_IDLE"] = "WHEN_IDLE";
+node_modules\@google\genai\dist\index.mjs:609:    
+FunctionResponseScheduling["INTERRUPT"] = "INTERRUPT";
+node_modules\@google\genai\dist\index.mjs:610:})(FunctionResponseScheduling || 
+(FunctionResponseScheduling = {}));
+node_modules\@google\genai\dist\index.mjs:613:(function (Type) {
+node_modules\@google\genai\dist\index.mjs:649:(function (AuthType) {
+node_modules\@google\genai\dist\index.mjs:678:(function (HttpElementLocation) {
+node_modules\@google\genai\dist\index.mjs:703:(function (ApiSpec) {
+node_modules\@google\genai\dist\index.mjs:719:(function (Environment) {
+node_modules\@google\genai\dist\index.mjs:739:(function (SafetyPolicy) {
+node_modules\@google\genai\dist\index.mjs:775:(function (PhishBlockThreshold) {
+node_modules\@google\genai\dist\index.mjs:805:/** Specifies the function 
+Behavior. Currently only non-blocking functions are supported. If not 
+specified, the system keeps the current function call behavior. This field is 
+currently only supported by the BidiGenerateContent method. */
+node_modules\@google\genai\dist\index.mjs:807:(function (Behavior) {
+node_modules\@google\genai\dist\index.mjs:813:     * If set, the system will 
+wait to receive the function response before continuing the conversation.
+node_modules\@google\genai\dist\index.mjs:817:     * If set, the system will 
+not wait to receive the function response. Instead, it will attempt to handle 
+function responses as they become available while maintaining the conversation 
+between the user and the model.
+node_modules\@google\genai\dist\index.mjs:823:(function 
+(DynamicRetrievalConfigMode) {
+node_modules\@google\genai\dist\index.mjs:835:(function (ThinkingLevel) {
+node_modules\@google\genai\dist\index.mjs:859:(function (PersonGeneration) {
+node_modules\@google\genai\dist\index.mjs:875:(function (ProminentPeople) {
+node_modules\@google\genai\dist\index.mjs:891:(function (HarmCategory) {
+node_modules\@google\genai\dist\index.mjs:939:(function (HarmBlockMethod) {
+node_modules\@google\genai\dist\index.mjs:955:(function (HarmBlockThreshold) {
+node_modules\@google\genai\dist\index.mjs:981:/** Function calling mode. */
+node_modules\@google\genai\dist\index.mjs:982:var FunctionCallingConfigMode;
+node_modules\@google\genai\dist\index.mjs:983:(function 
+(FunctionCallingConfigMode) {
+node_modules\@google\genai\dist\index.mjs:985:     * Unspecified function 
+calling mode. This value should not be used.
+node_modules\@google\genai\dist\index.mjs:987:    
+FunctionCallingConfigMode["MODE_UNSPECIFIED"] = "MODE_UNSPECIFIED";
+node_modules\@google\genai\dist\index.mjs:989:     * Default model behavior, 
+model decides to predict either function calls or natural language response.
+node_modules\@google\genai\dist\index.mjs:991:    
+FunctionCallingConfigMode["AUTO"] = "AUTO";
+node_modules\@google\genai\dist\index.mjs:993:     * Model is constrained to 
+always predicting function calls only. If "allowed_function_names" are set, 
+the predicted function calls will be limited to any one of 
+"allowed_function_names", else the predicted function calls will be any one of 
+the provided "function_declarations".
+node_modules\@google\genai\dist\index.mjs:995:    
+FunctionCallingConfigMode["ANY"] = "ANY";
+node_modules\@google\genai\dist\index.mjs:997:     * Model will not predict 
+any function calls. Model behavior is same as when not passing any function 
+declarations.
+node_modules\@google\genai\dist\index.mjs:999:    
+FunctionCallingConfigMode["NONE"] = "NONE";
+node_modules\@google\genai\dist\index.mjs:1001:     * Model is constrained to 
+predict either function calls or natural language response. If 
+"allowed_function_names" are set, the predicted function calls will be limited 
+to any one of "allowed_function_names", else the predicted function calls will 
+be any one of the provided "function_declarations".
+node_modules\@google\genai\dist\index.mjs:1003:    
+FunctionCallingConfigMode["VALIDATED"] = "VALIDATED";
+node_modules\@google\genai\dist\index.mjs:1004:})(FunctionCallingConfigMode || 
+(FunctionCallingConfigMode = {}));
+node_modules\@google\genai\dist\index.mjs:1009:(function (FinishReason) {
+node_modules\@google\genai\dist\index.mjs:1051:     * The function call 
+generated by the model is invalid.
+node_modules\@google\genai\dist\index.mjs:1053:    
+FinishReason["MALFORMED_FUNCTION_CALL"] = "MALFORMED_FUNCTION_CALL";
+node_modules\@google\genai\dist\index.mjs:1081:(function (HarmProbability) {
+node_modules\@google\genai\dist\index.mjs:1105:(function (HarmSeverity) {
+node_modules\@google\genai\dist\index.mjs:1129:(function (UrlRetrievalStatus) {
+node_modules\@google\genai\dist\index.mjs:1143:     * Url retrieval is failed 
+because the content is behind paywall. This enum value is not supported in 
+Vertex AI.
+node_modules\@google\genai\dist\index.mjs:1147:     * Url retrieval is failed 
+because the content is unsafe. This enum value is not supported in Vertex AI.
+node_modules\@google\genai\dist\index.mjs:1153:(function (BlockedReason) {
+node_modules\@google\genai\dist\index.mjs:1189:(function (TrafficType) {
+node_modules\@google\genai\dist\index.mjs:1213:(function (MediaModality) {
+node_modules\@google\genai\dist\index.mjs:1239:/** The stage of the underlying 
+model. This enum is not supported in Vertex AI. */
+node_modules\@google\genai\dist\index.mjs:1241:(function (ModelStage) {
+node_modules\@google\genai\dist\index.mjs:1277:(function (MediaResolution) {
+node_modules\@google\genai\dist\index.mjs:1297:(function (Modality) {
+node_modules\@google\genai\dist\index.mjs:1321:(function (TuningMode) {
+node_modules\@google\genai\dist\index.mjs:1337:(function (AdapterSize) {
+node_modules\@google\genai\dist\index.mjs:1369:(function (JobState) {
+node_modules\@google\genai\dist\index.mjs:1421:(function (TuningJobState) {
+node_modules\@google\genai\dist\index.mjs:1449:(function (AggregationMetric) {
+node_modules\@google\genai\dist\index.mjs:1497:(function (PairwiseChoice) {
+node_modules\@google\genai\dist\index.mjs:1517:(function (TuningSpeed) {
+node_modules\@google\genai\dist\index.mjs:1533:(function (TuningTask) {
+node_modules\@google\genai\dist\index.mjs:1553:(function (VideoOrientation) {
+node_modules\@google\genai\dist\index.mjs:1567:/** Output only. Current state 
+of the `Document`. This enum is not supported in Vertex AI. */
+node_modules\@google\genai\dist\index.mjs:1569:(function (DocumentState) {
+node_modules\@google\genai\dist\index.mjs:1589:(function (ServiceTier) {
+node_modules\@google\genai\dist\index.mjs:1609:(function 
+(PartMediaResolutionLevel) {
+node_modules\@google\genai\dist\index.mjs:1631:/** The type of tool in the 
+function call. */
+node_modules\@google\genai\dist\index.mjs:1633:(function (ToolType) {
+node_modules\@google\genai\dist\index.mjs:1661:(function (ResourceScope) {
+node_modules\@google\genai\dist\index.mjs:1673:(function 
+(FeatureSelectionPreference) {
+node_modules\@google\genai\dist\index.mjs:1681:(function (EmbeddingApiType) {
+node_modules\@google\genai\dist\index.mjs:1693:(function (SafetyFilterLevel) {
+node_modules\@google\genai\dist\index.mjs:1701:(function (ImagePromptLanguage) 
+{
+node_modules\@google\genai\dist\index.mjs:1737:(function (MaskReferenceMode) {
+node_modules\@google\genai\dist\index.mjs:1746:(function 
+(ControlReferenceType) {
+node_modules\@google\genai\dist\index.mjs:1754:(function 
+(SubjectReferenceType) {
+node_modules\@google\genai\dist\index.mjs:1762:(function (EditMode) {
+node_modules\@google\genai\dist\index.mjs:1774:(function (SegmentMode) {
+node_modules\@google\genai\dist\index.mjs:1783:(function 
+(VideoGenerationReferenceType) {
+node_modules\@google\genai\dist\index.mjs:1798:(function 
+(VideoGenerationMaskMode) {
+node_modules\@google\genai\dist\index.mjs:1825:(function 
+(VideoCompressionQuality) {
+node_modules\@google\genai\dist\index.mjs:1839:(function (ImageResizeMode) {
+node_modules\@google\genai\dist\index.mjs:1853:(function (ResponseParseType) {
+node_modules\@google\genai\dist\index.mjs:1869:(function (MatchOperation) {
+node_modules\@google\genai\dist\index.mjs:1889:(function 
+(ReinforcementTuningThinkingLevel) {
+node_modules\@google\genai\dist\index.mjs:1905:(function (TuningMethod) {
+node_modules\@google\genai\dist\index.mjs:1925:(function (FileState) {
+node_modules\@google\genai\dist\index.mjs:1933:(function (FileSource) {
+node_modules\@google\genai\dist\index.mjs:1941:(function (TurnCompleteReason) {
+node_modules\@google\genai\dist\index.mjs:1947:     * The function call 
+generated by the model is invalid.
+node_modules\@google\genai\dist\index.mjs:1949:    
+TurnCompleteReason["MALFORMED_FUNCTION_CALL"] = "MALFORMED_FUNCTION_CALL";
+node_modules\@google\genai\dist\index.mjs:2057:(function (VadSignalType) {
+node_modules\@google\genai\dist\index.mjs:2073:(function (VoiceActivityType) {
+node_modules\@google\genai\dist\index.mjs:2089:(function (StartSensitivity) {
+node_modules\@google\genai\dist\index.mjs:2105:(function (EndSensitivity) {
+node_modules\@google\genai\dist\index.mjs:2121:(function (ActivityHandling) {
+node_modules\@google\genai\dist\index.mjs:2137:(function (TurnCoverage) {
+node_modules\@google\genai\dist\index.mjs:2157:(function (Scale) {
+node_modules\@google\genai\dist\index.mjs:2213:(function (MusicGenerationMode) 
+{
+node_modules\@google\genai\dist\index.mjs:2236:(function 
+(LiveMusicPlaybackControl) {
+node_modules\@google\genai\dist\index.mjs:2266:class ToolResponse {
+node_modules\@google\genai\dist\index.mjs:2268:/** Raw media bytes for 
+function response. Text should not be sent as raw bytes, use the 'text' field. 
+*/
+node_modules\@google\genai\dist\index.mjs:2269:class FunctionResponseBlob {
+node_modules\@google\genai\dist\index.mjs:2271:/** URI based data for function 
+response. This data type is not supported in Gemini API. */
+node_modules\@google\genai\dist\index.mjs:2272:class FunctionResponseFileData {
+node_modules\@google\genai\dist\index.mjs:2274:/** A datatype containing media 
+that is part of a `FunctionResponse` message. A `FunctionResponsePart` 
+consists of data which has an associated datatype. A `FunctionResponsePart` 
+can only contain one of the accepted types in `FunctionResponsePart.data`. A 
+`FunctionResponsePart` must have a fixed IANA MIME type identifying the type 
+and subtype of the media if the `inline_data` field is filled with raw bytes. 
+*/
+node_modules\@google\genai\dist\index.mjs:2275:class FunctionResponsePart {
+node_modules\@google\genai\dist\index.mjs:2278: * Creates a 
+`FunctionResponsePart` object from a `base64` encoded `string`.
+node_modules\@google\genai\dist\index.mjs:2280:function 
+createFunctionResponsePartFromBase64(data, mimeType) {
+node_modules\@google\genai\dist\index.mjs:2289: * Creates a 
+`FunctionResponsePart` object from a `URI` string.
+node_modules\@google\genai\dist\index.mjs:2291:function 
+createFunctionResponsePartFromUri(uri, mimeType) {
+node_modules\@google\genai\dist\index.mjs:2299:/** The result output from a 
+FunctionCall that contains a string representing the FunctionDeclaration.name 
+and a structured JSON object containing any output from the function is used 
+as context to the model. This should contain the result of a `FunctionCall` 
+made based on model prediction. */
+node_modules\@google\genai\dist\index.mjs:2300:class FunctionResponse {
+node_modules\@google\genai\dist\index.mjs:2305:function createPartFromUri(uri, 
+mimeType, mediaResolution) {
+node_modules\@google\genai\dist\index.mjs:2314:function 
+createPartFromText(text) {
+node_modules\@google\genai\dist\index.mjs:2320: * Creates a `Part` object from 
+a `FunctionCall` object.
+node_modules\@google\genai\dist\index.mjs:2322:function 
+createPartFromFunctionCall(name, args) {
+node_modules\@google\genai\dist\index.mjs:2324:        functionCall: {
+node_modules\@google\genai\dist\index.mjs:2331: * Creates a `Part` object from 
+a `FunctionResponse` object.
+node_modules\@google\genai\dist\index.mjs:2333:function 
+createPartFromFunctionResponse(id, name, response, parts = []) {
+node_modules\@google\genai\dist\index.mjs:2335:        functionResponse: 
+Object.assign({ id: id, name: name, response: response }, (parts.length > 0 && 
+{ parts })),
+node_modules\@google\genai\dist\index.mjs:2341:function 
+createPartFromBase64(data, mimeType, mediaResolution) {
+node_modules\@google\genai\dist\index.mjs:2350:function 
+createPartFromCodeExecutionResult(outcome, output) {
+node_modules\@google\genai\dist\index.mjs:2361:function 
+createPartFromExecutableCode(code, language) {
+node_modules\@google\genai\dist\index.mjs:2369:function _isPart(obj) {
+node_modules\@google\genai\dist\index.mjs:2373:            'functionCall' in 
+obj ||
+node_modules\@google\genai\dist\index.mjs:2374:            'functionResponse' 
+in obj ||
+node_modules\@google\genai\dist\index.mjs:2382:function _toParts(partOrString) 
+{
+node_modules\@google\genai\dist\index.mjs:2414:function 
+createUserContent(partOrString) {
+node_modules\@google\genai\dist\index.mjs:2423:function 
+createModelContent(partOrString) {
+node_modules\@google\genai\dist\index.mjs:2429:/** A wrapper class for the 
+http response. */
+node_modules\@google\genai\dist\index.mjs:2430:class HttpResponse {
+node_modules\@google\genai\dist\index.mjs:2446:class 
+GenerateContentResponsePromptFeedback {
+node_modules\@google\genai\dist\index.mjs:2449:class 
+GenerateContentResponseUsageMetadata {
+node_modules\@google\genai\dist\index.mjs:2452:class GenerateContentResponse {
+node_modules\@google\genai\dist\index.mjs:2466:     * const response = await 
+ai.models.generateContent({
+node_modules\@google\genai\dist\index.mjs:2546:     * Returns the function 
+calls from the first candidate in the response.
+node_modules\@google\genai\dist\index.mjs:2549:     * If there are multiple 
+candidates in the response, the function calls from
+node_modules\@google\genai\dist\index.mjs:2551:     * If there are no function 
+calls in the response, undefined will be returned.
+node_modules\@google\genai\dist\index.mjs:2555:     * const 
+controlLightFunctionDeclaration: FunctionDeclaration = {
+node_modules\@google\genai\dist\index.mjs:2574:     *  const response = await 
+ai.models.generateContent({
+node_modules\@google\genai\dist\index.mjs:2578:     *       tools: 
+[{functionDeclarations: [controlLightFunctionDeclaration]}],
+node_modules\@google\genai\dist\index.mjs:2580:     *         
+functionCallingConfig: {
+node_modules\@google\genai\dist\index.mjs:2581:     *           mode: 
+FunctionCallingConfigMode.ANY,
+node_modules\@google\genai\dist\index.mjs:2582:     *           
+allowedFunctionNames: ['controlLight'],
+node_modules\@google\genai\dist\index.mjs:2587:     *  
+console.debug(JSON.stringify(response.functionCalls));
+node_modules\@google\genai\dist\index.mjs:2590:    get functionCalls() {
+node_modules\@google\genai\dist\index.mjs:2596:            console.warn('there 
+are multiple candidates in the response, returning function calls from the 
+first one.');
+node_modules\@google\genai\dist\index.mjs:2598:        const functionCalls = 
+(_h = (_g = (_f = (_e = this.candidates) === null || _e === void 0 ? void 0 : 
+_e[0]) === null || _f === void 0 ? void 0 : _f.content) === null || _g === 
+void 0 ? void 0 : _g.parts) === null || _h === void 0 ? void 0 : 
+_h.filter((part) => part.functionCall).map((part) => 
+part.functionCall).filter((functionCall) => functionCall !== undefined);
+node_modules\@google\genai\dist\index.mjs:2599:        if ((functionCalls === 
+null || functionCalls === void 0 ? void 0 : functionCalls.length) === 0) {
+node_modules\@google\genai\dist\index.mjs:2602:        return functionCalls;
+node_modules\@google\genai\dist\index.mjs:2615:     * const response = await 
+ai.models.generateContent({
+node_modules\@google\genai\dist\index.mjs:2651:     * const response = await 
+ai.models.generateContent({
+node_modules\@google\genai\dist\index.mjs:2679:class EmbedContentResponse {
+node_modules\@google\genai\dist\index.mjs:2682:class GenerateImagesResponse {
+node_modules\@google\genai\dist\index.mjs:2685:class EditImageResponse {
+node_modules\@google\genai\dist\index.mjs:2687:class UpscaleImageResponse {
+node_modules\@google\genai\dist\index.mjs:2690:class RecontextImageResponse {
+node_modules\@google\genai\dist\index.mjs:2693:class SegmentImageResponse {
+node_modules\@google\genai\dist\index.mjs:2695:class ListModelsResponse {
+node_modules\@google\genai\dist\index.mjs:2697:class DeleteModelResponse {
+node_modules\@google\genai\dist\index.mjs:2700:class CountTokensResponse {
+node_modules\@google\genai\dist\index.mjs:2703:class ComputeTokensResponse {
+node_modules\@google\genai\dist\index.mjs:2706:class GenerateVideosResponse {
+node_modules\@google\genai\dist\index.mjs:2709:class GenerateVideosOperation {
+node_modules\@google\genai\dist\index.mjs:2728:class 
+ReinforcementTuningParseResponseConfig {
+node_modules\@google\genai\dist\index.mjs:2731:class 
+ReinforcementTuningAutoraterScorerParsedResponseConversionScorer {
+node_modules\@google\genai\dist\index.mjs:2734:class EvaluateDatasetResponse {
+node_modules\@google\genai\dist\index.mjs:2737:class ListTuningJobsResponse {
+node_modules\@google\genai\dist\index.mjs:2740:class CancelTuningJobResponse {
+node_modules\@google\genai\dist\index.mjs:2746:class ValidateRewardResponse {
+node_modules\@google\genai\dist\index.mjs:2749:class 
+DeleteCachedContentResponse {
+node_modules\@google\genai\dist\index.mjs:2751:class 
+ListCachedContentsResponse {
+node_modules\@google\genai\dist\index.mjs:2754:class ListDocumentsResponse {
+node_modules\@google\genai\dist\index.mjs:2757:class 
+ListFileSearchStoresResponse {
+node_modules\@google\genai\dist\index.mjs:2760:class 
+UploadToFileSearchStoreResumableResponse {
+node_modules\@google\genai\dist\index.mjs:2763:class ImportFileResponse {
+node_modules\@google\genai\dist\index.mjs:2766:class ImportFileOperation {
+node_modules\@google\genai\dist\index.mjs:2779:class ListFilesResponse {
+node_modules\@google\genai\dist\index.mjs:2782:class CreateFileResponse {
+node_modules\@google\genai\dist\index.mjs:2785:class DeleteFileResponse {
+node_modules\@google\genai\dist\index.mjs:2788:class RegisterFilesResponse {
+node_modules\@google\genai\dist\index.mjs:2791:class InlinedResponse {
+node_modules\@google\genai\dist\index.mjs:2794:class 
+SingleEmbedContentResponse {
+node_modules\@google\genai\dist\index.mjs:2797:class 
+InlinedEmbedContentResponse {
+node_modules\@google\genai\dist\index.mjs:2800:class ListBatchJobsResponse {
+node_modules\@google\genai\dist\index.mjs:2803:class ReplayResponse {
+node_modules\@google\genai\dist\index.mjs:2810:class RawReferenceImage {
+node_modules\@google\genai\dist\index.mjs:2830:class MaskReferenceImage {
+node_modules\@google\genai\dist\index.mjs:2851:class ControlReferenceImage {
+node_modules\@google\genai\dist\index.mjs:2870:class StyleReferenceImage {
+node_modules\@google\genai\dist\index.mjs:2889:class SubjectReferenceImage {
+node_modules\@google\genai\dist\index.mjs:2906:class ContentReferenceImage {
+node_modules\@google\genai\dist\index.mjs:2918:class LiveServerMessage {
+node_modules\@google\genai\dist\index.mjs:2983:Individual `FunctionResponse` 
+objects are matched to the respective
+node_modules\@google\genai\dist\index.mjs:2984:`FunctionCall` objects by the 
+`id` field.
+node_modules\@google\genai\dist\index.mjs:2986:Note that in the unary and 
+server-streaming GenerateContent APIs function
+node_modules\@google\genai\dist\index.mjs:2988:GenerateContent APIs function 
+calling happens over this dedicated set of
+node_modules\@google\genai\dist\index.mjs:2990:class LiveClientToolResponse {
+node_modules\@google\genai\dist\index.mjs:2993:class 
+LiveSendToolResponseParameters {
+node_modules\@google\genai\dist\index.mjs:2996:        this.functionResponses 
+= [];
+node_modules\@google\genai\dist\index.mjs:3000:class LiveMusicServerMessage {
+node_modules\@google\genai\dist\index.mjs:3017:class 
+UploadToFileSearchStoreResponse {
+node_modules\@google\genai\dist\index.mjs:3020:class 
+UploadToFileSearchStoreOperation {
+node_modules\@google\genai\dist\index.mjs:3038:function tModel(apiClient, 
+model) {
+node_modules\@google\genai\dist\index.mjs:3068:function 
+tCachesModel(apiClient, model) {
+node_modules\@google\genai\dist\index.mjs:3084:function tBlobs(blobs) {
+node_modules\@google\genai\dist\index.mjs:3092:function tBlob(blob) {
+node_modules\@google\genai\dist\index.mjs:3098:function tImageBlob(blob) {
+node_modules\@google\genai\dist\index.mjs:3106:function tAudioBlob(blob) {
+node_modules\@google\genai\dist\index.mjs:3114:function tPart(origin) {
+node_modules\@google\genai\dist\index.mjs:3126:function tParts(origin) {
+node_modules\@google\genai\dist\index.mjs:3137:function _isContent(origin) {
+node_modules\@google\genai\dist\index.mjs:3144:function 
+_isFunctionCallPart(origin) {
+node_modules\@google\genai\dist\index.mjs:3148:        'functionCall' in 
+origin);
+node_modules\@google\genai\dist\index.mjs:3150:function 
+_isFunctionResponsePart(origin) {
+node_modules\@google\genai\dist\index.mjs:3154:        'functionResponse' in 
+origin);
+node_modules\@google\genai\dist\index.mjs:3156:function tContent(origin) {
+node_modules\@google\genai\dist\index.mjs:3161:        // _isContent is a 
+utility function that checks if the
+node_modules\@google\genai\dist\index.mjs:3170:function 
+tContentsForEmbed(apiClient, origin) {
+node_modules\@google\genai\dist\index.mjs:3199:function tContents(origin) {
+node_modules\@google\genai\dist\index.mjs:3207:        if 
+(_isFunctionCallPart(origin) || _isFunctionResponsePart(origin)) {
+node_modules\@google\genai\dist\index.mjs:3208:            throw new Error('To 
+specify functionCall or functionResponse parts, please wrap them in a Content 
+object, specifying the role for them');
+node_modules\@google\genai\dist\index.mjs:3222:            // function that 
+checks if the item is a Content.
+node_modules\@google\genai\dist\index.mjs:3225:        else if 
+(_isFunctionCallPart(item) || _isFunctionResponsePart(item)) {
+node_modules\@google\genai\dist\index.mjs:3226:            throw new Error('To 
+specify functionCall or functionResponse parts, please wrap them, and any 
+other parts, in Content objects as appropriate, specifying the role for them');
+node_modules\@google\genai\dist\index.mjs:3244:function 
+flattenTypeArrayToAnyOf(typeList, resultingSchema) {
+node_modules\@google\genai\dist\index.mjs:3265:function 
+processJsonSchema(_jsonSchema) {
+node_modules\@google\genai\dist\index.mjs:3340:                // beginning of 
+this function.
+node_modules\@google\genai\dist\index.mjs:3383:// zodToJsonSchema, typebox, 
+zodToJsonSchema function can return JsonSchema7Type
+node_modules\@google\genai\dist\index.mjs:3391:function tSchema(schema) {
+node_modules\@google\genai\dist\index.mjs:3394:function 
+tSpeechConfig(speechConfig) {
+node_modules\@google\genai\dist\index.mjs:3411:function 
+tLiveSpeechConfig(speechConfig) {
+node_modules\@google\genai\dist\index.mjs:3417:function tTool(tool) {
+node_modules\@google\genai\dist\index.mjs:3418:    if 
+(tool.functionDeclarations) {
+node_modules\@google\genai\dist\index.mjs:3419:        for (const 
+functionDeclaration of tool.functionDeclarations) {
+node_modules\@google\genai\dist\index.mjs:3420:            if 
+(functionDeclaration.parameters) {
+node_modules\@google\genai\dist\index.mjs:3421:                if 
+(!Object.keys(functionDeclaration.parameters).includes('$schema')) {
+node_modules\@google\genai\dist\index.mjs:3422:                    
+functionDeclaration.parameters = 
+processJsonSchema(functionDeclaration.parameters);
+node_modules\@google\genai\dist\index.mjs:3425:                    if 
+(!functionDeclaration.parametersJsonSchema) {
+node_modules\@google\genai\dist\index.mjs:3426:                        
+functionDeclaration.parametersJsonSchema =
+node_modules\@google\genai\dist\index.mjs:3427:                            
+functionDeclaration.parameters;
+node_modules\@google\genai\dist\index.mjs:3428:                        delete 
+functionDeclaration.parameters;
+node_modules\@google\genai\dist\index.mjs:3432:            if 
+(functionDeclaration.response) {
+node_modules\@google\genai\dist\index.mjs:3433:                if 
+(!Object.keys(functionDeclaration.response).includes('$schema')) {
+node_modules\@google\genai\dist\index.mjs:3434:                    
+functionDeclaration.response = processJsonSchema(functionDeclaration.response);
+node_modules\@google\genai\dist\index.mjs:3437:                    if 
+(!functionDeclaration.responseJsonSchema) {
+node_modules\@google\genai\dist\index.mjs:3438:                        
+functionDeclaration.responseJsonSchema =
+node_modules\@google\genai\dist\index.mjs:3439:                            
+functionDeclaration.response;
+node_modules\@google\genai\dist\index.mjs:3440:                        delete 
+functionDeclaration.response;
+node_modules\@google\genai\dist\index.mjs:3448:function tTools(tools) {
+node_modules\@google\genai\dist\index.mjs:3514:function resourceName(client, 
+resourceName, resourcePrefix, splitsAfterPrefix = 1) {
+node_modules\@google\genai\dist\index.mjs:3539:function 
+tCachedContentName(apiClient, name) {
+node_modules\@google\genai\dist\index.mjs:3545:function 
+tTuningJobStatus(status) {
+node_modules\@google\genai\dist\index.mjs:3559:function tBytes(fromImageBytes) 
+{
+node_modules\@google\genai\dist\index.mjs:3562:function _isFile(origin) {
+node_modules\@google\genai\dist\index.mjs:3568:function 
+isGeneratedVideo(origin) {
+node_modules\@google\genai\dist\index.mjs:3574:function isVideo(origin) {
+node_modules\@google\genai\dist\index.mjs:3580:function tFileName(fromName) {
+node_modules\@google\genai\dist\index.mjs:3617:function tModelsUrl(apiClient, 
+baseModels) {
+node_modules\@google\genai\dist\index.mjs:3627:function 
+tExtractModels(response) {
+node_modules\@google\genai\dist\index.mjs:3635:function hasField(data, 
+fieldName) {
+node_modules\@google\genai\dist\index.mjs:3638:function 
+mcpToGeminiTool(mcpTool, config = {}) {
+node_modules\@google\genai\dist\index.mjs:3640:    const functionDeclaration = 
+{
+node_modules\@google\genai\dist\index.mjs:3646:        
+functionDeclaration['responseJsonSchema'] = mcpToolSchema['outputSchema'];
+node_modules\@google\genai\dist\index.mjs:3649:        
+functionDeclaration['behavior'] = config.behavior;
+node_modules\@google\genai\dist\index.mjs:3652:        functionDeclarations: [
+node_modules\@google\genai\dist\index.mjs:3653:            functionDeclaration,
+node_modules\@google\genai\dist\index.mjs:3659: * Converts a list of MCP tools 
+to a single Gemini tool with a list of function
+node_modules\@google\genai\dist\index.mjs:3662:function 
+mcpToolsToGeminiTool(mcpTools, config = {}) {
+node_modules\@google\genai\dist\index.mjs:3663:    const functionDeclarations 
+= [];
+node_modules\@google\genai\dist\index.mjs:3668:            throw new 
+Error(`Duplicate function name ${mcpToolName} found in MCP tools. Please 
+ensure function names are unique.`);
+node_modules\@google\genai\dist\index.mjs:3672:        if 
+(geminiTool.functionDeclarations) {
+node_modules\@google\genai\dist\index.mjs:3673:            
+functionDeclarations.push(...geminiTool.functionDeclarations);
+node_modules\@google\genai\dist\index.mjs:3676:    return { 
+functionDeclarations: functionDeclarations };
+node_modules\@google\genai\dist\index.mjs:3679:function 
+tBatchJobSource(client, src) {
+node_modules\@google\genai\dist\index.mjs:3708:            throw new 
+Error('InlinedRequest[] is not supported in Vertex AI.');
+node_modules\@google\genai\dist\index.mjs:3728:            throw new 
+Error('Exactly one of `gcsUri`, `bigqueryUri`, or `vertexDatasetName` must be 
+set for Vertex AI.');
+node_modules\@google\genai\dist\index.mjs:3740:function 
+tBatchJobDestination(dest) {
+node_modules\@google\genai\dist\index.mjs:3761:function 
+tRecvBatchJobDestination(dest) {
+node_modules\@google\genai\dist\index.mjs:3807:function 
+tBatchJobName(apiClient, name) {
+node_modules\@google\genai\dist\index.mjs:3829:function tJobState(state) {
+node_modules\@google\genai\dist\index.mjs:3856:function 
+tIsVertexEmbedContentModel(model) {
+node_modules\@google\genai\dist\index.mjs:3866:function 
+authConfigToMldev$4(fromObject) {
+node_modules\@google\genai\dist\index.mjs:3893:function 
+batchJobDestinationFromMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:3927:function 
+batchJobDestinationFromVertex(fromObject) {
+node_modules\@google\genai\dist\index.mjs:3955:function 
+batchJobDestinationToVertex(fromObject) {
+node_modules\@google\genai\dist\index.mjs:3987:function 
+batchJobFromMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4035:function 
+batchJobFromVertex(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4093:function 
+batchJobSourceFromVertex(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4119:function 
+batchJobSourceToMldev(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:4151:function 
+batchJobSourceToVertex(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4179:function 
+blobToMldev$4(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4194:function 
+cancelBatchJobParametersToMldev(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:4202:function 
+cancelBatchJobParametersToVertex(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:4210:function 
+candidateFromMldev$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4270:function 
+citationMetadataFromMldev$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4284:function 
+contentToMldev$4(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4302:function 
+createBatchJobConfigToMldev(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:4319:function 
+createBatchJobConfigToVertex(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:4334:function 
+createBatchJobParametersToMldev(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:4350:function 
+createBatchJobParametersToVertex(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:4366:function 
+createEmbeddingsBatchJobConfigToMldev(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:4374:function 
+createEmbeddingsBatchJobParametersToMldev(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:4390:function 
+deleteBatchJobParametersToMldev(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:4398:function 
+deleteBatchJobParametersToVertex(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:4406:function 
+deleteResourceJobFromMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4428:function 
+deleteResourceJobFromVertex(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4450:function 
+embedContentBatchToMldev(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:4469:function 
+embedContentConfigToMldev$1(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:4499:function 
+embeddingsBatchJobSourceToMldev(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:4513:function 
+fileDataToMldev$4(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4528:function 
+functionCallToMldev$4(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4550:function 
+functionCallingConfigToMldev$2(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4552:    const 
+fromAllowedFunctionNames = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:4553:        'allowedFunctionNames',
+node_modules\@google\genai\dist\index.mjs:4555:    if 
+(fromAllowedFunctionNames != null) {
+node_modules\@google\genai\dist\index.mjs:4556:        
+setValueByPath(toObject, ['allowedFunctionNames'], fromAllowedFunctionNames);
+node_modules\@google\genai\dist\index.mjs:4562:    if 
+(getValueByPath(fromObject, ['streamFunctionCallArguments']) !==
+node_modules\@google\genai\dist\index.mjs:4564:        throw new 
+Error('streamFunctionCallArguments parameter is only supported in Gemini 
+Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+node_modules\@google\genai\dist\index.mjs:4568:function 
+generateContentConfigToMldev$1(apiClient, fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:4735:function 
+generateContentResponseFromMldev$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4779:function 
+getBatchJobParametersToMldev(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:4787:function 
+getBatchJobParametersToVertex(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:4795:function 
+googleMapsToMldev$4(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4807:function 
+googleSearchToMldev$4(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4827:function 
+imageConfigToMldev$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4855:function 
+inlinedRequestToMldev(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:4881:function 
+inlinedResponseFromMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4897:function 
+listBatchJobsConfigToMldev(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:4912:function 
+listBatchJobsConfigToVertex(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:4928:function 
+listBatchJobsParametersToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4936:function 
+listBatchJobsParametersToVertex(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4944:function 
+listBatchJobsResponseFromMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4970:function 
+listBatchJobsResponseFromVertex(fromObject) {
+node_modules\@google\genai\dist\index.mjs:4998:function 
+partToMldev$4(fromObject) {
+node_modules\@google\genai\dist\index.mjs:5022:    const fromFunctionCall = 
+getValueByPath(fromObject, ['functionCall']);
+node_modules\@google\genai\dist\index.mjs:5023:    if (fromFunctionCall != 
+null) {
+node_modules\@google\genai\dist\index.mjs:5024:        
+setValueByPath(toObject, ['functionCall'], 
+functionCallToMldev$4(fromFunctionCall));
+node_modules\@google\genai\dist\index.mjs:5026:    const fromFunctionResponse 
+= getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:5027:        'functionResponse',
+node_modules\@google\genai\dist\index.mjs:5029:    if (fromFunctionResponse != 
+null) {
+node_modules\@google\genai\dist\index.mjs:5030:        
+setValueByPath(toObject, ['functionResponse'], fromFunctionResponse);
+node_modules\@google\genai\dist\index.mjs:5070:function 
+safetySettingToMldev$3(fromObject) {
+node_modules\@google\genai\dist\index.mjs:5085:function 
+toolConfigToMldev$2(fromObject) {
+node_modules\@google\genai\dist\index.mjs:5093:    const 
+fromFunctionCallingConfig = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:5094:        'functionCallingConfig',
+node_modules\@google\genai\dist\index.mjs:5096:    if 
+(fromFunctionCallingConfig != null) {
+node_modules\@google\genai\dist\index.mjs:5097:        
+setValueByPath(toObject, ['functionCallingConfig'], 
+functionCallingConfigToMldev$2(fromFunctionCallingConfig));
+node_modules\@google\genai\dist\index.mjs:5105:function 
+toolToMldev$4(fromObject) {
+node_modules\@google\genai\dist\index.mjs:5135:    const 
+fromFunctionDeclarations = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:5136:        'functionDeclarations',
+node_modules\@google\genai\dist\index.mjs:5138:    if 
+(fromFunctionDeclarations != null) {
+node_modules\@google\genai\dist\index.mjs:5139:        let transformedList = 
+fromFunctionDeclarations;
+node_modules\@google\genai\dist\index.mjs:5145:        
+setValueByPath(toObject, ['functionDeclarations'], transformedList);
+node_modules\@google\genai\dist\index.mjs:5172:function 
+vertexMultimodalDatasetDestinationFromVertex(fromObject) {
+node_modules\@google\genai\dist\index.mjs:5187:function 
+vertexMultimodalDatasetDestinationToVertex(fromObject) {
+node_modules\@google\genai\dist\index.mjs:5208:(function (PagedItem) {
+node_modules\@google\genai\dist\index.mjs:5219: * Pager class for iterating 
+through paginated results.
+node_modules\@google\genai\dist\index.mjs:5221:class Pager {
+node_modules\@google\genai\dist\index.mjs:5319:     * const pager = await 
+ai.files.list({config: {pageSize: 10}});
+node_modules\@google\genai\dist\index.mjs:5353:     * const pager = await 
+ai.files.list({config: {pageSize: 10}});
+node_modules\@google\genai\dist\index.mjs:5391:class Batches extends 
+BaseModule {
+node_modules\@google\genai\dist\index.mjs:5403:         * const batchJobs = 
+await ai.batches.list({config: {'pageSize': 2}});
+node_modules\@google\genai\dist\index.mjs:5420:         * const response = 
+await ai.batches.create({
+node_modules\@google\genai\dist\index.mjs:5446:         * const response = 
+await ai.batches.createEmbeddings({
+node_modules\@google\genai\dist\index.mjs:5461:    // Helper function to 
+handle inlined generate content requests
+node_modules\@google\genai\dist\index.mjs:5489:    // Helper function to get 
+the first GCS URI
+node_modules\@google\genai\dist\index.mjs:5499:    // Helper function to get 
+the BigQuery URI
+node_modules\@google\genai\dist\index.mjs:5509:    // Function to format the 
+destination configuration for Vertex AI
+node_modules\@google\genai\dist\index.mjs:5644:     * await 
+ai.batches.get({name: '...'}); // The server-generated resource name.
+node_modules\@google\genai\dist\index.mjs:5707:     * await 
+ai.batches.cancel({name: '...'}); // The server-generated resource name.
+node_modules\@google\genai\dist\index.mjs:5821:     * await 
+ai.batches.delete({name: '...'}); // The server-generated resource name.
+node_modules\@google\genai\dist\index.mjs:5895:function 
+authConfigToMldev$3(fromObject) {
+node_modules\@google\genai\dist\index.mjs:5922:function 
+blobToMldev$3(fromObject) {
+node_modules\@google\genai\dist\index.mjs:5937:function 
+codeExecutionResultToVertex$3(fromObject) {
+node_modules\@google\genai\dist\index.mjs:5952:function 
+computerUseToVertex$2(fromObject) {
+node_modules\@google\genai\dist\index.mjs:5958:    const 
+fromExcludedPredefinedFunctions = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:5959:        
+'excludedPredefinedFunctions',
+node_modules\@google\genai\dist\index.mjs:5961:    if 
+(fromExcludedPredefinedFunctions != null) {
+node_modules\@google\genai\dist\index.mjs:5962:        
+setValueByPath(toObject, ['excludedPredefinedFunctions'], 
+fromExcludedPredefinedFunctions);
+node_modules\@google\genai\dist\index.mjs:5975:function 
+contentToMldev$3(fromObject) {
+node_modules\@google\genai\dist\index.mjs:5993:function 
+contentToVertex$3(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6011:function 
+createCachedContentConfigToMldev(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:6060:function 
+createCachedContentConfigToVertex(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:6110:function 
+createCachedContentParametersToMldev(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:6122:function 
+createCachedContentParametersToVertex(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:6134:function 
+deleteCachedContentParametersToMldev(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:6142:function 
+deleteCachedContentParametersToVertex(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:6150:function 
+deleteCachedContentResponseFromMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6160:function 
+deleteCachedContentResponseFromVertex(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6170:function 
+executableCodeToVertex$3(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6185:function 
+fileDataToMldev$3(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6200:function 
+functionCallToMldev$3(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6222:function 
+functionCallingConfigToMldev$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6224:    const 
+fromAllowedFunctionNames = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:6225:        'allowedFunctionNames',
+node_modules\@google\genai\dist\index.mjs:6227:    if 
+(fromAllowedFunctionNames != null) {
+node_modules\@google\genai\dist\index.mjs:6228:        
+setValueByPath(toObject, ['allowedFunctionNames'], fromAllowedFunctionNames);
+node_modules\@google\genai\dist\index.mjs:6234:    if 
+(getValueByPath(fromObject, ['streamFunctionCallArguments']) !==
+node_modules\@google\genai\dist\index.mjs:6236:        throw new 
+Error('streamFunctionCallArguments parameter is only supported in Gemini 
+Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+node_modules\@google\genai\dist\index.mjs:6240:function 
+getCachedContentParametersToMldev(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:6248:function 
+getCachedContentParametersToVertex(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:6256:function 
+googleMapsToMldev$3(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6268:function 
+googleSearchToMldev$3(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6288:function 
+listCachedContentsConfigToMldev(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:6300:function 
+listCachedContentsConfigToVertex(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:6312:function 
+listCachedContentsParametersToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6320:function 
+listCachedContentsParametersToVertex(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6328:function 
+listCachedContentsResponseFromMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6356:function 
+listCachedContentsResponseFromVertex(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6384:function 
+mcpServerToVertex$2(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6394:function 
+partToMldev$3(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6418:    const fromFunctionCall = 
+getValueByPath(fromObject, ['functionCall']);
+node_modules\@google\genai\dist\index.mjs:6419:    if (fromFunctionCall != 
+null) {
+node_modules\@google\genai\dist\index.mjs:6420:        
+setValueByPath(toObject, ['functionCall'], 
+functionCallToMldev$3(fromFunctionCall));
+node_modules\@google\genai\dist\index.mjs:6422:    const fromFunctionResponse 
+= getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:6423:        'functionResponse',
+node_modules\@google\genai\dist\index.mjs:6425:    if (fromFunctionResponse != 
+null) {
+node_modules\@google\genai\dist\index.mjs:6426:        
+setValueByPath(toObject, ['functionResponse'], fromFunctionResponse);
+node_modules\@google\genai\dist\index.mjs:6466:function 
+partToVertex$3(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6490:    const fromFunctionCall = 
+getValueByPath(fromObject, ['functionCall']);
+node_modules\@google\genai\dist\index.mjs:6491:    if (fromFunctionCall != 
+null) {
+node_modules\@google\genai\dist\index.mjs:6492:        
+setValueByPath(toObject, ['functionCall'], fromFunctionCall);
+node_modules\@google\genai\dist\index.mjs:6494:    const fromFunctionResponse 
+= getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:6495:        'functionResponse',
+node_modules\@google\genai\dist\index.mjs:6497:    if (fromFunctionResponse != 
+null) {
+node_modules\@google\genai\dist\index.mjs:6498:        
+setValueByPath(toObject, ['functionResponse'], fromFunctionResponse);
+node_modules\@google\genai\dist\index.mjs:6535:function 
+toolConfigToMldev$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6543:    const 
+fromFunctionCallingConfig = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:6544:        'functionCallingConfig',
+node_modules\@google\genai\dist\index.mjs:6546:    if 
+(fromFunctionCallingConfig != null) {
+node_modules\@google\genai\dist\index.mjs:6547:        
+setValueByPath(toObject, ['functionCallingConfig'], 
+functionCallingConfigToMldev$1(fromFunctionCallingConfig));
+node_modules\@google\genai\dist\index.mjs:6555:function 
+toolConfigToVertex$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6563:    const 
+fromFunctionCallingConfig = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:6564:        'functionCallingConfig',
+node_modules\@google\genai\dist\index.mjs:6566:    if 
+(fromFunctionCallingConfig != null) {
+node_modules\@google\genai\dist\index.mjs:6567:        
+setValueByPath(toObject, ['functionCallingConfig'], fromFunctionCallingConfig);
+node_modules\@google\genai\dist\index.mjs:6575:function 
+toolToMldev$3(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6605:    const 
+fromFunctionDeclarations = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:6606:        'functionDeclarations',
+node_modules\@google\genai\dist\index.mjs:6608:    if 
+(fromFunctionDeclarations != null) {
+node_modules\@google\genai\dist\index.mjs:6609:        let transformedList = 
+fromFunctionDeclarations;
+node_modules\@google\genai\dist\index.mjs:6615:        
+setValueByPath(toObject, ['functionDeclarations'], transformedList);
+node_modules\@google\genai\dist\index.mjs:6642:function 
+toolToVertex$2(fromObject) {
+node_modules\@google\genai\dist\index.mjs:6675:    const 
+fromFunctionDeclarations = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:6676:        'functionDeclarations',
+node_modules\@google\genai\dist\index.mjs:6678:    if 
+(fromFunctionDeclarations != null) {
+node_modules\@google\genai\dist\index.mjs:6679:        let transformedList = 
+fromFunctionDeclarations;
+node_modules\@google\genai\dist\index.mjs:6685:        
+setValueByPath(toObject, ['functionDeclarations'], transformedList);
+node_modules\@google\genai\dist\index.mjs:6715:function 
+updateCachedContentConfigToMldev(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:6727:function 
+updateCachedContentConfigToVertex(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:6739:function 
+updateCachedContentParametersToMldev(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:6751:function 
+updateCachedContentParametersToVertex(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:6769:class Caches extends BaseModule 
+{
+node_modules\@google\genai\dist\index.mjs:6781:         * const cachedContents 
+= await ai.caches.list({config: {'pageSize': 2}});
+node_modules\@google\genai\dist\index.mjs:6796:     * Developer API 
+reference](https://ai.google.dev/gemini-api/docs/caching?lang=node/context-cac)
+node_modules\@google\genai\dist\index.mjs:6806:     * const response = await 
+ai.caches.create({
+node_modules\@google\genai\dist\index.mjs:6817:    async create(params) {
+node_modules\@google\genai\dist\index.mjs:6875:     * await 
+ai.caches.get({name: '...'}); // The server-generated resource name.
+node_modules\@google\genai\dist\index.mjs:6936:     * await 
+ai.caches.delete({name: '...'}); // The server-generated resource name.
+node_modules\@google\genai\dist\index.mjs:7015:     * const response = await 
+ai.caches.update({
+node_modules\@google\genai\dist\index.mjs:7158:function __rest(s, e) {
+node_modules\@google\genai\dist\index.mjs:7162:    if (s != null && typeof 
+Object.getOwnPropertySymbols === "function")
+node_modules\@google\genai\dist\index.mjs:7170:function __values(o) {
+node_modules\@google\genai\dist\index.mjs:7171:    var s = typeof Symbol === 
+"function" && Symbol.iterator, m = s && o[s], i = 0;
+node_modules\@google\genai\dist\index.mjs:7174:        next: function () {
+node_modules\@google\genai\dist\index.mjs:7182:function __await(v) {
+node_modules\@google\genai\dist\index.mjs:7186:function 
+__asyncGenerator(thisArg, _arguments, generator) {
+node_modules\@google\genai\dist\index.mjs:7189:    return i = 
+Object.create((typeof AsyncIterator === "function" ? AsyncIterator : 
+Object).prototype), verb("next"), verb("throw"), verb("return", awaitReturn), 
+i[Symbol.asyncIterator] = function () { return this; }, i;
+node_modules\@google\genai\dist\index.mjs:7190:    function awaitReturn(f) { 
+return function (v) { return Promise.resolve(v).then(f, reject); }; }
+node_modules\@google\genai\dist\index.mjs:7191:    function verb(n, f) { if 
+(g[n]) { i[n] = function (v) { return new Promise(function (a, b) { q.push([n, 
+v, a, b]) > 1 || resume(n, v); }); }; if (f) i[n] = f(i[n]); } }
+node_modules\@google\genai\dist\index.mjs:7192:    function resume(n, v) { try 
+{ step(g[n](v)); } catch (e) { settle(q[0][3], e); } }
+node_modules\@google\genai\dist\index.mjs:7193:    function step(r) { r.value 
+instanceof __await ? Promise.resolve(r.value.v).then(fulfill, reject) : 
+settle(q[0][2], r); }
+node_modules\@google\genai\dist\index.mjs:7194:    function fulfill(value) { 
+resume("next", value); }
+node_modules\@google\genai\dist\index.mjs:7195:    function reject(value) { 
+resume("throw", value); }
+node_modules\@google\genai\dist\index.mjs:7196:    function settle(f, v) { if 
+(f(v), q.shift(), q.length) resume(q[0][0], q[0][1]); }
+node_modules\@google\genai\dist\index.mjs:7199:function __asyncValues(o) {
+node_modules\@google\genai\dist\index.mjs:7202:    return m ? m.call(o) : (o = 
+typeof __values === "function" ? __values(o) : o[Symbol.iterator](), i = {}, 
+verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = 
+function () { return this; }, i);
+node_modules\@google\genai\dist\index.mjs:7203:    function verb(n) { i[n] = 
+o[n] && function (v) { return new Promise(function (resolve, reject) { v = 
+o[n](v), settle(resolve, reject, v.done, v.value); }); }; }
+node_modules\@google\genai\dist\index.mjs:7204:    function settle(resolve, 
+reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, 
+done: d }); }, reject); }
+node_modules\@google\genai\dist\index.mjs:7207:typeof SuppressedError === 
+"function" ? SuppressedError : function (error, suppressed, message) {
+node_modules\@google\genai\dist\index.mjs:7220:function 
+isValidResponse(response) {
+node_modules\@google\genai\dist\index.mjs:7231:function 
+isValidContent(content) {
+node_modules\@google\genai\dist\index.mjs:7248:function 
+validateHistory(history) {
+node_modules\@google\genai\dist\index.mjs:7267:function 
+extractCuratedHistory(comprehensiveHistory) {
+node_modules\@google\genai\dist\index.mjs:7301: * A utility class to create a 
+chat session.
+node_modules\@google\genai\dist\index.mjs:7303:class Chats {
+node_modules\@google\genai\dist\index.mjs:7321:     * const chat = 
+ai.chats.create({
+node_modules\@google\genai\dist\index.mjs:7330:    create(params) {
+node_modules\@google\genai\dist\index.mjs:7344:class Chat {
+node_modules\@google\genai\dist\index.mjs:7369:     * const chat = 
+ai.chats.create({model: 'gemini-2.0-flash'});
+node_modules\@google\genai\dist\index.mjs:7392:            const 
+fullAutomaticFunctionCallingHistory = response.automaticFunctionCallingHistory;
+node_modules\@google\genai\dist\index.mjs:7394:            let 
+automaticFunctionCallingHistory = [];
+node_modules\@google\genai\dist\index.mjs:7395:            if 
+(fullAutomaticFunctionCallingHistory != null) {
+node_modules\@google\genai\dist\index.mjs:7396:                
+automaticFunctionCallingHistory =
+node_modules\@google\genai\dist\index.mjs:7397:                    (_c = 
+fullAutomaticFunctionCallingHistory.slice(index)) !== null && _c !== void 0 ? 
+_c : [];
+node_modules\@google\genai\dist\index.mjs:7400:            
+this.recordHistory(inputContent, modelOutput, automaticFunctionCallingHistory);
+node_modules\@google\genai\dist\index.mjs:7422:     * const chat = 
+ai.chats.create({model: 'gemini-2.0-flash'});
+node_modules\@google\genai\dist\index.mjs:7482:        return 
+__asyncGenerator(this, arguments, function* processStreamResponse_1() {
+node_modules\@google\genai\dist\index.mjs:7510:    recordHistory(userInput, 
+modelOutput, automaticFunctionCallingHistory) {
+node_modules\@google\genai\dist\index.mjs:7524:        if 
+(automaticFunctionCallingHistory &&
+node_modules\@google\genai\dist\index.mjs:7525:            
+automaticFunctionCallingHistory.length > 0) {
+node_modules\@google\genai\dist\index.mjs:7526:            
+this.history.push(...extractCuratedHistory(automaticFunctionCallingHistory));
+node_modules\@google\genai\dist\index.mjs:7540:function 
+createFileSearchStoreConfigToMldev(apiClient, fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:7554:function 
+createFileSearchStoreParametersToMldev(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:7562:function 
+deleteFileSearchStoreConfigToMldev(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:7570:function 
+deleteFileSearchStoreParametersToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:7582:function 
+getFileSearchStoreParametersToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:7590:function 
+importFileConfigToMldev(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:7612:function 
+importFileOperationFromMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:7636:function 
+importFileParametersToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:7654:function 
+importFileResponseFromMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:7672:function 
+listFileSearchStoresConfigToMldev(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:7684:function 
+listFileSearchStoresParametersToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:7692:function 
+listFileSearchStoresResponseFromMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:7720:function 
+uploadToFileSearchStoreConfigToMldev(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:7750:function 
+uploadToFileSearchStoreParametersToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:7764:function 
+uploadToFileSearchStoreResumableResponseFromMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:7783:class ApiError extends Error {
+node_modules\@google\genai\dist\index.mjs:7819: * The ApiClient class is used 
+to send requests to the Gemini API or Vertex AI
+node_modules\@google\genai\dist\index.mjs:7825:class ApiClient {
+node_modules\@google\genai\dist\index.mjs:8087:                        
+'function') {
+node_modules\@google\genai\dist\index.mjs:8137:        return 
+__asyncGenerator(this, arguments, function* processStreamResponse_1() {
+node_modules\@google\genai\dist\index.mjs:8283:     * in Vertex AI.
+node_modules\@google\genai\dist\index.mjs:8321:     * in Vertex AI.
+node_modules\@google\genai\dist\index.mjs:8387:async function 
+throwErrorIfNotOK(response) {
+node_modules\@google\genai\dist\index.mjs:8426: * The function does not 
+enforce that updated values from `extraBody` have the
+node_modules\@google\genai\dist\index.mjs:8434:function 
+includeExtraBodyToRequestInit(requestInit, extraBody) {
+node_modules\@google\genai\dist\index.mjs:8464:    function deepMerge(target, 
+source) {
+node_modules\@google\genai\dist\index.mjs:8499:function crossError() {
+node_modules\@google\genai\dist\index.mjs:8500:    // TODO(b/399934880): this 
+message needs a link to a help page explaining how to enable conditional 
+exports
+node_modules\@google\genai\dist\index.mjs:8503:*Enabling conditional exports 
+for your project [recommended]*
+node_modules\@google\genai\dist\index.mjs:8514:class CrossDownloader {
+node_modules\@google\genai\dist\index.mjs:8525:class CrossUploader {
+node_modules\@google\genai\dist\index.mjs:8551:async function uploadBlob(file, 
+uploadUrl, apiClient, httpOptions) {
+node_modules\@google\genai\dist\index.mjs:8560:async function 
+uploadBlobToFileSearchStore(file, uploadUrl, apiClient, httpOptions) {
+node_modules\@google\genai\dist\index.mjs:8572:async function 
+uploadBlobInternal(file, uploadUrl, apiClient, httpOptions) {
+node_modules\@google\genai\dist\index.mjs:8626:async function 
+getBlobStat(file) {
+node_modules\@google\genai\dist\index.mjs:8630:function sleep(ms) {
+node_modules\@google\genai\dist\index.mjs:8639:class CrossWebSocketFactory {
+node_modules\@google\genai\dist\index.mjs:8640:    create(_url, _headers, 
+_callbacks) {
+node_modules\@google\genai\dist\index.mjs:8651:function 
+createFileParametersToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:8659:function 
+createFileResponseFromMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:8669:function 
+deleteFileParametersToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:8677:function 
+deleteFileResponseFromMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:8687:function 
+getFileParametersToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:8695:function 
+internalRegisterFilesParametersToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:8703:function 
+listFilesConfigToMldev(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:8715:function 
+listFilesParametersToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:8723:function 
+listFilesResponseFromMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:8749:function 
+registerFilesResponseFromMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:8775:class Files extends BaseModule {
+node_modules\@google\genai\dist\index.mjs:8787:         * const files = await 
+ai.files.list({config: {'pageSize': 2}});
+node_modules\@google\genai\dist\index.mjs:8834:     * const file = await 
+ai.files.upload({file: 'file.txt', config: {
+node_modules\@google\genai\dist\index.mjs:8863:     * await 
+ai.files.download({file: file.name, downloadPath: 'file.txt'});
+node_modules\@google\genai\dist\index.mjs:8964:     * file = await 
+ai.files.get(config);
+node_modules\@google\genai\dist\index.mjs:9009:     * await 
+ai.files.delete({name: file.name});
+node_modules\@google\genai\dist\index.mjs:9094:function 
+deleteDocumentConfigToMldev(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:9102:function 
+deleteDocumentParametersToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:9114:function 
+getDocumentParametersToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:9122:function 
+listDocumentsConfigToMldev(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:9134:function 
+listDocumentsParametersToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:9146:function 
+listDocumentsResponseFromMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:9178:class Documents extends 
+BaseModule {
+node_modules\@google\genai\dist\index.mjs:9190:         * const documents = 
+await ai.documents.list({parent:'rag_store_name', config: {'pageSize': 2}});
+node_modules\@google\genai\dist\index.mjs:9306:class FileSearchStores extends 
+BaseModule {
+node_modules\@google\genai\dist\index.mjs:9319:         * const 
+fileSearchStores = await ai.fileSearchStores.list({config: {'pageSize': 2}});
+node_modules\@google\genai\dist\index.mjs:9359:     * const operation = await 
+ai.fileSearchStores.upload({fileSearchStoreName: 'fileSearchStores/foo-bar', 
+file: 'file.txt', config: {
+node_modules\@google\genai\dist\index.mjs:9417:    async create(params) {
+node_modules\@google\genai\dist\index.mjs:9636:function isDeno() {
+node_modules\@google\genai\dist\index.mjs:9646:function env() {
+node_modules\@google\genai\dist\index.mjs:9665:function fillGlobals(options) {
+node_modules\@google\genai\dist\index.mjs:9689:class 
+GoogleGenAISecurityProvider {
+node_modules\@google\genai\dist\index.mjs:9696:    async 
+resolveGoogleGenAISecurity(url) {
+node_modules\@google\genai\dist\index.mjs:9700:class GoogleGenAIAuthHook {
+node_modules\@google\genai\dist\index.mjs:9717:function 
+decodeSDKLevelAPIVersionPath(url) {
+node_modules\@google\genai\dist\index.mjs:9730:async function 
+resolveSecurity$1(securitySource, requestURL) {
+node_modules\@google\genai\dist\index.mjs:9732:        return 
+securitySource.resolveGoogleGenAISecurity(requestURL);
+node_modules\@google\genai\dist\index.mjs:9734:    const security = typeof 
+securitySource === "function"
+node_modules\@google\genai\dist\index.mjs:9742:function 
+getStaticDefaultHeaders(securitySource) {
+node_modules\@google\genai\dist\index.mjs:9752:function 
+withEnvSecurity(security) {
+node_modules\@google\genai\dist\index.mjs:9758:function 
+securityFromHeaders(headers) {
+node_modules\@google\genai\dist\index.mjs:9776:function 
+applyDefaultHeaders(target, source) {
+node_modules\@google\genai\dist\index.mjs:9786:function 
+applyApiRevision(hookCtx, headers) {
+node_modules\@google\genai\dist\index.mjs:9792:function 
+applyUserProject(hookCtx, headers) {
+node_modules\@google\genai\dist\index.mjs:9798:function applyAuth(headers, 
+security) {
+node_modules\@google\genai\dist\index.mjs:9810:function 
+hasAuthHeaders(headers) {
+node_modules\@google\genai\dist\index.mjs:9814:function bearer(token) {
+node_modules\@google\genai\dist\index.mjs:9819:function isSecurity(value) {
+node_modules\@google\genai\dist\index.mjs:9822:function 
+isSecurityResolver(value) {
+node_modules\@google\genai\dist\index.mjs:9825:        
+"resolveGoogleGenAISecurity" in value &&
+node_modules\@google\genai\dist\index.mjs:9826:        typeof 
+value.resolveGoogleGenAISecurity === "function");
+node_modules\@google\genai\dist\index.mjs:9828:function 
+hasSecurityValue(security) {
+node_modules\@google\genai\dist\index.mjs:9845: * Base class for all HTTP 
+errors.
+node_modules\@google\genai\dist\index.mjs:9847:class HTTPClientError extends 
+Error {
+node_modules\@google\genai\dist\index.mjs:9865:class UnexpectedClientError 
+extends HTTPClientError {
+node_modules\@google\genai\dist\index.mjs:9874:class InvalidRequestError 
+extends HTTPClientError {
+node_modules\@google\genai\dist\index.mjs:9883:class RequestAbortedError 
+extends HTTPClientError {
+node_modules\@google\genai\dist\index.mjs:9893:class RequestTimeoutError 
+extends HTTPClientError {
+node_modules\@google\genai\dist\index.mjs:9903:class ConnectionError extends 
+HTTPClientError {
+node_modules\@google\genai\dist\index.mjs:9920:/** The base class for all HTTP 
+error responses */
+node_modules\@google\genai\dist\index.mjs:9921:class GoogleGenAiError extends 
+Error {
+node_modules\@google\genai\dist\index.mjs:9930:        this.name = 
+"GoogleGenAiError";
+node_modules\@google\genai\dist\index.mjs:9941:class 
+GeminiNextGenAPIClientError extends Error {
+node_modules\@google\genai\dist\index.mjs:9944:class APIError extends 
+GeminiNextGenAPIClientError {
+node_modules\@google\genai\dist\index.mjs:10002:class APIUserAbortError 
+extends APIError {
+node_modules\@google\genai\dist\index.mjs:10007:class APIConnectionError 
+extends APIError {
+node_modules\@google\genai\dist\index.mjs:10013:class 
+APIConnectionTimeoutError extends APIConnectionError {
+node_modules\@google\genai\dist\index.mjs:10021:class BadRequestError extends 
+APIError {
+node_modules\@google\genai\dist\index.mjs:10023:class AuthenticationError 
+extends APIError {
+node_modules\@google\genai\dist\index.mjs:10025:class PermissionDeniedError 
+extends APIError {
+node_modules\@google\genai\dist\index.mjs:10027:class NotFoundError extends 
+APIError {
+node_modules\@google\genai\dist\index.mjs:10029:class ConflictError extends 
+APIError {
+node_modules\@google\genai\dist\index.mjs:10031:class UnprocessableEntityError 
+extends APIError {
+node_modules\@google\genai\dist\index.mjs:10033:class RateLimitError extends 
+APIError {
+node_modules\@google\genai\dist\index.mjs:10035:class InternalServerError 
+extends APIError {
+node_modules\@google\genai\dist\index.mjs:10037:function wrapSDKError(error) {
+node_modules\@google\genai\dist\index.mjs:10041:    if (error instanceof 
+GoogleGenAiError) {
+node_modules\@google\genai\dist\index.mjs:10049:function wrapAPIError(error) {
+node_modules\@google\genai\dist\index.mjs:10059:function 
+wrapHTTPClientError(error) {
+node_modules\@google\genai\dist\index.mjs:10071:function 
+getErrorPayload(error) {
+node_modules\@google\genai\dist\index.mjs:10090:function 
+getObjectProperty(value, key) {
+node_modules\@google\genai\dist\index.mjs:10095:function 
+stringifyErrorBody(error) {
+node_modules\@google\genai\dist\index.mjs:10105:function 
+isPlainObject$2(value) {
+node_modules\@google\genai\dist\index.mjs:10108:function 
+isCompatAPIErrorInstance(value) {
+node_modules\@google\genai\dist\index.mjs:10114:function 
+defineReadonly(target, key, value) {
+node_modules\@google\genai\dist\index.mjs:10132: * Any hooks you wish to add 
+should be registered in the initHooks function. Feel free to define them
+node_modules\@google\genai\dist\index.mjs:10135:function initHooks(hooks) {
+node_modules\@google\genai\dist\index.mjs:10139:    const googleGenAIAuthHook 
+= new GoogleGenAIAuthHook();
+node_modules\@google\genai\dist\index.mjs:10140:    
+hooks.registerBeforeCreateRequestHook(googleGenAIAuthHook);
+node_modules\@google\genai\dist\index.mjs:10141:    
+hooks.registerBeforeRequestHook(googleGenAIAuthHook);
+node_modules\@google\genai\dist\index.mjs:10151:class SDKHooks {
+node_modules\@google\genai\dist\index.mjs:10236:function OK(value) {
+node_modules\@google\genai\dist\index.mjs:10239:function ERR(error) {
+node_modules\@google\genai\dist\index.mjs:10253:function bytesToBase64(u8arr) {
+node_modules\@google\genai\dist\index.mjs:10256:function stringToBytes(str) {
+node_modules\@google\genai\dist\index.mjs:10259:function stringToBase64(str) {
+node_modules\@google\genai\dist\index.mjs:10274:function 
+pathToFunc(pathPattern, options) {
+node_modules\@google\genai\dist\index.mjs:10276:    return function 
+buildURLPath(params = {}) {
+node_modules\@google\genai\dist\index.mjs:10278:            .replace(paramRE, 
+function (_, placeholder) {
+node_modules\@google\genai\dist\index.mjs:10308:function 
+serverURLFromOptions(options) {
+node_modules\@google\genai\dist\index.mjs:10336:function 
+combineSignals(...signals) {
+node_modules\@google\genai\dist\index.mjs:10348:            if ("any" in 
+AbortSignal && typeof AbortSignal.any === "function") {
+node_modules\@google\genai\dist\index.mjs:10354:function 
+abortSignalAny(signals) {
+node_modules\@google\genai\dist\index.mjs:10368:    function abort() {
+node_modules\@google\genai\dist\index.mjs:10373:    function clean() {
+node_modules\@google\genai\dist\index.mjs:10387:function compactMap(values) {
+node_modules\@google\genai\dist\index.mjs:10396:function 
+isPlainObject$1(value) {
+node_modules\@google\genai\dist\index.mjs:10424:function formEncoder(sep) {
+node_modules\@google\genai\dist\index.mjs:10470:function encodeJSON(key, 
+value, options) {
+node_modules\@google\genai\dist\index.mjs:10515:function explode(key, value) {
+node_modules\@google\genai\dist\index.mjs:10527:function serializeValue(value) 
+{
+node_modules\@google\genai\dist\index.mjs:10542:function jsonReplacer(_, 
+value) {
+node_modules\@google\genai\dist\index.mjs:10550:function mapDefined(inp, 
+mapper) {
+node_modules\@google\genai\dist\index.mjs:10564:function 
+mapDefinedEntries(inp, mapper) {
+node_modules\@google\genai\dist\index.mjs:10578:function queryJoin(...args) {
+node_modules\@google\genai\dist\index.mjs:10581:function queryEncoder(f) {
+node_modules\@google\genai\dist\index.mjs:10582:    const bulkEncode = 
+function (values, options) {
+node_modules\@google\genai\dist\index.mjs:10622:class HTTPClient {
+node_modules\@google\genai\dist\index.mjs:10698:function 
+matchContentType(response, pattern) {
+node_modules\@google\genai\dist\index.mjs:10735:function 
+matchStatusCode(response, codes) {
+node_modules\@google\genai\dist\index.mjs:10760:function 
+matchResponse(response, code, contentTypePattern) {
+node_modules\@google\genai\dist\index.mjs:10767:function 
+isConnectionError(err) {
+node_modules\@google\genai\dist\index.mjs:10785:function isTimeoutError(err) {
+node_modules\@google\genai\dist\index.mjs:10801:function isAbortError(err) {
+node_modules\@google\genai\dist\index.mjs:10835:class PermanentError extends 
+Error {
+node_modules\@google\genai\dist\index.mjs:10856:class TemporaryError extends 
+Error {
+node_modules\@google\genai\dist\index.mjs:10864:async function retry(fetchFn, 
+options) {
+node_modules\@google\genai\dist\index.mjs:10881:function wrapFetcher(fn, 
+options) {
+node_modules\@google\genai\dist\index.mjs:10903:function 
+isRetryableResponse(res, statusCodes) {
+node_modules\@google\genai\dist\index.mjs:10920:async function 
+retryBackoff(fn, strategy) {
+node_modules\@google\genai\dist\index.mjs:10954:async function 
+retryAttemptCountBackoff(fn, strategy, config) {
+node_modules\@google\genai\dist\index.mjs:10986:function 
+retryIntervalFromResponse(res) {
+node_modules\@google\genai\dist\index.mjs:11009:async function delay(delay) {
+node_modules\@google\genai\dist\index.mjs:11027:    && typeof 
+gt["importScripts"] === "function";
+node_modules\@google\genai\dist\index.mjs:11031:class ClientSDK {
+node_modules\@google\genai\dist\index.mjs:11238:async function 
+logRequest(logger, req) {
+node_modules\@google\genai\dist\index.mjs:11273:async function 
+logResponse(logger, res, req) {
+node_modules\@google\genai\dist\index.mjs:11326:/** The fallback error class 
+if no more specific error class is matched */
+node_modules\@google\genai\dist\index.mjs:11327:class GoogleGenAiDefaultError 
+extends GoogleGenAiError {
+node_modules\@google\genai\dist\index.mjs:11348:        this.name = 
+"GoogleGenAiDefaultError";
+node_modules\@google\genai\dist\index.mjs:11359:function tryParseJson(s) {
+node_modules\@google\genai\dist\index.mjs:11367:function 
+wrapEventStreamResponse(body, opts = {}) {
+node_modules\@google\genai\dist\index.mjs:11389:class Stream extends 
+ReadableStream {
+node_modules\@google\genai\dist\index.mjs:11450:        if (typeof fn === 
+"function")
+node_modules\@google\genai\dist\index.mjs:11502:function findBoundary(buf, 
+len, from) {
+node_modules\@google\genai\dist\index.mjs:11522:function parseMessage(chunk, 
+parse, state, dataRequired) {
+node_modules\@google\genai\dist\index.mjs:11579:function jsonErr(codes, 
+errorClass, options) {
+node_modules\@google\genai\dist\index.mjs:11580:    return 
+Object.assign(Object.assign({}, options), { err: true, enc: "json", codes, 
+errorClass });
+node_modules\@google\genai\dist\index.mjs:11582:function json(codes, options) {
+node_modules\@google\genai\dist\index.mjs:11585:function sse(codes, sse, 
+options) {
+node_modules\@google\genai\dist\index.mjs:11588:function nil(codes, options) {
+node_modules\@google\genai\dist\index.mjs:11591:function fail(codes) {
+node_modules\@google\genai\dist\index.mjs:11594:function match(...matchers) {
+node_modules\@google\genai\dist\index.mjs:11595:    return async function 
+matchFunc(response, request, options) {
+node_modules\@google\genai\dist\index.mjs:11615:                    error: new 
+GoogleGenAiDefaultError("Unexpected Status or Content-Type", {
+node_modules\@google\genai\dist\index.mjs:11674:                    error: new 
+GoogleGenAiDefaultError("API error occurred", {
+node_modules\@google\genai\dist\index.mjs:11699:            // When the spec 
+error response is a single error class, instantiate
+node_modules\@google\genai\dist\index.mjs:11701:            // union of error 
+variants (no class), `errorClass` is undefined and
+node_modules\@google\genai\dist\index.mjs:11703:            const errValue = 
+matcher.errorClass
+node_modules\@google\genai\dist\index.mjs:11704:                ? new 
+matcher.errorClass(data, { request, response, body })
+node_modules\@google\genai\dist\index.mjs:11716:function 
+unpackHeaders(headers) {
+node_modules\@google\genai\dist\index.mjs:11732:(function (SecurityErrorCode) {
+node_modules\@google\genai\dist\index.mjs:11736:class SecurityError extends 
+Error {
+node_modules\@google\genai\dist\index.mjs:11749:function 
+resolveSecurity(...options) {
+node_modules\@google\genai\dist\index.mjs:11829:function applyBasic(state, 
+spec) {
+node_modules\@google\genai\dist\index.mjs:11835:function applyBearer(state, 
+spec) {
+node_modules\@google\genai\dist\index.mjs:11847:function 
+resolveGlobalSecurity(security, allowedFields) {
+node_modules\@google\genai\dist\index.mjs:11870:async function 
+extractSecurity(sec) {
+node_modules\@google\genai\dist\index.mjs:11874:    return typeof sec === 
+"function" ? sec() : sec;
+node_modules\@google\genai\dist\index.mjs:11885:class APIPromise {
+node_modules\@google\genai\dist\index.mjs:11933:function unwrapAsAPIPromise(p) 
+{
+node_modules\@google\genai\dist\index.mjs:11963:function agentsCreate(client, 
+body, api_version, options) {
+node_modules\@google\genai\dist\index.mjs:11966:async function $do$e(client, 
+body, api_version, options) {
+node_modules\@google\genai\dist\index.mjs:12048:function agentsDelete(client, 
+id, api_version, options) {
+node_modules\@google\genai\dist\index.mjs:12051:async function $do$d(client, 
+id, api_version, options) {
+node_modules\@google\genai\dist\index.mjs:12136:function agentsGet(client, id, 
+api_version, options) {
+node_modules\@google\genai\dist\index.mjs:12139:async function $do$c(client, 
+id, api_version, options) {
+node_modules\@google\genai\dist\index.mjs:12224:function agentsList(client, 
+api_version, page_size, page_token, parent, options) {
+node_modules\@google\genai\dist\index.mjs:12227:async function $do$b(client, 
+api_version, page_size, page_token, parent, options) {
+node_modules\@google\genai\dist\index.mjs:12313:class Agents extends ClientSDK 
+{
+node_modules\@google\genai\dist\index.mjs:12317:    create(params, options) {
+node_modules\@google\genai\dist\index.mjs:12319:        return 
+unwrapAsAPIPromise(agentsCreate(this, body, api_version, options));
+node_modules\@google\genai\dist\index.mjs:12351:class 
+CancelInteractionByIdServerError extends GoogleGenAiError {
+node_modules\@google\genai\dist\index.mjs:12365:class 
+CancelInteractionByIdClientError extends GoogleGenAiError {
+node_modules\@google\genai\dist\index.mjs:12387:class 
+CreateInteractionServerError extends GoogleGenAiError {
+node_modules\@google\genai\dist\index.mjs:12395:        this.name = 
+"CreateInteractionServerError";
+node_modules\@google\genai\dist\index.mjs:12401:class 
+CreateInteractionClientError extends GoogleGenAiError {
+node_modules\@google\genai\dist\index.mjs:12423:class 
+DeleteInteractionServerError extends GoogleGenAiError {
+node_modules\@google\genai\dist\index.mjs:12431:        this.name = 
+"DeleteInteractionServerError";
+node_modules\@google\genai\dist\index.mjs:12437:class 
+DeleteInteractionClientError extends GoogleGenAiError {
+node_modules\@google\genai\dist\index.mjs:12459:class 
+GetInteractionByIdServerError extends GoogleGenAiError {
+node_modules\@google\genai\dist\index.mjs:12473:class 
+GetInteractionByIdClientError extends GoogleGenAiError {
+node_modules\@google\genai\dist\index.mjs:12496: * Cancels an interaction by 
+id. This only applies to background interactions that are still running.
+node_modules\@google\genai\dist\index.mjs:12498:function 
+interactionsCancel(client, id, api_version, options) {
+node_modules\@google\genai\dist\index.mjs:12501:async function $do$a(client, 
+id, api_version, options) {
+node_modules\@google\genai\dist\index.mjs:12516:    const path = 
+pathToFunc("/{api_version}/interactions/{id}/cancel")(pathParams);
+node_modules\@google\genai\dist\index.mjs:12586:function 
+interactionsCreate(client, body, api_version, options) {
+node_modules\@google\genai\dist\index.mjs:12589:async function $do$9(client, 
+body, api_version, options) {
+node_modules\@google\genai\dist\index.mjs:12600:    const path = 
+pathToFunc("/{api_version}/interactions")(pathParams);
+node_modules\@google\genai\dist\index.mjs:12660:    }), jsonErr("4XX", 
+CreateInteractionClientError), jsonErr("5XX", 
+CreateInteractionServerError))(response, req, { extraFields: responseFields });
+node_modules\@google\genai\dist\index.mjs:12680:function 
+interactionsDelete(client, id, api_version, options) {
+node_modules\@google\genai\dist\index.mjs:12683:async function $do$8(client, 
+id, api_version, options) {
+node_modules\@google\genai\dist\index.mjs:12698:    const path = 
+pathToFunc("/{api_version}/interactions/{id}")(pathParams);
+node_modules\@google\genai\dist\index.mjs:12754:    const [result] = await 
+match(nil(200), jsonErr("4XX", DeleteInteractionClientError), jsonErr("5XX", 
+DeleteInteractionServerError))(response, req, { extraFields: responseFields });
+node_modules\@google\genai\dist\index.mjs:12768:function 
+interactionsGet(client, id, stream, last_event_id, include_input, api_version, 
+options) {
+node_modules\@google\genai\dist\index.mjs:12771:async function $do$7(client, 
+id, stream, last_event_id, include_input, api_version, options) {
+node_modules\@google\genai\dist\index.mjs:12789:    const path = 
+pathToFunc("/{api_version}/interactions/{id}")(pathParams);
+node_modules\@google\genai\dist\index.mjs:12868:class Interactions extends 
+ClientSDK {
+node_modules\@google\genai\dist\index.mjs:12869:    create(params, options) {
+node_modules\@google\genai\dist\index.mjs:12871:        return 
+unwrapAsAPIPromise(interactionsCreate(this, body, api_version, options));
+node_modules\@google\genai\dist\index.mjs:12874:        return 
+unwrapAsAPIPromise(interactionsGet(this, id, params === null || params === 
+void 0 ? void 0 : params.stream, params === null || params === void 0 ? void 0 
+: params.last_event_id, params === null || params === void 0 ? void 0 : 
+params.include_input, params === null || params === void 0 ? void 0 : 
+params.api_version, options));
+node_modules\@google\genai\dist\index.mjs:12883:        return 
+unwrapAsAPIPromise(interactionsDelete(this, id, params === null || params === 
+void 0 ? void 0 : params.api_version, options));
+node_modules\@google\genai\dist\index.mjs:12889:     * Cancels an interaction 
+by id. This only applies to background interactions that are still running.
+node_modules\@google\genai\dist\index.mjs:12892:        return 
+unwrapAsAPIPromise(interactionsCancel(this, id, params === null || params === 
+void 0 ? void 0 : params.api_version, options));
+node_modules\@google\genai\dist\index.mjs:12906:function 
+webhooksCreate(client, body, api_version, options) {
+node_modules\@google\genai\dist\index.mjs:12909:async function $do$6(client, 
+body, api_version, options) {
+node_modules\@google\genai\dist\index.mjs:12991:function 
+webhooksDelete(client, id, api_version, options) {
+node_modules\@google\genai\dist\index.mjs:12994:async function $do$5(client, 
+id, api_version, options) {
+node_modules\@google\genai\dist\index.mjs:13079:function webhooksGet(client, 
+id, api_version, options) {
+node_modules\@google\genai\dist\index.mjs:13082:async function $do$4(client, 
+id, api_version, options) {
+node_modules\@google\genai\dist\index.mjs:13167:function webhooksList(client, 
+api_version, page_size, page_token, options) {
+node_modules\@google\genai\dist\index.mjs:13170:async function $do$3(client, 
+api_version, page_size, page_token, options) {
+node_modules\@google\genai\dist\index.mjs:13257:function webhooksPing(client, 
+id, api_version, body, options) {
+node_modules\@google\genai\dist\index.mjs:13260:async function $do$2(client, 
+id, api_version, body, options) {
+node_modules\@google\genai\dist\index.mjs:13347:function 
+webhooksRotateSigningSecret(client, id, api_version, body, options) {
+node_modules\@google\genai\dist\index.mjs:13350:async function $do$1(client, 
+id, api_version, body, options) {
+node_modules\@google\genai\dist\index.mjs:13437:function 
+webhooksUpdate(client, id, api_version, update_mask, body, options) {
+node_modules\@google\genai\dist\index.mjs:13440:async function $do(client, id, 
+api_version, update_mask, body, options) {
+node_modules\@google\genai\dist\index.mjs:13529:class Webhooks extends 
+ClientSDK {
+node_modules\@google\genai\dist\index.mjs:13533:    create(params, options) {
+node_modules\@google\genai\dist\index.mjs:13535:        return 
+unwrapAsAPIPromise(webhooksCreate(this, body, api_version, options));
+node_modules\@google\genai\dist\index.mjs:13589:let GoogleGenAI$1 = class 
+GoogleGenAI extends ClientSDK {
+node_modules\@google\genai\dist\index.mjs:13590:    get interactions() {
+node_modules\@google\genai\dist\index.mjs:13592:        return ((_a = 
+this._interactions) !== null && _a !== void 0 ? _a : (this._interactions = new 
+Interactions(this._options)));
+node_modules\@google\genai\dist\index.mjs:13615:function 
+getGoogleGenAIServerURL(parentClient) {
+node_modules\@google\genai\dist\index.mjs:13622:function 
+getGoogleGenAIAPIVersion(parentClient) {
+node_modules\@google\genai\dist\index.mjs:13632:function 
+buildGoogleGenAIClient(parentClient, options = {}) {
+node_modules\@google\genai\dist\index.mjs:13634:    const sdk = new 
+GoogleGenAI$1(Object.assign(Object.assign({}, options), { api_version: (_a = 
+options.api_version) !== null && _a !== void 0 ? _a : 
+getGoogleGenAIAPIVersion(parentClient), security: (_b = options.security) !== 
+null && _b !== void 0 ? _b : new GoogleGenAISecurityProvider({
+node_modules\@google\genai\dist\index.mjs:13637:        }), server_url: (_d = 
+options.server_url) !== null && _d !== void 0 ? _d : 
+getGoogleGenAIServerURL(parentClient) }));
+node_modules\@google\genai\dist\index.mjs:13640:class 
+GeminiNextGenInteractions {
+node_modules\@google\genai\dist\index.mjs:13644:    async create(params, 
+options) {
+node_modules\@google\genai\dist\index.mjs:13647:            const response = 
+await wrapSDKCall(() => this.getClient(api_version).interactions.create(Object.
+assign(Object.assign({}, request), { stream: true, api_version }), 
+toGoogleGenAIRequestOptions(options, true)));
+node_modules\@google\genai\dist\index.mjs:13650:        const response = await 
+unwrapWithSdkHttpResponse(interactionsCreate(this.getClient(api_version), 
+request, api_version, toGoogleGenAIRequestOptions(options)));
+node_modules\@google\genai\dist\index.mjs:13656:            const response = 
+await wrapSDKCall(() => this.getClient(api_version).interactions.get(id, { 
+stream, last_event_id, include_input, api_version }, 
+toGoogleGenAIRequestOptions(options, true)));
+node_modules\@google\genai\dist\index.mjs:13659:        const response = await 
+unwrapWithSdkHttpResponse(interactionsGet(this.getClient(api_version), id, 
+stream, last_event_id, include_input, api_version, 
+toGoogleGenAIRequestOptions(options)));
+node_modules\@google\genai\dist\index.mjs:13663:        return wrapSDKCall(() 
+=> this.getClient(params === null || params === void 0 ? void 0 : 
+params.api_version).interactions.delete(id, { api_version: params === null || 
+params === void 0 ? void 0 : params.api_version }, 
+toGoogleGenAIRequestOptions(options)));
+node_modules\@google\genai\dist\index.mjs:13666:        return 
+addOutputPropertiesIfInteraction(await 
+unwrapWithSdkHttpResponse(interactionsCancel(this.getClient(params === null || 
+params === void 0 ? void 0 : params.api_version), id, params === null || 
+params === void 0 ? void 0 : params.api_version, 
+toGoogleGenAIRequestOptions(options))));
+node_modules\@google\genai\dist\index.mjs:13671:            return 
+buildGoogleGenAIClient(this.parentClient, {
+node_modules\@google\genai\dist\index.mjs:13675:        (_a = this.sdk) !== 
+null && _a !== void 0 ? _a : (this.sdk = 
+buildGoogleGenAIClient(this.parentClient));
+node_modules\@google\genai\dist\index.mjs:13679:class GeminiNextGenAgents {
+node_modules\@google\genai\dist\index.mjs:13683:    async create(params = {}, 
+options) {
+node_modules\@google\genai\dist\index.mjs:13685:        return 
+unwrapWithSdkHttpResponse(agentsCreate(this.getClient(api_version), body, 
+api_version, toGoogleGenAIRequestOptions(options)));
+node_modules\@google\genai\dist\index.mjs:13689:        return 
+unwrapWithSdkHttpResponse(agentsList(this.getClient(api_version), api_version, 
+pageSize, pageToken, parent, toGoogleGenAIRequestOptions(options)));
+node_modules\@google\genai\dist\index.mjs:13692:        return 
+unwrapWithSdkHttpResponse(agentsGet(this.getClient(params === null || params 
+=== void 0 ? void 0 : params.api_version), id, params === null || params === 
+void 0 ? void 0 : params.api_version, toGoogleGenAIRequestOptions(options)));
+node_modules\@google\genai\dist\index.mjs:13695:        return 
+unwrapWithSdkHttpResponse(agentsDelete(this.getClient(params === null || 
+params === void 0 ? void 0 : params.api_version), id, params === null || 
+params === void 0 ? void 0 : params.api_version, 
+toGoogleGenAIRequestOptions(options)));
+node_modules\@google\genai\dist\index.mjs:13700:            return 
+buildGoogleGenAIClient(this.parentClient, {
+node_modules\@google\genai\dist\index.mjs:13704:        (_a = this.sdk) !== 
+null && _a !== void 0 ? _a : (this.sdk = 
+buildGoogleGenAIClient(this.parentClient));
+node_modules\@google\genai\dist\index.mjs:13708:class GeminiNextGenWebhooks {
+node_modules\@google\genai\dist\index.mjs:13712:    async create(params, 
+options) {
+node_modules\@google\genai\dist\index.mjs:13714:        return 
+unwrapWithSdkHttpResponse(webhooksCreate(this.getClient(), body, api_version, 
+toGoogleGenAIRequestOptions(options)));
+node_modules\@google\genai\dist\index.mjs:13718:        return 
+unwrapWithSdkHttpResponse(webhooksList(this.getClient(), api_version, 
+page_size, page_token, toGoogleGenAIRequestOptions(options)));
+node_modules\@google\genai\dist\index.mjs:13721:        return 
+unwrapWithSdkHttpResponse(webhooksGet(this.getClient(), id, params === null || 
+params === void 0 ? void 0 : params.api_version, 
+toGoogleGenAIRequestOptions(options)));
+node_modules\@google\genai\dist\index.mjs:13725:        return 
+unwrapWithSdkHttpResponse(webhooksUpdate(this.getClient(), id, api_version, 
+update_mask, body, toGoogleGenAIRequestOptions(options)));
+node_modules\@google\genai\dist\index.mjs:13728:        return 
+unwrapWithSdkHttpResponse(webhooksDelete(this.getClient(), id, params === null 
+|| params === void 0 ? void 0 : params.api_version, 
+toGoogleGenAIRequestOptions(options)));
+node_modules\@google\genai\dist\index.mjs:13732:        return 
+unwrapWithSdkHttpResponse(webhooksRotateSigningSecret(this.getClient(), id, 
+api_version, body, toGoogleGenAIRequestOptions(options)));
+node_modules\@google\genai\dist\index.mjs:13736:        return 
+unwrapWithSdkHttpResponse(webhooksPing(this.getClient(), id, api_version, 
+body, toGoogleGenAIRequestOptions(options)));
+node_modules\@google\genai\dist\index.mjs:13740:        (_a = this.sdk) !== 
+null && _a !== void 0 ? _a : (this.sdk = 
+buildGoogleGenAIClient(this.parentClient));
+node_modules\@google\genai\dist\index.mjs:13744:function trimSlashes(value) {
+node_modules\@google\genai\dist\index.mjs:13747:function 
+toGoogleGenAIRequestOptions(options, streaming = false) {
+node_modules\@google\genai\dist\index.mjs:13792:function 
+warnIgnoredOption(name, value) {
+node_modules\@google\genai\dist\index.mjs:13794:        
+console.warn(`GoogleGenAI.interactions: request option ${name} is not 
+supported by the Google GenAI interactions bridge and will be ignored.`);
+node_modules\@google\genai\dist\index.mjs:13797:async function 
+unwrapWithSdkHttpResponse(promise) {
+node_modules\@google\genai\dist\index.mjs:13804:async function 
+wrapSDKCall(operation) {
+node_modules\@google\genai\dist\index.mjs:13812:function 
+wrapStreamErrors(stream) {
+node_modules\@google\genai\dist\index.mjs:13818:                return typeof 
+value === "function" ? value.bind(target) : value;
+node_modules\@google\genai\dist\index.mjs:13820:            return function 
+wrappedAsyncIterator() {
+node_modules\@google\genai\dist\index.mjs:13861:function 
+attachSdkHttpResponse(value, call) {
+node_modules\@google\genai\dist\index.mjs:13867:function 
+createSdkHttpResponse(response, parsedBody) {
+node_modules\@google\genai\dist\index.mjs:13878:function 
+addOutputPropertiesIfInteraction(value) {
+node_modules\@google\genai\dist\index.mjs:13879:    const interaction = 
+normalizeInteractionShape(value);
+node_modules\@google\genai\dist\index.mjs:13885:function 
+normalizeInteractionShape(value) {
+node_modules\@google\genai\dist\index.mjs:13903:function 
+isLegacyLyriaInteraction(value) {
+node_modules\@google\genai\dist\index.mjs:13907:function isPlainObject(value) {
+node_modules\@google\genai\dist\index.mjs:13910:function 
+addOutputProperties(interaction) {
+node_modules\@google\genai\dist\index.mjs:13965:function 
+normalizeInteractionDates(interaction) {
+node_modules\@google\genai\dist\index.mjs:13968:function 
+normalizeDateLike(value) {
+node_modules\@google\genai\dist\index.mjs:13977:function 
+audioTranscriptionConfigToMldev$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14000:function 
+authConfigToMldev$2(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14027:function 
+blobToMldev$2(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14042:function 
+codeExecutionResultToVertex$2(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14057:function 
+computerUseToVertex$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14063:    const 
+fromExcludedPredefinedFunctions = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:14064:        
+'excludedPredefinedFunctions',
+node_modules\@google\genai\dist\index.mjs:14066:    if 
+(fromExcludedPredefinedFunctions != null) {
+node_modules\@google\genai\dist\index.mjs:14067:        
+setValueByPath(toObject, ['excludedPredefinedFunctions'], 
+fromExcludedPredefinedFunctions);
+node_modules\@google\genai\dist\index.mjs:14080:function 
+contentToMldev$2(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14098:function 
+contentToVertex$2(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14116:function 
+executableCodeToVertex$2(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14131:function 
+fileDataToMldev$2(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14146:function 
+functionCallToMldev$2(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14168:function 
+generationConfigToVertex$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14296:function 
+googleMapsToMldev$2(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14308:function 
+googleSearchToMldev$2(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14328:function 
+liveConnectConfigToMldev$1(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:14463:function 
+liveConnectConfigToVertex(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:14598:function 
+liveConnectParametersToMldev(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:14610:function 
+liveConnectParametersToVertex(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:14622:function 
+liveMusicSetConfigParametersToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14632:function 
+liveMusicSetWeightedPromptsParametersToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14648:function 
+liveSendRealtimeInputParametersToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14690:function 
+liveSendRealtimeInputParametersToVertex(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14732:function 
+liveServerMessageFromVertex(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14786:function 
+mcpServerToVertex$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14796:function 
+partToMldev$2(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14820:    const fromFunctionCall = 
+getValueByPath(fromObject, ['functionCall']);
+node_modules\@google\genai\dist\index.mjs:14821:    if (fromFunctionCall != 
+null) {
+node_modules\@google\genai\dist\index.mjs:14822:        
+setValueByPath(toObject, ['functionCall'], 
+functionCallToMldev$2(fromFunctionCall));
+node_modules\@google\genai\dist\index.mjs:14824:    const fromFunctionResponse 
+= getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:14825:        'functionResponse',
+node_modules\@google\genai\dist\index.mjs:14827:    if (fromFunctionResponse 
+!= null) {
+node_modules\@google\genai\dist\index.mjs:14828:        
+setValueByPath(toObject, ['functionResponse'], fromFunctionResponse);
+node_modules\@google\genai\dist\index.mjs:14868:function 
+partToVertex$2(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14892:    const fromFunctionCall = 
+getValueByPath(fromObject, ['functionCall']);
+node_modules\@google\genai\dist\index.mjs:14893:    if (fromFunctionCall != 
+null) {
+node_modules\@google\genai\dist\index.mjs:14894:        
+setValueByPath(toObject, ['functionCall'], fromFunctionCall);
+node_modules\@google\genai\dist\index.mjs:14896:    const fromFunctionResponse 
+= getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:14897:        'functionResponse',
+node_modules\@google\genai\dist\index.mjs:14899:    if (fromFunctionResponse 
+!= null) {
+node_modules\@google\genai\dist\index.mjs:14900:        
+setValueByPath(toObject, ['functionResponse'], fromFunctionResponse);
+node_modules\@google\genai\dist\index.mjs:14937:function 
+safetySettingToMldev$2(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14952:function 
+sessionResumptionConfigToMldev$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14963:function 
+toolToMldev$2(fromObject) {
+node_modules\@google\genai\dist\index.mjs:14993:    const 
+fromFunctionDeclarations = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:14994:        'functionDeclarations',
+node_modules\@google\genai\dist\index.mjs:14996:    if 
+(fromFunctionDeclarations != null) {
+node_modules\@google\genai\dist\index.mjs:14997:        let transformedList = 
+fromFunctionDeclarations;
+node_modules\@google\genai\dist\index.mjs:15003:        
+setValueByPath(toObject, ['functionDeclarations'], transformedList);
+node_modules\@google\genai\dist\index.mjs:15030:function 
+toolToVertex$1(fromObject) {
+node_modules\@google\genai\dist\index.mjs:15063:    const 
+fromFunctionDeclarations = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:15064:        'functionDeclarations',
+node_modules\@google\genai\dist\index.mjs:15066:    if 
+(fromFunctionDeclarations != null) {
+node_modules\@google\genai\dist\index.mjs:15067:        let transformedList = 
+fromFunctionDeclarations;
+node_modules\@google\genai\dist\index.mjs:15073:        
+setValueByPath(toObject, ['functionDeclarations'], transformedList);
+node_modules\@google\genai\dist\index.mjs:15103:function 
+usageMetadataFromVertex(fromObject) {
+node_modules\@google\genai\dist\index.mjs:15195:function 
+voiceActivityFromVertex(fromObject) {
+node_modules\@google\genai\dist\index.mjs:15213:function 
+authConfigToMldev$1(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:15240:function 
+blobToMldev$1(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:15255:function 
+candidateFromMldev(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:15315:function 
+citationMetadataFromMldev(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:15329:function 
+codeExecutionResultToVertex$1(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:15344:function 
+computeTokensParametersToVertex(apiClient, fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:15362:function 
+computeTokensResponseFromVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:15382:function 
+computerUseToVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:15388:    const 
+fromExcludedPredefinedFunctions = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:15389:        
+'excludedPredefinedFunctions',
+node_modules\@google\genai\dist\index.mjs:15391:    if 
+(fromExcludedPredefinedFunctions != null) {
+node_modules\@google\genai\dist\index.mjs:15392:        
+setValueByPath(toObject, ['excludedPredefinedFunctions'], 
+fromExcludedPredefinedFunctions);
+node_modules\@google\genai\dist\index.mjs:15405:function 
+contentEmbeddingFromVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:15417:function 
+contentEmbeddingStatisticsFromVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:15429:function 
+contentToMldev$1(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:15447:function 
+contentToVertex$1(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:15465:function 
+controlReferenceConfigToVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:15479:function 
+countTokensConfigToMldev(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:15492:function 
+countTokensConfigToVertex(fromObject, parentObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:15518:function 
+countTokensParametersToMldev(apiClient, fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:15540:function 
+countTokensParametersToVertex(apiClient, fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:15562:function 
+countTokensResponseFromMldev(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:15582:function 
+countTokensResponseFromVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:15596:function 
+deleteModelParametersToMldev(apiClient, fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:15604:function 
+deleteModelParametersToVertex(apiClient, fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:15612:function 
+deleteModelResponseFromMldev(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:15622:function 
+deleteModelResponseFromVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:15632:function 
+editImageConfigToVertex(fromObject, parentObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:15722:function 
+editImageParametersInternalToVertex(apiClient, fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:15750:function 
+editImageResponseFromVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:15772:function 
+embedContentConfigToMldev(fromObject, parentObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:15802:function 
+embedContentConfigToVertex(fromObject, parentObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:15924:function 
+embedContentParametersPrivateToMldev(apiClient, fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:15954:function 
+embedContentParametersPrivateToVertex(apiClient, fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:15996:function 
+embedContentResponseFromMldev(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:16020:function 
+embedContentResponseFromVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:16065:function 
+endpointFromVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:16079:function 
+executableCodeToVertex$1(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:16094:function 
+fileDataToMldev$1(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:16109:function 
+functionCallToMldev$1(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:16131:function 
+functionCallingConfigToMldev(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:16133:    const 
+fromAllowedFunctionNames = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:16134:        'allowedFunctionNames',
+node_modules\@google\genai\dist\index.mjs:16136:    if 
+(fromAllowedFunctionNames != null) {
+node_modules\@google\genai\dist\index.mjs:16137:        
+setValueByPath(toObject, ['allowedFunctionNames'], fromAllowedFunctionNames);
+node_modules\@google\genai\dist\index.mjs:16143:    if 
+(getValueByPath(fromObject, ['streamFunctionCallArguments']) !==
+node_modules\@google\genai\dist\index.mjs:16145:        throw new 
+Error('streamFunctionCallArguments parameter is only supported in Gemini 
+Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+node_modules\@google\genai\dist\index.mjs:16149:function 
+generateContentConfigToMldev(apiClient, fromObject, parentObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:16316:function 
+generateContentConfigToVertex(apiClient, fromObject, parentObject, rootObject) 
+{
+node_modules\@google\genai\dist\index.mjs:16494:function 
+generateContentParametersToMldev(apiClient, fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:16516:function 
+generateContentParametersToVertex(apiClient, fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:16538:function 
+generateContentResponseFromMldev(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:16582:function 
+generateContentResponseFromVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:16626:function 
+generateImagesConfigToMldev(fromObject, parentObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:16708:function 
+generateImagesConfigToVertex(fromObject, parentObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:16800:function 
+generateImagesParametersToMldev(apiClient, fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:16816:function 
+generateImagesParametersToVertex(apiClient, fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:16832:function 
+generateImagesResponseFromMldev(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:16860:function 
+generateImagesResponseFromVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:16888:function 
+generateVideosConfigToMldev(fromObject, parentObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:16979:function 
+generateVideosConfigToVertex(fromObject, parentObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17080:function 
+generateVideosOperationFromMldev(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17107:function 
+generateVideosOperationFromVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17131:function 
+generateVideosParametersToMldev(apiClient, fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17159:function 
+generateVideosParametersToVertex(apiClient, fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17187:function 
+generateVideosResponseFromMldev(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17215:function 
+generateVideosResponseFromVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17241:function 
+generateVideosSourceToMldev(fromObject, parentObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17257:function 
+generateVideosSourceToVertex(fromObject, parentObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17273:function 
+generatedImageFromMldev(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17291:function 
+generatedImageFromVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17313:function 
+generatedImageMaskFromVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17331:function 
+generatedVideoFromMldev(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17339:function 
+generatedVideoFromVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17347:function 
+generationConfigToVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:17475:function 
+getModelParametersToMldev(apiClient, fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:17483:function 
+getModelParametersToVertex(apiClient, fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:17491:function 
+googleMapsToMldev$1(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17503:function 
+googleSearchToMldev$1(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:17523:function 
+imageConfigToMldev(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:17551:function 
+imageConfigToVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:17593:function 
+imageFromMldev(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:17607:function 
+imageFromVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:17625:function 
+imageToMldev(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:17640:function 
+imageToVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:17656:function 
+listModelsConfigToMldev(apiClient, fromObject, parentObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:17676:function 
+listModelsConfigToVertex(apiClient, fromObject, parentObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:17696:function 
+listModelsParametersToMldev(apiClient, fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17704:function 
+listModelsParametersToVertex(apiClient, fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17712:function 
+listModelsResponseFromMldev(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17738:function 
+listModelsResponseFromVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17764:function 
+maskReferenceConfigToVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:17770:    const 
+fromSegmentationClasses = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:17771:        'segmentationClasses',
+node_modules\@google\genai\dist\index.mjs:17773:    if 
+(fromSegmentationClasses != null) {
+node_modules\@google\genai\dist\index.mjs:17774:        
+setValueByPath(toObject, ['maskClasses'], fromSegmentationClasses);
+node_modules\@google\genai\dist\index.mjs:17782:function 
+mcpServerToVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:17792:function 
+modelFromMldev(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17856:function 
+modelFromVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17910:function 
+partToMldev$1(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:17934:    const fromFunctionCall = 
+getValueByPath(fromObject, ['functionCall']);
+node_modules\@google\genai\dist\index.mjs:17935:    if (fromFunctionCall != 
+null) {
+node_modules\@google\genai\dist\index.mjs:17936:        
+setValueByPath(toObject, ['functionCall'], 
+functionCallToMldev$1(fromFunctionCall));
+node_modules\@google\genai\dist\index.mjs:17938:    const fromFunctionResponse 
+= getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:17939:        'functionResponse',
+node_modules\@google\genai\dist\index.mjs:17941:    if (fromFunctionResponse 
+!= null) {
+node_modules\@google\genai\dist\index.mjs:17942:        
+setValueByPath(toObject, ['functionResponse'], fromFunctionResponse);
+node_modules\@google\genai\dist\index.mjs:17982:function 
+partToVertex$1(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18006:    const fromFunctionCall = 
+getValueByPath(fromObject, ['functionCall']);
+node_modules\@google\genai\dist\index.mjs:18007:    if (fromFunctionCall != 
+null) {
+node_modules\@google\genai\dist\index.mjs:18008:        
+setValueByPath(toObject, ['functionCall'], fromFunctionCall);
+node_modules\@google\genai\dist\index.mjs:18010:    const fromFunctionResponse 
+= getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:18011:        'functionResponse',
+node_modules\@google\genai\dist\index.mjs:18013:    if (fromFunctionResponse 
+!= null) {
+node_modules\@google\genai\dist\index.mjs:18014:        
+setValueByPath(toObject, ['functionResponse'], fromFunctionResponse);
+node_modules\@google\genai\dist\index.mjs:18051:function 
+productImageToVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18059:function 
+recontextImageConfigToVertex(fromObject, parentObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:18119:function 
+recontextImageParametersToVertex(apiClient, fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18135:function 
+recontextImageResponseFromVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18151:function 
+recontextImageSourceToVertex(fromObject, parentObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18175:function 
+referenceImageAPIInternalToVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18219:function 
+safetyAttributesFromMldev(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:18241:function 
+safetyAttributesFromVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:18263:function 
+safetySettingToMldev$1(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:18278:function 
+scribbleImageToVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18286:function 
+segmentImageConfigToVertex(fromObject, parentObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:18320:function 
+segmentImageParametersToVertex(apiClient, fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18336:function 
+segmentImageResponseFromVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18350:function 
+segmentImageSourceToVertex(fromObject, parentObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18368:function 
+toolConfigToMldev(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18376:    const 
+fromFunctionCallingConfig = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:18377:        
+'functionCallingConfig',
+node_modules\@google\genai\dist\index.mjs:18379:    if 
+(fromFunctionCallingConfig != null) {
+node_modules\@google\genai\dist\index.mjs:18380:        
+setValueByPath(toObject, ['functionCallingConfig'], 
+functionCallingConfigToMldev(fromFunctionCallingConfig));
+node_modules\@google\genai\dist\index.mjs:18388:function 
+toolConfigToVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:18396:    const 
+fromFunctionCallingConfig = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:18397:        
+'functionCallingConfig',
+node_modules\@google\genai\dist\index.mjs:18399:    if 
+(fromFunctionCallingConfig != null) {
+node_modules\@google\genai\dist\index.mjs:18400:        
+setValueByPath(toObject, ['functionCallingConfig'], fromFunctionCallingConfig);
+node_modules\@google\genai\dist\index.mjs:18408:function 
+toolToMldev$1(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18438:    const 
+fromFunctionDeclarations = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:18439:        'functionDeclarations',
+node_modules\@google\genai\dist\index.mjs:18441:    if 
+(fromFunctionDeclarations != null) {
+node_modules\@google\genai\dist\index.mjs:18442:        let transformedList = 
+fromFunctionDeclarations;
+node_modules\@google\genai\dist\index.mjs:18448:        
+setValueByPath(toObject, ['functionDeclarations'], transformedList);
+node_modules\@google\genai\dist\index.mjs:18475:function 
+toolToVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18508:    const 
+fromFunctionDeclarations = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:18509:        'functionDeclarations',
+node_modules\@google\genai\dist\index.mjs:18511:    if 
+(fromFunctionDeclarations != null) {
+node_modules\@google\genai\dist\index.mjs:18512:        let transformedList = 
+fromFunctionDeclarations;
+node_modules\@google\genai\dist\index.mjs:18518:        
+setValueByPath(toObject, ['functionDeclarations'], transformedList);
+node_modules\@google\genai\dist\index.mjs:18548:function 
+tunedModelInfoFromMldev(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:18564:function 
+tunedModelInfoFromVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:18583:function 
+updateModelConfigToMldev(fromObject, parentObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:18601:function 
+updateModelConfigToVertex(fromObject, parentObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:18619:function 
+updateModelParametersToMldev(apiClient, fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18631:function 
+updateModelParametersToVertex(apiClient, fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18643:function 
+upscaleImageAPIConfigInternalToVertex(fromObject, parentObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:18707:function 
+upscaleImageAPIParametersInternalToVertex(apiClient, fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18729:function 
+upscaleImageResponseFromVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18751:function 
+videoFromMldev(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:18767:function 
+videoFromVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:18785:function 
+videoGenerationMaskToVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18797:function 
+videoGenerationReferenceImageToMldev(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18811:function 
+videoGenerationReferenceImageToVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:18825:function 
+videoToMldev(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:18841:function 
+videoToVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:18869:function 
+hasMcpToolUsage(tools) {
+node_modules\@google\genai\dist\index.mjs:18881:function 
+setMcpUsageHeader(headers) {
+node_modules\@google\genai\dist\index.mjs:18887:function 
+isMcpCallableTool(object) {
+node_modules\@google\genai\dist\index.mjs:18893:function 
+listAllTools(mcpClient_1) {
+node_modules\@google\genai\dist\index.mjs:18894:    return 
+__asyncGenerator(this, arguments, function* listAllTools_1(mcpClient, maxTools 
+= 100) {
+node_modules\@google\genai\dist\index.mjs:18912: * given function call 
+arguments.
+node_modules\@google\genai\dist\index.mjs:18917:class McpCallableTool {
+node_modules\@google\genai\dist\index.mjs:18920:        
+this.functionNameToMcpClient = {};
+node_modules\@google\genai\dist\index.mjs:18927:    static create(mcpClients, 
+config) {
+node_modules\@google\genai\dist\index.mjs:18931:     * Validates the function 
+names are not duplicate and initialize the function
+node_modules\@google\genai\dist\index.mjs:18942:        const functionMap = {};
+node_modules\@google\genai\dist\index.mjs:18952:                    if 
+(functionMap[mcpToolName]) {
+node_modules\@google\genai\dist\index.mjs:18953:                        throw 
+new Error(`Duplicate function name ${mcpToolName} found in MCP tools. Please 
+ensure function names are unique.`);
+node_modules\@google\genai\dist\index.mjs:18955:                    
+functionMap[mcpToolName] = mcpClient;
+node_modules\@google\genai\dist\index.mjs:18967:        
+this.functionNameToMcpClient = functionMap;
+node_modules\@google\genai\dist\index.mjs:18973:    async 
+callTool(functionCalls) {
+node_modules\@google\genai\dist\index.mjs:18975:        const 
+functionCallResponseParts = [];
+node_modules\@google\genai\dist\index.mjs:18976:        for (const 
+functionCall of functionCalls) {
+node_modules\@google\genai\dist\index.mjs:18977:            if 
+(functionCall.name in this.functionNameToMcpClient) {
+node_modules\@google\genai\dist\index.mjs:18978:                const 
+mcpClient = this.functionNameToMcpClient[functionCall.name];
+node_modules\@google\genai\dist\index.mjs:18987:                    name: 
+functionCall.name,
+node_modules\@google\genai\dist\index.mjs:18988:                    arguments: 
+functionCall.args,
+node_modules\@google\genai\dist\index.mjs:18993:                
+functionCallResponseParts.push({
+node_modules\@google\genai\dist\index.mjs:18994:                    
+functionResponse: {
+node_modules\@google\genai\dist\index.mjs:18995:                        name: 
+functionCall.name,
+node_modules\@google\genai\dist\index.mjs:19003:        return 
+functionCallResponseParts;
+node_modules\@google\genai\dist\index.mjs:19006:function isMcpClient(client) {
+node_modules\@google\genai\dist\index.mjs:19010:        typeof 
+client.listTools === 'function');
+node_modules\@google\genai\dist\index.mjs:19015: * The callable tool can 
+invoke the MCP clients with given function call
+node_modules\@google\genai\dist\index.mjs:19016: * arguments. (often for 
+automatic function calling).
+node_modules\@google\genai\dist\index.mjs:19022:function mcpToTool(...args) {
+node_modules\@google\genai\dist\index.mjs:19030:        return 
+McpCallableTool.create(args, {});
+node_modules\@google\genai\dist\index.mjs:19032:    return 
+McpCallableTool.create(args.slice(0, args.length - 1), maybeConfig);
+node_modules\@google\genai\dist\index.mjs:19044: * This function is 
+responsible for parsing incoming messages, transforming them
+node_modules\@google\genai\dist\index.mjs:19053:async function 
+handleWebSocketMessage$1(apiClient, onmessage, event) {
+node_modules\@google\genai\dist\index.mjs:19066:   LiveMusic class 
+encapsulates the configuration for live music
+node_modules\@google\genai\dist\index.mjs:19071:class LiveMusic {
+node_modules\@google\genai\dist\index.mjs:19091:       const session = await 
+ai.live.music.connect({
+node_modules\@google\genai\dist\index.mjs:19110:            throw new 
+Error('Live music is not supported for Vertex AI.');
+node_modules\@google\genai\dist\index.mjs:19117:        const url = `${websocke
+tBaseUrl}/ws/google.ai.generativelanguage.${apiVersion}.GenerativeService.BidiG
+enerateMusic?key=${apiKey}`;
+node_modules\@google\genai\dist\index.mjs:19123:        const 
+onopenAwaitedCallback = function () {
+node_modules\@google\genai\dist\index.mjs:19132:            onerror: (_a = 
+callbacks === null || callbacks === void 0 ? void 0 : callbacks.onerror) !== 
+null && _a !== void 0 ? _a : function (e) {
+node_modules\@google\genai\dist\index.mjs:19134:            onclose: (_b = 
+callbacks === null || callbacks === void 0 ? void 0 : callbacks.onclose) !== 
+null && _b !== void 0 ? _b : function (e) {
+node_modules\@google\genai\dist\index.mjs:19137:        const conn = 
+this.webSocketFactory.create(url, headersToMap$1(headers), websocketCallbacks);
+node_modules\@google\genai\dist\index.mjs:19153:class LiveMusicSession {
+node_modules\@google\genai\dist\index.mjs:19246:function 
+headersToMap$1(headers) {
+node_modules\@google\genai\dist\index.mjs:19256:function mapToHeaders$1(map) {
+node_modules\@google\genai\dist\index.mjs:19269:const 
+FUNCTION_RESPONSE_REQUIRES_ID = 'FunctionResponse request must have an `id` 
+field from the response of a ToolCall.FunctionalCalls in Google AI.';
+node_modules\@google\genai\dist\index.mjs:19274: * This function is 
+responsible for parsing incoming messages, transforming them
+node_modules\@google\genai\dist\index.mjs:19283:async function 
+handleWebSocketMessage(apiClient, onmessage, event) {
+node_modules\@google\genai\dist\index.mjs:19307:   Live class encapsulates the 
+configuration for live interaction with the
+node_modules\@google\genai\dist\index.mjs:19312:class Live {
+node_modules\@google\genai\dist\index.mjs:19339:       const session = await 
+ai.live.connect({
+node_modules\@google\genai\dist\index.mjs:19401:                    
+console.warn("Warning: The SDK's ephemeral token support is in v1alpha only. 
+Please use const ai = new GoogleGenAI({apiKey: token.name, httpOptions: { 
+apiVersion: 'v1alpha' }}); before session connection.");
+node_modules\@google\genai\dist\index.mjs:19406:            url = `${websocketB
+aseUrl}/ws/google.ai.generativelanguage.${apiVersion}.GenerativeService.${metho
+d}?${keyName}=${apiKey}`;
+node_modules\@google\genai\dist\index.mjs:19413:        const 
+onopenAwaitedCallback = function () {
+node_modules\@google\genai\dist\index.mjs:19424:            onerror: (_a = 
+callbacks === null || callbacks === void 0 ? void 0 : callbacks.onerror) !== 
+null && _a !== void 0 ? _a : function (e) {
+node_modules\@google\genai\dist\index.mjs:19426:            onclose: (_b = 
+callbacks === null || callbacks === void 0 ? void 0 : callbacks.onclose) !== 
+null && _b !== void 0 ? _b : function (e) {
+node_modules\@google\genai\dist\index.mjs:19429:        const conn = 
+this.webSocketFactory.create(url, headersToMap(headers), websocketCallbacks);
+node_modules\@google\genai\dist\index.mjs:19489:        return 'callTool' in 
+tool && typeof tool.callTool === 'function';
+node_modules\@google\genai\dist\index.mjs:19500:class Session {
+node_modules\@google\genai\dist\index.mjs:19526:        let functionResponses 
+= [];
+node_modules\@google\genai\dist\index.mjs:19527:        if 
+(params.functionResponses == null) {
+node_modules\@google\genai\dist\index.mjs:19528:            throw new 
+Error('functionResponses is required.');
+node_modules\@google\genai\dist\index.mjs:19530:        if 
+(!Array.isArray(params.functionResponses)) {
+node_modules\@google\genai\dist\index.mjs:19531:            functionResponses 
+= [params.functionResponses];
+node_modules\@google\genai\dist\index.mjs:19534:            functionResponses 
+= params.functionResponses;
+node_modules\@google\genai\dist\index.mjs:19536:        if 
+(functionResponses.length === 0) {
+node_modules\@google\genai\dist\index.mjs:19537:            throw new 
+Error('functionResponses is required.');
+node_modules\@google\genai\dist\index.mjs:19539:        for (const 
+functionResponse of functionResponses) {
+node_modules\@google\genai\dist\index.mjs:19540:            if (typeof 
+functionResponse !== 'object' ||
+node_modules\@google\genai\dist\index.mjs:19541:                
+functionResponse === null ||
+node_modules\@google\genai\dist\index.mjs:19542:                !('name' in 
+functionResponse) ||
+node_modules\@google\genai\dist\index.mjs:19543:                !('response' 
+in functionResponse)) {
+node_modules\@google\genai\dist\index.mjs:19544:                throw new 
+Error(`Could not parse function response, type '${typeof functionResponse}'.`);
+node_modules\@google\genai\dist\index.mjs:19546:            if 
+(!apiClient.isVertexAI() && !('id' in functionResponse)) {
+node_modules\@google\genai\dist\index.mjs:19547:                throw new 
+Error(FUNCTION_RESPONSE_REQUIRES_ID);
+node_modules\@google\genai\dist\index.mjs:19551:            toolResponse: { 
+'functionResponses': functionResponses },
+node_modules\@google\genai\dist\index.mjs:19646:      Send a function response 
+message over the established connection.
+node_modules\@google\genai\dist\index.mjs:19648:      @param params - Contains 
+property `functionResponses`.
+node_modules\@google\genai\dist\index.mjs:19650:        - `functionResponses` 
+will be converted to a `functionResponses[]`
+node_modules\@google\genai\dist\index.mjs:19653:      Use 
+`sendFunctionResponse` to reply to `LiveServerToolCall` from the server.
+node_modules\@google\genai\dist\index.mjs:19655:      Use {@link 
+types.LiveConnectConfig#tools} to configure the callable functions.
+node_modules\@google\genai\dist\index.mjs:19660:        if 
+(params.functionResponses == null) {
+node_modules\@google\genai\dist\index.mjs:19679:       const session = await 
+ai.live.connect({
+node_modules\@google\genai\dist\index.mjs:19696:function headersToMap(headers) 
+{
+node_modules\@google\genai\dist\index.mjs:19706:function mapToHeaders(map) {
+node_modules\@google\genai\dist\index.mjs:19720:/** Returns whether automatic 
+function calling is disabled. */
+node_modules\@google\genai\dist\index.mjs:19721:function 
+shouldDisableAfc(config) {
+node_modules\@google\genai\dist\index.mjs:19723:    if ((_a = config === null 
+|| config === void 0 ? void 0 : config.automaticFunctionCalling) === null || 
+_a === void 0 ? void 0 : _a.disable) {
+node_modules\@google\genai\dist\index.mjs:19736:    const maxCalls = (_c = 
+config === null || config === void 0 ? void 0 : 
+config.automaticFunctionCalling) === null || _c === void 0 ? void 0 : 
+_c.maximumRemoteCalls;
+node_modules\@google\genai\dist\index.mjs:19739:        console.warn('Invalid 
+maximumRemoteCalls value provided for automatic function calling. Disabled 
+automatic function calling. Please provide a valid integer value greater than 
+0. maximumRemoteCalls provided:', maxCalls);
+node_modules\@google\genai\dist\index.mjs:19744:function isCallableTool(tool) {
+node_modules\@google\genai\dist\index.mjs:19745:    return 'callTool' in tool 
+&& typeof tool.callTool === 'function';
+node_modules\@google\genai\dist\index.mjs:19749:function 
+hasCallableTools(params) {
+node_modules\@google\genai\dist\index.mjs:19756:function 
+findAfcIncompatibleToolIndexes(params) {
+node_modules\@google\genai\dist\index.mjs:19768:        if 
+(geminiTool.functionDeclarations &&
+node_modules\@google\genai\dist\index.mjs:19769:            
+geminiTool.functionDeclarations.length > 0) {
+node_modules\@google\genai\dist\index.mjs:19776: * Returns whether to append 
+automatic function calling history to the
+node_modules\@google\genai\dist\index.mjs:19779:function 
+shouldAppendAfcHistory(config) {
+node_modules\@google\genai\dist\index.mjs:19781:    return !((_a = config === 
+null || config === void 0 ? void 0 : config.automaticFunctionCalling) === null 
+|| _a === void 0 ? void 0 : _a.ignoreCallHistory);
+node_modules\@google\genai\dist\index.mjs:19789:class Models extends 
+BaseModule {
+node_modules\@google\genai\dist\index.mjs:19801:         * const response = 
+await ai.models.embedContent({
+node_modules\@google\genai\dist\index.mjs:19866:         * const response = 
+await ai.models.generateContent({
+node_modules\@google\genai\dist\index.mjs:19888:                throw new 
+Error(`Automatic function calling with CallableTools (or MCP objects) and 
+basic FunctionDeclarations is not yet supported. Incompatible tools found at 
+${formattedIndexes}.`);
+node_modules\@google\genai\dist\index.mjs:19891:            let 
+functionResponseContent;
+node_modules\@google\genai\dist\index.mjs:19892:            const 
+automaticFunctionCallingHistory = tContents(transformedParams.contents);
+node_modules\@google\genai\dist\index.mjs:19893:            const 
+maxRemoteCalls = (_c = (_b = (_a = transformedParams.config) === null || _a 
+=== void 0 ? void 0 : _a.automaticFunctionCalling) === null || _b === void 0 ? 
+void 0 : _b.maximumRemoteCalls) !== null && _c !== void 0 ? _c : 
+DEFAULT_MAX_REMOTE_CALLS;
+node_modules\@google\genai\dist\index.mjs:19897:                if 
+(!response.functionCalls || response.functionCalls.length === 0) {
+node_modules\@google\genai\dist\index.mjs:19901:                const 
+functionResponseParts = [];
+node_modules\@google\genai\dist\index.mjs:19905:                        const 
+parts = await callableTool.callTool(response.functionCalls);
+node_modules\@google\genai\dist\index.mjs:19906:                        
+functionResponseParts.push(...parts);
+node_modules\@google\genai\dist\index.mjs:19910:                
+functionResponseContent = {
+node_modules\@google\genai\dist\index.mjs:19912:                    parts: 
+functionResponseParts,
+node_modules\@google\genai\dist\index.mjs:19916:                
+transformedParams.contents.push(functionResponseContent);
+node_modules\@google\genai\dist\index.mjs:19918:                    
+automaticFunctionCallingHistory.push(responseContent);
+node_modules\@google\genai\dist\index.mjs:19919:                    
+automaticFunctionCallingHistory.push(functionResponseContent);
+node_modules\@google\genai\dist\index.mjs:19923:                
+response.automaticFunctionCallingHistory =
+node_modules\@google\genai\dist\index.mjs:19924:                    
+automaticFunctionCallingHistory;
+node_modules\@google\genai\dist\index.mjs:19957:         * const response = 
+await ai.models.generateContentStream({
+node_modules\@google\genai\dist\index.mjs:19981:                throw new 
+Error(`Incompatible tools found at ${formattedIndexes}. Automatic function 
+calling with CallableTools (or MCP objects) and basic FunctionDeclarations" is 
+not yet supported.`);
+node_modules\@google\genai\dist\index.mjs:19985:            const 
+streamFunctionCall = (_c = (_b = (_a = params === null || params === void 0 ? 
+void 0 : params.config) === null || _a === void 0 ? void 0 : _a.toolConfig) 
+=== null || _b === void 0 ? void 0 : _b.functionCallingConfig) === null || _c 
+=== void 0 ? void 0 : _c.streamFunctionCallArguments;
+node_modules\@google\genai\dist\index.mjs:19986:            const disableAfc = 
+(_e = (_d = params === null || params === void 0 ? void 0 : params.config) === 
+null || _d === void 0 ? void 0 : _d.automaticFunctionCalling) === null || _e 
+=== void 0 ? void 0 : _e.disable;
+node_modules\@google\genai\dist\index.mjs:19987:            if 
+(streamFunctionCall && !disableAfc) {
+node_modules\@google\genai\dist\index.mjs:19988:                throw new 
+Error("Running in streaming mode with 'streamFunctionCallArguments' enabled, " 
++
+node_modules\@google\genai\dist\index.mjs:19989:                    'this 
+feature is not compatible with automatic function calling (AFC). ' +
+node_modules\@google\genai\dist\index.mjs:19990:                    "Please 
+set 'config.automaticFunctionCalling.disable' to true to disable AFC " +
+node_modules\@google\genai\dist\index.mjs:19991:                    "or leave 
+'config.toolConfig.functionCallingConfig.streamFunctionCallArguments' " +
+node_modules\@google\genai\dist\index.mjs:19992:                    'to be 
+undefined or set to false to disable streaming function call arguments 
+feature.');
+node_modules\@google\genai\dist\index.mjs:20148:         * const operation = 
+await ai.models.generateVideos({
+node_modules\@google\genai\dist\index.mjs:20159:         *   operation = await 
+ai.operations.getVideosOperation({operation: operation});
+node_modules\@google\genai\dist\index.mjs:20252:                for (const 
+declaration of (_c = toolDeclaration.functionDeclarations) !== null && _c !== 
+void 0 ? _c : []) {
+node_modules\@google\genai\dist\index.mjs:20254:                        throw 
+new Error('Function declaration name is required.');
+node_modules\@google\genai\dist\index.mjs:20267:        const maxRemoteCalls = 
+(_c = (_b = (_a = params.config) === null || _a === void 0 ? void 0 : 
+_a.automaticFunctionCalling) === null || _b === void 0 ? void 0 : 
+_b.maximumRemoteCalls) !== null && _c !== void 0 ? _c : 
+DEFAULT_MAX_REMOTE_CALLS;
+node_modules\@google\genai\dist\index.mjs:20268:        let 
+wereFunctionsCalled = false;
+node_modules\@google\genai\dist\index.mjs:20271:        return (function 
+(models, afcTools, params) {
+node_modules\@google\genai\dist\index.mjs:20272:            return 
+__asyncGenerator(this, arguments, function* () {
+node_modules\@google\genai\dist\index.mjs:20276:                    if 
+(wereFunctionsCalled) {
+node_modules\@google\genai\dist\index.mjs:20278:                        
+wereFunctionsCalled = false;
+node_modules\@google\genai\dist\index.mjs:20282:                    const 
+functionResponses = [];
+node_modules\@google\genai\dist\index.mjs:20293:                               
+     if (remoteCallCount < maxRemoteCalls && part.functionCall) {
+node_modules\@google\genai\dist\index.mjs:20294:                               
+         if (!part.functionCall.name) {
+node_modules\@google\genai\dist\index.mjs:20295:                               
+             throw new Error('Function call name was not returned by the 
+model.');
+node_modules\@google\genai\dist\index.mjs:20297:                               
+         if (!afcTools.has(part.functionCall.name)) {
+node_modules\@google\genai\dist\index.mjs:20298:                               
+             throw new Error(`Automatic function calling was requested, but 
+not all the tools the model used implement the CallableTool interface. 
+Available tools: ${afcTools.keys()}, missing tool: ${part.functionCall.name}`);
+node_modules\@google\genai\dist\index.mjs:20302:                               
+                 .get(part.functionCall.name)
+node_modules\@google\genai\dist\index.mjs:20303:                               
+                 .callTool([part.functionCall]));
+node_modules\@google\genai\dist\index.mjs:20304:                               
+             functionResponses.push(...responseParts);
+node_modules\@google\genai\dist\index.mjs:20318:                    if 
+(functionResponses.length > 0) {
+node_modules\@google\genai\dist\index.mjs:20319:                        
+wereFunctionsCalled = true;
+node_modules\@google\genai\dist\index.mjs:20325:                               
+     parts: functionResponses,
+node_modules\@google\genai\dist\index.mjs:20334:                            
+parts: functionResponses,
+node_modules\@google\genai\dist\index.mjs:20434:            return 
+response.then(function (apiResponse) {
+node_modules\@google\genai\dist\index.mjs:20435:                return 
+__asyncGenerator(this, arguments, function* () {
+node_modules\@google\genai\dist\index.mjs:20476:            return 
+response.then(function (apiResponse) {
+node_modules\@google\genai\dist\index.mjs:20477:                return 
+__asyncGenerator(this, arguments, function* () {
+node_modules\@google\genai\dist\index.mjs:20512:     * const response = await 
+ai.models.embedContent({
+node_modules\@google\genai\dist\index.mjs:20764:     * const response = await 
+ai.models.recontextImage({
+node_modules\@google\genai\dist\index.mjs:20819:     * const response = await 
+ai.models.segmentImage({
+node_modules\@google\genai\dist\index.mjs:20870:     * const modelInfo = await 
+ai.models.get({model: 'gemini-2.0-flash'});
+node_modules\@google\genai\dist\index.mjs:21001:     * const response = await 
+ai.models.update({
+node_modules\@google\genai\dist\index.mjs:21070:     * const response = await 
+ai.models.delete({model: 'tuned-model-name'});
+node_modules\@google\genai\dist\index.mjs:21150:     * const response = await 
+ai.models.countTokens({
+node_modules\@google\genai\dist\index.mjs:21236:     * const response = await 
+ai.models.computeTokens({
+node_modules\@google\genai\dist\index.mjs:21349:class Operations extends 
+BaseModule {
+node_modules\@google\genai\dist\index.mjs:21514:function 
+audioTranscriptionConfigToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:21537:function 
+authConfigToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:21564:function 
+blobToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:21579:function 
+contentToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:21597:function 
+createAuthTokenConfigToMldev(apiClient, fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:21627:function 
+createAuthTokenParametersToMldev(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:21635:function 
+fileDataToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:21650:function 
+functionCallToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:21672:function 
+googleMapsToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:21684:function 
+googleSearchToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:21704:function 
+liveConnectConfigToMldev(fromObject, parentObject) {
+node_modules\@google\genai\dist\index.mjs:21839:function 
+liveConnectConstraintsToMldev(apiClient, fromObject) {
+node_modules\@google\genai\dist\index.mjs:21851:function 
+partToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:21875:    const fromFunctionCall = 
+getValueByPath(fromObject, ['functionCall']);
+node_modules\@google\genai\dist\index.mjs:21876:    if (fromFunctionCall != 
+null) {
+node_modules\@google\genai\dist\index.mjs:21877:        
+setValueByPath(toObject, ['functionCall'], 
+functionCallToMldev(fromFunctionCall));
+node_modules\@google\genai\dist\index.mjs:21879:    const fromFunctionResponse 
+= getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:21880:        'functionResponse',
+node_modules\@google\genai\dist\index.mjs:21882:    if (fromFunctionResponse 
+!= null) {
+node_modules\@google\genai\dist\index.mjs:21883:        
+setValueByPath(toObject, ['functionResponse'], fromFunctionResponse);
+node_modules\@google\genai\dist\index.mjs:21923:function 
+safetySettingToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:21938:function 
+sessionResumptionConfigToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:21949:function 
+toolToMldev(fromObject) {
+node_modules\@google\genai\dist\index.mjs:21979:    const 
+fromFunctionDeclarations = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:21980:        'functionDeclarations',
+node_modules\@google\genai\dist\index.mjs:21982:    if 
+(fromFunctionDeclarations != null) {
+node_modules\@google\genai\dist\index.mjs:21983:        let transformedList = 
+fromFunctionDeclarations;
+node_modules\@google\genai\dist\index.mjs:21989:        
+setValueByPath(toObject, ['functionDeclarations'], transformedList);
+node_modules\@google\genai\dist\index.mjs:22028:function getFieldMasks(setup) {
+node_modules\@google\genai\dist\index.mjs:22053:function 
+convertBidiSetupToTokenSetup(requestDict, config) {
+node_modules\@google\genai\dist\index.mjs:22164:class Tokens extends 
+BaseModule {
+node_modules\@google\genai\dist\index.mjs:22184:     * const ai = new 
+GoogleGenAI({
+node_modules\@google\genai\dist\index.mjs:22196:     * const token = await 
+ai.tokens.create(config);
+node_modules\@google\genai\dist\index.mjs:22213:     * const token = await 
+ai.tokens.create(config);
+node_modules\@google\genai\dist\index.mjs:22231:     * const token = await 
+ai.tokens.create(config);
+node_modules\@google\genai\dist\index.mjs:22249:     * const token = await 
+ai.tokens.create(config);
+node_modules\@google\genai\dist\index.mjs:22252:    async create(params) {
+node_modules\@google\genai\dist\index.mjs:22293:function 
+cancelTuningJobParametersToMldev(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:22301:function 
+cancelTuningJobParametersToVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:22309:function 
+cancelTuningJobResponseFromMldev(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:22319:function 
+cancelTuningJobResponseFromVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:22329:function 
+codeExecutionResultToVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:22344:function 
+contentToVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:22362:function 
+createTuningJobConfigToMldev(fromObject, parentObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:22386:    if 
+(getValueByPath(fromObject, ['exportLastCheckpointOnly']) !==
+node_modules\@google\genai\dist\index.mjs:22388:        throw new 
+Error('exportLastCheckpointOnly parameter is only supported in Gemini 
+Enterprise Agent Platform mode, not in Gemini Developer API mode.');
+node_modules\@google\genai\dist\index.mjs:22458:function 
+createTuningJobConfigToVertex(fromObject, parentObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:22587:    let 
+discriminatorExportLastCheckpointOnly = getValueByPath(rootObject, ['config', 
+'method']);
+node_modules\@google\genai\dist\index.mjs:22588:    if 
+(discriminatorExportLastCheckpointOnly === undefined) {
+node_modules\@google\genai\dist\index.mjs:22589:        
+discriminatorExportLastCheckpointOnly = 'SUPERVISED_FINE_TUNING';
+node_modules\@google\genai\dist\index.mjs:22591:    if 
+(discriminatorExportLastCheckpointOnly === 'SUPERVISED_FINE_TUNING') {
+node_modules\@google\genai\dist\index.mjs:22592:        const 
+fromExportLastCheckpointOnly = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:22593:            
+'exportLastCheckpointOnly',
+node_modules\@google\genai\dist\index.mjs:22595:        if (parentObject !== 
+undefined && fromExportLastCheckpointOnly != null) {
+node_modules\@google\genai\dist\index.mjs:22596:            
+setValueByPath(parentObject, ['supervisedTuningSpec', 
+'exportLastCheckpointOnly'], fromExportLastCheckpointOnly);
+node_modules\@google\genai\dist\index.mjs:22599:    else if 
+(discriminatorExportLastCheckpointOnly === 'PREFERENCE_TUNING') {
+node_modules\@google\genai\dist\index.mjs:22600:        const 
+fromExportLastCheckpointOnly = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:22601:            
+'exportLastCheckpointOnly',
+node_modules\@google\genai\dist\index.mjs:22603:        if (parentObject !== 
+undefined && fromExportLastCheckpointOnly != null) {
+node_modules\@google\genai\dist\index.mjs:22604:            
+setValueByPath(parentObject, ['preferenceOptimizationSpec', 
+'exportLastCheckpointOnly'], fromExportLastCheckpointOnly);
+node_modules\@google\genai\dist\index.mjs:22607:    else if 
+(discriminatorExportLastCheckpointOnly === 'DISTILLATION') {
+node_modules\@google\genai\dist\index.mjs:22608:        const 
+fromExportLastCheckpointOnly = getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:22609:            
+'exportLastCheckpointOnly',
+node_modules\@google\genai\dist\index.mjs:22611:        if (parentObject !== 
+undefined && fromExportLastCheckpointOnly != null) {
+node_modules\@google\genai\dist\index.mjs:22612:            
+setValueByPath(parentObject, ['distillationSpec', 'exportLastCheckpointOnly'], 
+fromExportLastCheckpointOnly);
+node_modules\@google\genai\dist\index.mjs:22803:function 
+createTuningJobParametersPrivateToMldev(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:22827:function 
+createTuningJobParametersPrivateToVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:22851:function 
+distillationHyperParametersFromVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:22883:function 
+distillationSamplingSpecFromVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:22917:function 
+distillationSpecFromVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:22971:function 
+executableCodeToVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:22986:function 
+generationConfigFromVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:23110:function 
+getTuningJobParametersToMldev(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:23118:function 
+getTuningJobParametersToVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:23126:function 
+listTuningJobsConfigToVertex(fromObject, parentObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:23142:function 
+listTuningJobsParametersToVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:23150:function 
+listTuningJobsResponseFromVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:23176:function 
+partToVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:23200:    const fromFunctionCall = 
+getValueByPath(fromObject, ['functionCall']);
+node_modules\@google\genai\dist\index.mjs:23201:    if (fromFunctionCall != 
+null) {
+node_modules\@google\genai\dist\index.mjs:23202:        
+setValueByPath(toObject, ['functionCall'], fromFunctionCall);
+node_modules\@google\genai\dist\index.mjs:23204:    const fromFunctionResponse 
+= getValueByPath(fromObject, [
+node_modules\@google\genai\dist\index.mjs:23205:        'functionResponse',
+node_modules\@google\genai\dist\index.mjs:23207:    if (fromFunctionResponse 
+!= null) {
+node_modules\@google\genai\dist\index.mjs:23208:        
+setValueByPath(toObject, ['functionResponse'], fromFunctionResponse);
+node_modules\@google\genai\dist\index.mjs:23245:function 
+reinforcementTuningExampleToVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:23269:function 
+tunedModelFromMldev(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:23281:function 
+tuningDatasetToMldev(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:23301:function 
+tuningDatasetToVertex(fromObject, parentObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:23378:function 
+tuningJobFromMldev(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:23430:function 
+tuningJobFromVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:23610:function 
+tuningOperationFromMldev(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:23636:function 
+tuningValidationDatasetToVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:23650:function 
+validateRewardParametersToVertex(fromObject, rootObject) {
+node_modules\@google\genai\dist\index.mjs:23680:function 
+validateRewardResponseFromVertex(fromObject, _rootObject) {
+node_modules\@google\genai\dist\index.mjs:23712:class Tunings extends 
+BaseModule {
+node_modules\@google\genai\dist\index.mjs:23724:         * const tuningJobs = 
+await ai.tunings.list({config: {'pageSize': 2}});
+node_modules\@google\genai\dist\index.mjs:23905:     * await 
+ai.tunings.cancel({name: '...'}); // The server-generated resource name.
+node_modules\@google\genai\dist\index.mjs:24101:class WebAuth {
+node_modules\@google\genai\dist\index.mjs:24134: * The {@link 
+GoogleGenAIOptions.vertexai} value determines which of the API services to use.
+node_modules\@google\genai\dist\index.mjs:24136: * When using the Gemini API, 
+a {@link GoogleGenAIOptions.apiKey} must also be set,
+node_modules\@google\genai\dist\index.mjs:24137: * when using Vertex AI {@link 
+GoogleGenAIOptions.project} and {@link GoogleGenAIOptions.location} must also 
+be set.
+node_modules\@google\genai\dist\index.mjs:24142: * import {GoogleGenAI} from 
+'@google/genai';
+node_modules\@google\genai\dist\index.mjs:24143: * const ai = new 
+GoogleGenAI({apiKey: 'GEMINI_API_KEY'});
+node_modules\@google\genai\dist\index.mjs:24149: * import {GoogleGenAI} from 
+'@google/genai';
+node_modules\@google\genai\dist\index.mjs:24150: * const ai = new GoogleGenAI({
+node_modules\@google\genai\dist\index.mjs:24158:class GoogleGenAI {
+node_modules\@google\genai\dist\index.mjs:24162:            
+this._nextGenClient = buildGoogleGenAIClient(this.apiClient, {
+node_modules\@google\genai\dist\index.mjs:24167:            
+console.warn('GoogleGenAI: Client level httpOptions.extraBody is not supported 
+by the Gemini NextGen client and will be ignored.');
+node_modules\@google\genai\dist\index.mjs:24171:    get interactions() {
+node_modules\@google\genai\dist\index.mjs:24172:        if (this._interactions 
+!== undefined) {
+node_modules\@google\genai\dist\index.mjs:24173:            return 
+this._interactions;
+node_modules\@google\genai\dist\index.mjs:24175:        this._interactions = 
+new GeminiNextGenInteractions(this.apiClient);
+node_modules\@google\genai\dist\index.mjs:24176:        return 
+this._interactions;
+node_modules\@google\genai\dist\index.mjs:24189:        
+console.warn('GoogleGenAI.agents: Agents usage is experimental and may change 
+in future versions.');
+node_modules\@google\genai\dist\index.mjs:24220:        this.chats = new 
+Chats(this.models, this.apiClient);
+node_modules\@google\genai\dist\index.mjs:24231:export { ActivityHandling, 
+AdapterSize, AggregationMetric, ApiError, ApiSpec, AuthType, Batches, 
+Behavior, BlockedReason, Caches, CancelTuningJobResponse, Chat, Chats, 
+ComputeTokensResponse, ContentReferenceImage, ControlReferenceImage, 
+ControlReferenceType, CountTokensResponse, CreateFileResponse, 
+DeleteCachedContentResponse, DeleteFileResponse, DeleteModelResponse, 
+DocumentState, DynamicRetrievalConfigMode, EditImageResponse, EditMode, 
+EmbedContentResponse, EmbeddingApiType, EndSensitivity, Environment, 
+EvaluateDatasetResponse, FeatureSelectionPreference, FileSource, FileState, 
+Files, FinishReason, FunctionCallingConfigMode, FunctionResponse, 
+FunctionResponseBlob, FunctionResponseFileData, FunctionResponsePart, 
+FunctionResponseScheduling, GenerateContentResponse, 
+GenerateContentResponsePromptFeedback, GenerateContentResponseUsageMetadata, 
+GenerateImagesResponse, GenerateVideosOperation, GenerateVideosResponse, 
+GoogleGenAI, HarmBlockMethod, HarmBlockThreshold, HarmCategory, 
+HarmProbability, HarmSeverity, HttpElementLocation, HttpResponse, 
+ImagePromptLanguage, ImageResizeMode, ImportFileOperation, ImportFileResponse, 
+InlinedEmbedContentResponse, InlinedResponse, JobState, Language, 
+ListBatchJobsResponse, ListCachedContentsResponse, ListDocumentsResponse, 
+ListFileSearchStoresResponse, ListFilesResponse, ListModelsResponse, 
+ListTuningJobsResponse, Live, LiveClientToolResponse, 
+LiveMusicPlaybackControl, LiveMusicServerMessage, 
+LiveSendToolResponseParameters, LiveServerMessage, MaskReferenceImage, 
+MaskReferenceMode, MatchOperation, MediaModality, MediaResolution, Modality, 
+ModelStage, Models, MusicGenerationMode, Operations, Outcome, PagedItem, 
+Pager, PairwiseChoice, PartMediaResolutionLevel, PersonGeneration, 
+PhishBlockThreshold, ProminentPeople, RawReferenceImage, 
+RecontextImageResponse, RegisterFilesResponse, 
+ReinforcementTuningAutoraterScorerParsedResponseConversionScorer, 
+ReinforcementTuningParseResponseConfig, ReinforcementTuningThinkingLevel, 
+ReplayResponse, ResourceScope, ResponseParseType, SafetyFilterLevel, 
+SafetyPolicy, Scale, SegmentImageResponse, SegmentMode, ServiceTier, Session, 
+SingleEmbedContentResponse, StartSensitivity, StyleReferenceImage, 
+SubjectReferenceImage, SubjectReferenceType, ThinkingLevel, Tokens, 
+ToolResponse, ToolType, TrafficType, TuningJobState, TuningMethod, TuningMode, 
+TuningSpeed, TuningTask, TurnCompleteReason, TurnCoverage, Type, 
+UploadToFileSearchStoreOperation, UploadToFileSearchStoreResponse, 
+UploadToFileSearchStoreResumableResponse, UpscaleImageResponse, 
+UrlRetrievalStatus, VadSignalType, ValidateRewardResponse, 
+VideoCompressionQuality, VideoGenerationMaskMode, 
+VideoGenerationReferenceType, VideoOrientation, VoiceActivityType, 
+createFunctionResponsePartFromBase64, createFunctionResponsePartFromUri, 
+createModelContent, createPartFromBase64, createPartFromCodeExecutionResult, 
+createPartFromExecutableCode, createPartFromFunctionCall, 
+createPartFromFunctionResponse, createPartFromText, createPartFromUri, 
+createUserContent, mcpToTool, setDefaultBaseUrls };
+
+
