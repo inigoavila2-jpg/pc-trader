@@ -1,8 +1,18 @@
-const { loadStateFromSupabase } = require("../loadState");
+const { loadStateFromSupabase, loadThemeFromSupabase } = require("../loadState");
 const { saveStateToSupabase } = require("../saveState");
 const { supabase } = require("../config");
 
 function registerDataRoutes(app) {
+  app.get("/data/theme", async (req, res) => {
+    try {
+      const theme = await loadThemeFromSupabase();
+      res.json(theme);
+    } catch (err) {
+      console.error("GET /data/theme error:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.get("/data", async (req, res) => {
     try {
       const state = await loadStateFromSupabase();

@@ -1,13 +1,15 @@
 
-import { GoogleGenAI } from "@google/genai";
 import { Monitor } from "lucide-react";
 
 import { _buyVisionClient } from "./_buyVisionClient.jsx";
 
-export function getGeminiVisionClient(){
+export async function getGeminiVisionClient(){
   const apiKey = import.meta.env?.VITE_GEMINI_KEY || import.meta.env?.VITE_GEMINI_API_KEY || import.meta.env?.GEMINI_API_KEY || process?.env?.VITE_GEMINI_KEY || process?.env?.GEMINI_API_KEY;
   if(!apiKey) return null;
-  if(!_buyVisionClient) _buyVisionClient = new GoogleGenAI({apiKey});
+  if(!_buyVisionClient){
+    const { GoogleGenAI } = await import("@google/genai");
+    if(!_buyVisionClient) _buyVisionClient = new GoogleGenAI({apiKey});
+  }
   return _buyVisionClient;
 }
 
@@ -31,7 +33,7 @@ export function dataUrlParts(dataUrl){
 }
 
 async function analyzeBuyImage(dataUrl,{mode="single",existingRows=[]}={}){
-  const ai=getGeminiVisionClient();
+  const ai=await getGeminiVisionClient();
   if(!ai) throw new Error("Gemini API key is not configured");
   const {mimeType,data}=dataUrlParts(dataUrl);
   const categories=["GPU","CPU","Motherboard","CPU+MB","RAM","PSU","Storage","Cooler","Case","Monitor","Mouse","Keyboard","Other"];

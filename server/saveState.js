@@ -66,6 +66,14 @@ async function saveStateToSupabase(state) {
     }
   };
 
+  const checkBatch = async (operations) => {
+    const results = await Promise.allSettled(
+      operations.map(([query, label]) => check(query, label))
+    );
+    const failed = results.find((result) => result.status === "rejected");
+    if (failed) throw failed.reason;
+  };
+
   const bundlesRows = (rows.bundles || []).map((bundle) => ({
     id: bundle.id,
     name: bundle.name,
@@ -190,79 +198,41 @@ async function saveStateToSupabase(state) {
     }
   }
 
-  // Only after settings have been saved do we rewrite the related tables.
-  // Every operation checks Supabase errors rather than reporting false success.
-  await check(
-    supabase.from("bundles").delete().not("id", "is", null),
-    "Delete bundles failed"
-  );
-  await check(
-    supabase.from("parts").delete().not("id", "is", null),
-    "Delete parts failed"
-  );
-  await check(
-    supabase.from("builds").delete().not("id", "is", null),
-    "Delete builds failed"
-  );
-  await check(
-    supabase.from("build_parts").delete().not("build_id", "is", null),
-    "Delete build parts failed"
-  );
-  await check(
-    supabase.from("sales").delete().not("id", "is", null),
-    "Delete sales failed"
-  );
-  await check(
-    supabase.from("expenses").delete().not("id", "is", null),
-    "Delete expenses failed"
-  );
-  await check(
-    supabase.from("transactions").delete().not("id", "is", null),
-    "Delete transactions failed"
-  );
-  await check(
-    supabase.from("quick_notes").delete().not("id", "is", null),
-    "Delete quick notes failed"
-  );
-  await check(
-    supabase.from("custom_categories").delete().not("id", "is", null),
-    "Delete categories failed"
-  );
-  await check(
-    supabase.from("part_history").delete().not("id", "is", null),
-    "Delete part history failed"
-  );
+  // Keep the existing full-state write, but send independent deletes together.
+  // Waiting for every result keeps the response and save indicator truthful.
+  await checkBatch([
+    [supabase.from("bundles").delete().not("id", "is", null), "Delete bundles failed"],
+    [supabase.from("parts").delete().not("id", "is", null), "Delete parts failed"],
+    [supabase.from("builds").delete().not("id", "is", null), "Delete builds failed"],
+    [supabase.from("build_parts").delete().not("build_id", "is", null), "Delete build parts failed"],
+    [supabase.from("sales").delete().not("id", "is", null), "Delete sales failed"],
+    [supabase.from("expenses").delete().not("id", "is", null), "Delete expenses failed"],
+    [supabase.from("transactions").delete().not("id", "is", null), "Delete transactions failed"],
+    [supabase.from("quick_notes").delete().not("id", "is", null), "Delete quick notes failed"],
+    [supabase.from("custom_categories").delete().not("id", "is", null), "Delete categories failed"],
+    [supabase.from("part_history").delete().not("id", "is", null), "Delete part history failed"],
+  ]);
 
   if (bundlesRows.length) {
     await check(supabase.from("bundles").insert(bundlesRows), "Save bundles failed");
   }
-  if (partsRows.length) {
-    await check(supabase.from("parts").insert(partsRows), "Save parts failed");
-  }
-  if (buildRows.length) {
-    await check(supabase.from("builds").insert(buildRows), "Save builds failed");
-  }
-  if (buildPartsRows.length) {
-    await check(supabase.from("build_parts").insert(buildPartsRows), "Save build parts failed");
-  }
-  if (salesRows.length) {
-    await check(supabase.from("sales").insert(salesRows), "Save sales failed");
-  }
-  if (expensesRows.length) {
-    await check(supabase.from("expenses").insert(expensesRows), "Save expenses failed");
-  }
-  if (transactionsRows.length) {
-    await check(supabase.from("transactions").insert(transactionsRows), "Save transactions failed");
-  }
-  if (quickNotesRows.length) {
-    await check(supabase.from("quick_notes").insert(quickNotesRows), "Save notes failed");
-  }
-  if (categoriesRows.length) {
-    await check(supabase.from("custom_categories").insert(categoriesRows), "Save categories failed");
-  }
-  if (partHistoryRows.length) {
-    await check(supabase.from("part_history").insert(partHistoryRows), "Save part history failed");
-  }
+
+  // Parts can belong to bundles; build parts and sales refer to parts/builds.
+  // Finish these parent rows before sending dependent rows.
+  await checkBatch([
+    ...(partsRows.length ? [[supabase.from("parts").insert(partsRows), "Save parts failed"]] : []),
+    ...(buildRows.length ? [[supabase.from("builds").insert(buildRows), "Save builds failed"]] : []),
+  ]);
+
+  await checkBatch([
+    ...(buildPartsRows.length ? [[supabase.from("build_parts").insert(buildPartsRows), "Save build parts failed"]] : []),
+    ...(salesRows.length ? [[supabase.from("sales").insert(salesRows), "Save sales failed"]] : []),
+    ...(expensesRows.length ? [[supabase.from("expenses").insert(expensesRows), "Save expenses failed"]] : []),
+    ...(transactionsRows.length ? [[supabase.from("transactions").insert(transactionsRows), "Save transactions failed"]] : []),
+    ...(quickNotesRows.length ? [[supabase.from("quick_notes").insert(quickNotesRows), "Save notes failed"]] : []),
+    ...(categoriesRows.length ? [[supabase.from("custom_categories").insert(categoriesRows), "Save categories failed"]] : []),
+    ...(partHistoryRows.length ? [[supabase.from("part_history").insert(partHistoryRows), "Save part history failed"]] : []),
+  ]);
 }
 
 module.exports = { saveStateToSupabase };

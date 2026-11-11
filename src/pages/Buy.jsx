@@ -2,7 +2,8 @@ import { useState, useRef, useCallback } from "react";
 
 import { Boxes, Banknote, Settings as SettingsIcon, Plus, Trash2, Copy, Wallet, Cpu } from "lucide-react";
 import { fmt, pct, today, uid } from "../data/model.js";
-import { FONT_DISPLAY, FONT_MONO, useTheme, PhotoUpload, Card, Btn, IconBtn, Inp, CategoryPicker, CategoryManager, PageHeader, DealBar, Segmented } from "../components/index.js";
+import { FONT_DISPLAY, FONT_MONO, useTheme, PhotoUpload, Card, Btn, IconBtn, Inp, CategoryPicker, PageHeader, DealBar, Segmented } from "../components/index.js";
+import { CategoryManager } from "../components/CategoryManager.jsx";
 import { usePersistentState } from "../hooks/appHooks.js";
 import { Inventory } from "./Inventory.jsx";
 import { Builds } from "./Builds.jsx";

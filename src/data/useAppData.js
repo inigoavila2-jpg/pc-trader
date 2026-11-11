@@ -14,7 +14,7 @@ export function useAppData() {
   const themeWritePending=useRef(false);
   const skipNextStateSave=useRef(false);
 
-  // Load once from the server (which is backed by PocketBase)
+  // Load the shared app state once from the server.
   useEffect(()=>{
     fetch("/data")
       .then(r=>{if(!r.ok)throw new Error(`Server returned ${r.status}`);return r.json();})
@@ -117,7 +117,7 @@ export function useAppData() {
         let payload=state;
         if(!themeWritePending.current){
           try{
-            const latestRes=await fetch(`/data?themeSync=${Date.now()}`,{cache:"no-store"});
+            const latestRes=await fetch("/data/theme",{cache:"no-store"});
             if(latestRes.ok){
               const latest=await latestRes.json();
               payload={
@@ -157,7 +157,7 @@ export function useAppData() {
       if(disposed||syncing||themeWritePending.current||document.visibilityState==="hidden")return;
       syncing=true;
       try{
-        const response=await fetch(`/data?themeSync=${Date.now()}`,{cache:"no-store"});
+        const response=await fetch("/data/theme",{cache:"no-store"});
         if(!response.ok)return;
         const remote=await response.json();
         if(disposed)return;

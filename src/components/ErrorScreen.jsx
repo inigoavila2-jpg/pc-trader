@@ -10,7 +10,7 @@ export function ErrorScreen({t}) {
       flexDirection:"column",gap:8,fontFamily:FONT_BODY,padding:24,textAlign:"center"}}>
       <AlertTriangle size={26}/>
       <div style={{fontSize:18,fontWeight:700,color:t.text,fontFamily:FONT_DISPLAY}}>Couldn't load your data</div>
-      <div style={{fontSize:13,color:t.textMuted,maxWidth:360}}>Check that the server is running and PocketBase is reachable, then refresh.</div>
+      <div style={{fontSize:13,color:t.textMuted,maxWidth:360}}>Check that the server and database are reachable, then refresh.</div>
     </div>
   );
 }

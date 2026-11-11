@@ -8,21 +8,6 @@ export function ChatboxView(props) {
 
   return (
     <>
-      {/* Floating Chat Bubble */}
-      <button
-        onClick={() => setOpen(!open)}
-        style={{
-          position: 'fixed', bottom: 'calc(78px + env(safe-area-inset-bottom))', right: 20, width: 56, height: 56, borderRadius: '50%',
-          background: '#7c3aed', border: 'none', cursor: 'pointer', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', fontSize: 24,
-          boxShadow: '0 8px 24px rgba(124,58,237,0.4)', zIndex: 4999,
-          transition: 'transform 0.2s, box-shadow 0.2s', transform: open ? 'scale(1.1)' : 'scale(1)',
-        }}
-        title="AI Assistant"
-      >
-        🤖
-      </button>
-
       {open && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 5000 }} onClick={() => setOpen(false)} />
       )}

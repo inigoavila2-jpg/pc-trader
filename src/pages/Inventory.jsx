@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 
 import { Boxes, Wrench, Settings as SettingsIcon, Search, X, Trash2, PackageX } from "lucide-react";
 import { fmt, today, uid } from "../data/model.js";
-import { FONT_DISPLAY, FONT_BODY, FONT_MONO, useTheme, STATUS_LABEL, StatusBadge, PhotoThumb, ConfirmModal, Card, Btn, IconBtn, Inp, CategoryManager, PageHeader, DefectiveModal, QuickSellModal, EditPartModal, PartDetailSheet, PartGroupSheet } from "../components/index.js";
+import { FONT_DISPLAY, FONT_BODY, FONT_MONO, useTheme, STATUS_LABEL, StatusBadge, PhotoThumb, ConfirmModal, Card, Btn, IconBtn, Inp, PageHeader, DefectiveModal, QuickSellModal, EditPartModal, PartDetailSheet, PartGroupSheet } from "../components/index.js";
+import { CategoryManager } from "../components/CategoryManager.jsx";
 import { Builds } from "./Builds.jsx";
 
 export function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}) {

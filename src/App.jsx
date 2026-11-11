@@ -1,18 +1,23 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 
 import { AIAgentChatbox } from "./components/AIAgentChatbox";
 import { fmt } from "./data/model.js";
 import { useAppData } from "./data/useAppData.js";
 import { Search } from "lucide-react";
 
-import { THEME, buildTheme, FONT_BODY, FONT_MONO, GOOGLE_FONTS_HREF, ThemeCtx, ToastContainer, AnimNum, Lightbox, IconBtn, QuickActionsFab, ALL_TABS, TAB_ICON, GlobalSearchModal, BrandMark, SyncStatus, LoadingScreen, ErrorScreen } from "./components/index.js";
+import { THEME, buildTheme, FONT_BODY, FONT_MONO, ThemeCtx, ToastContainer, AnimNum, Lightbox, IconBtn, QuickActionsFab, ALL_TABS, TAB_ICON, GlobalSearchModal, BrandMark, SyncStatus, LoadingScreen, ErrorScreen } from "./components/index.js";
 import { useMediaQuery, usePersistentState, useToast } from "./hooks/appHooks.js";
-import { Dashboard, Buy, Inventory, Builds, Sell, History, Settings } from "./pages/index.js";
+import { Dashboard, Buy, Inventory, Builds, Sell, History, Settings } from "./pages/lazyPages.js";
 
 export default function App() {
   const { state, dispatch, loadStatus, saveStatus } = useAppData();
 
-  const [tab,setTab]=useState("Dashboard");
+  const [tab,setActiveTab]=useState("Dashboard");
+  const [visitedTabs,setVisitedTabs]=useState(["Dashboard"]);
+  const setTab=useCallback(nextTab=>{
+    setActiveTab(nextTab);
+    setVisitedTabs(previous=>previous.includes(nextTab)?previous:[...previous,nextTab]);
+  },[]);
   const {toasts,toast}=useToast();
   const [localTheme,setLocalTheme]=usePersistentState("pc-trader-theme-mode","dark");
   const [legacyThemeColors,setLegacyThemeColors]=usePersistentState("pc-trader-theme-colors",{});
@@ -65,28 +70,30 @@ export default function App() {
   if(loadStatus==="error")return <ErrorScreen t={t}/>;
 
   const contentMaxWidth=isDesktop?1120:740;
-  const totalProfit=state.sales.filter(s=>!s.deleted&&!s.returned).reduce((s,x)=>s+x.profit,0);
-
-  // All seven tabs stay mounted (toggled with display:none) instead of being conditionally
-  // rendered, so an in-progress form (e.g. a half-typed Sell note) survives switching tabs and
-  // coming back — unchanged from the original behavior, just reformatted.
-  const panels=(
-    <>
-      <div style={{display:tab==="Dashboard"?"block":"none"}}><Dashboard state={state} dispatch={dispatch} toast={toast} setTab={setTab} openLightbox={openLightbox}/></div>
-      <div style={{display:tab==="Buy"?"block":"none"}}><Buy state={state} dispatch={dispatch} toast={toast}/></div>
-      <div style={{display:tab==="Inventory"?"block":"none"}}><Inventory state={state} dispatch={dispatch} toast={toast} setTab={setTab} openLightbox={openLightbox} jumpRequest={inventoryJump}/></div>
-      <div style={{display:tab==="Builds"?"block":"none"}}><Builds state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/></div>
-      <div style={{display:tab==="Sell"?"block":"none"}}><Sell state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/></div>
-      <div style={{display:tab==="History"?"block":"none"}}><History state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox} jumpRequest={historyJump}/></div>
-      <div style={{display:tab==="Settings"?"block":"none"}}><Settings state={state} dispatch={dispatch} toast={toast} theme={theme} setTheme={setTheme} themeColors={themeColors} themePreviewColors={themePreviewColors} setThemePreviewColors={setThemePreviewColors}/></div>
-    </>
+  const totalProfit=useMemo(
+    ()=>state.sales.filter(sale=>!sale.deleted&&!sale.returned).reduce((sum,sale)=>sum+sale.profit,0),
+    [state.sales]
   );
+
+  const pageContent={
+    Dashboard:<Dashboard state={state} dispatch={dispatch} toast={toast} setTab={setTab} openLightbox={openLightbox}/>,
+    Buy:<Buy state={state} dispatch={dispatch} toast={toast}/>,
+    Inventory:<Inventory state={state} dispatch={dispatch} toast={toast} setTab={setTab} openLightbox={openLightbox} jumpRequest={inventoryJump}/>,
+    Builds:<Builds state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/>,
+    Sell:<Sell state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/>,
+    History:<History state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox} jumpRequest={historyJump}/>,
+    Settings:<Settings state={state} dispatch={dispatch} toast={toast} theme={theme} setTheme={setTheme} themeColors={themeColors} themePreviewColors={themePreviewColors} setThemePreviewColors={setThemePreviewColors}/>,
+  };
+  const panels=visitedTabs.map(name=>(
+    <div key={name} style={{display:tab===name?"block":"none"}}>
+      <Suspense fallback={<LoadingScreen t={t}/>}>{pageContent[name]}</Suspense>
+    </div>
+  ));
 
   return (
     <ThemeCtx.Provider value={t}>
       <div style={{minHeight:"100vh",background:t.bg,color:t.text,fontFamily:FONT_BODY,transition:"background 0.3s,color 0.3s"}}>
         <style>{`
-          @import url('${GOOGLE_FONTS_HREF}');
           @keyframes blFadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
           @keyframes blSlideIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
           @keyframes blSlideUp{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}
