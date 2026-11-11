@@ -19,39 +19,17 @@ async function loadStateFromSupabase() {
     transactionsRes,
     historyRes,
   ] = await Promise.all([
-    supabase
-      .from("app_settings")
-      .select("id,target_margin,business_cash,cash_on_hand,personal_cash,theme_mode,active_theme_slot,theme_palette_slots,outstanding_receivables,total_debt,net_worth_snapshots,hidden_categories")
-      .eq("id", 1)
-      .maybeSingle(),
-    supabase.from("custom_categories").select("id,name,domain,created_at").order("created_at"),
-    supabase.from("quick_notes").select("id,text,created_at").order("created_at"),
-    supabase
-      .from("bundles")
-      .select("id,name,purchase_price,total_market,photo_url,photo_record_id,created_at")
-      .order("created_at"),
-    supabase
-      .from("builds")
-      .select("id,name,photo_url,photo_record_id,dissolved,sold,created_at")
-      .order("created_at"),
-    supabase
-      .from("parts")
-      .select("id,bundle_id,name,category,allocated_cost,market_value,source,status,sold_to,notes,photo_url,photo_record_id,created_at,domain")
-      .order("created_at"),
-    supabase.from("build_parts").select("build_id,part_id"),
-    supabase
-      .from("sales")
-      .select("id,part_id,build_id,name,cost,sale_price,profit,buyer_name,write_off,reason,returned,return_reason,sale_date,build_parts_snapshot,payment_account,account")
-      .order("sale_date"),
-    supabase.from("expenses").select("id,expense_type,wallet,account,amount,description,expense_date").order("expense_date"),
-    supabase
-      .from("transactions")
-      .select("id,type,amount,description,wallet,account,transfer_from,transfer_to,transaction_date")
-      .order("transaction_date"),
-    supabase
-      .from("part_history")
-      .select("part_id,event,event_date")
-      .order("event_date"),
+    supabase.from("app_settings").select("*").eq("id", 1).maybeSingle(),
+    supabase.from("custom_categories").select("*").order("created_at"),
+    supabase.from("quick_notes").select("*").order("created_at"),
+    supabase.from("bundles").select("*").order("created_at"),
+    supabase.from("builds").select("*").order("created_at"),
+    supabase.from("parts").select("*").order("created_at"),
+    supabase.from("build_parts").select("*"),
+    supabase.from("sales").select("*").order("sale_date"),
+    supabase.from("expenses").select("*").order("expense_date"),
+    supabase.from("transactions").select("*").order("transaction_date"),
+    supabase.from("part_history").select("*").order("event_date"),
   ]);
 
   const requiredResults = [
