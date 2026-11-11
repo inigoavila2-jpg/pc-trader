@@ -65,15 +65,15 @@ export default function App() {
     : savedSlotColors;
   const themeColors=useMemo(()=>({[theme]:savedSlotColors}),[theme,activeThemeSlot,state?.themePaletteSlots]);
   const t=buildTheme(theme==="dark"?THEME.dark:THEME.light,activeThemeColors);
+  const totalProfit=useMemo(
+    ()=> (state?.sales||[]).filter(sale=>!sale.deleted&&!sale.returned).reduce((sum,sale)=>sum+sale.profit,0),
+    [state?.sales]
+  );
 
   if(loadStatus==="loading")return <LoadingScreen t={t}/>;
   if(loadStatus==="error")return <ErrorScreen t={t}/>;
 
   const contentMaxWidth=isDesktop?1120:740;
-  const totalProfit=useMemo(
-    ()=>state.sales.filter(sale=>!sale.deleted&&!sale.returned).reduce((sum,sale)=>sum+sale.profit,0),
-    [state.sales]
-  );
 
   const pageContent={
     Dashboard:<Dashboard state={state} dispatch={dispatch} toast={toast} setTab={setTab} openLightbox={openLightbox}/>,
