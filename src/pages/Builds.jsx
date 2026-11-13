@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 import { X, Plus, Pencil, Receipt, Monitor, Search } from "lucide-react";
 import { fmt, today, uid, CATEGORIES, categoryKey, domainOf } from "../data/model.js";
 import { FONT_DISPLAY, FONT_MONO, useTheme, PhotoUpload, PhotoThumb, ConfirmModal, Card, Btn, IconBtn, Inp, PageHeader, CategoryPartPicker, EditBuildPartsModal, ReceiptPricePromptModal, BuildDetailSheet, ReceiptModal } from "../components/index.js";
 
-export function Builds({state,dispatch,toast,openLightbox}) {
+export function Builds({state,dispatch,toast,openLightbox,jumpRequest,onRecordChange}) {
   const t=useTheme();
   const [creating,setCreating]=useState(false);
   const [buildName,setBuildName]=useState("");
@@ -16,6 +16,7 @@ export function Builds({state,dispatch,toast,openLightbox}) {
   const [buildPhoto,setBuildPhoto]=useState({photoUrl:"",photoRecordId:""});
   const [deletingBuild,setDeletingBuild]=useState(null);
   const [viewingBuild,setViewingBuild]=useState(null);
+  const lastBuildId=useRef(null);
   const [editingBuild,setEditingBuild]=useState(null);
   const [receiptPromptBuild,setReceiptPromptBuild]=useState(null);
   const [buildReceipt,setBuildReceipt]=useState(null);
@@ -26,6 +27,18 @@ export function Builds({state,dispatch,toast,openLightbox}) {
   const buildCost=avail.filter(p=>sel.includes(p.id)).reduce((s,p)=>s+p.allocatedCost,0);
   const buildMarket=avail.filter(p=>sel.includes(p.id)).reduce((s,p)=>s+p.marketValue,0);
   const toggle=id=>setSel(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
+  useEffect(()=>{
+    if(jumpRequest?.addPartId&&avail.some(part=>part.id===jumpRequest.addPartId)){
+      setCreating(true);setSel(previous=>previous.includes(jumpRequest.addPartId)?previous:[...previous,jumpRequest.addPartId]);
+    }
+    if(jumpRequest?.buildId){const build=state.builds.find(item=>item.id===jumpRequest.buildId);if(build)setViewingBuild(build);}
+    else if(jumpRequest)setViewingBuild(null);
+  },[jumpRequest,state.builds,state.parts]);
+  useEffect(()=>{
+    if(lastBuildId.current===viewingBuild?.id)return;
+    lastBuildId.current=viewingBuild?.id||null;
+    onRecordChange?.("build",viewingBuild?.id);
+  },[viewingBuild?.id,onRecordChange]);
 
   const hiddenKeys=new Set((state.hiddenCategories||[]).map(categoryKey));
   const customPcPartCats=(state.customCategories||[]).filter(c=>c.domain==="pc_part"&&!hiddenKeys.has(categoryKey(c.name))).map(c=>c.name);

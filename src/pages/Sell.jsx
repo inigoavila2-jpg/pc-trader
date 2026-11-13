@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { Banknote, Check, ChevronDown, Wallet, Link as LinkIcon, Monitor, Cpu } from "lucide-react";
+import { Banknote, Check, ChevronDown, Wallet, Link as LinkIcon, Monitor, Cpu, Search } from "lucide-react";
 import { fmt, pct, today, uid } from "../data/model.js";
 import { FONT_BODY, FONT_MONO, useTheme, PhotoUpload, PhotoThumb, Card, Btn, Inp, PageHeader, Segmented } from "../components/index.js";
 import { usePersistentState } from "../hooks/appHooks.js";
@@ -17,6 +17,7 @@ export function Sell({state,dispatch,toast,openLightbox}) {
   const [loading,setLoading]=useState(false);
   const [attempted,setAttempted]=useState(false);
   const [pickerOpen,setPickerOpen]=useState(false);
+  const [pickerSearch,setPickerSearch]=useState("");
   const targetMargin=state.settings?.targetMargin||30;
 
   const avail=state.parts.filter(p=>p.status==="available");
@@ -65,12 +66,12 @@ export function Sell({state,dispatch,toast,openLightbox}) {
     });
   };
 
-  const list=mode==="part"?avail:builds;
+  const list=(mode==="part"?avail:builds).filter(item=>item.name.toLowerCase().includes(pickerSearch.trim().toLowerCase()));
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
       <PageHeader title="Sell" sub="Record a sale and lock in your profit."/>
-      <Segmented ariaLabel="What are you selling" value={mode} onChange={m=>{setMode(m);setSelId("");setPickerOpen(false);setAttempted(false);}}
+      <Segmented ariaLabel="What are you selling" value={mode} onChange={m=>{setMode(m);setSelId("");setPickerSearch("");setPickerOpen(false);setAttempted(false);}}
         options={[["part","Sell part",Cpu],["build","Sell build",Monitor]]}/>
       <Card>
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
@@ -95,11 +96,15 @@ export function Sell({state,dispatch,toast,openLightbox}) {
             {pickerOpen&&(
               <>
                 <div onClick={()=>setPickerOpen(false)} aria-hidden="true" style={{position:"fixed",inset:0,zIndex:40}}/>
-                <div role="listbox" aria-label={mode==="part"?"Available parts":"Available builds"} style={{position:"absolute",top:"100%",left:0,right:0,marginTop:6,background:t.bgElevated,
-                  border:`1px solid ${t.border}`,borderRadius:9,overflow:"hidden",maxHeight:280,overflowY:"auto",
+                <div style={{position:"absolute",top:"100%",left:0,right:0,marginTop:6,background:t.bgElevated,
+                  border:`1px solid ${t.border}`,borderRadius:9,overflow:"hidden",maxHeight:340,display:"flex",flexDirection:"column",
                   animation:"blFadeUp 0.15s ease",boxShadow:t.shadow,zIndex:50}}>
+                  <div style={{padding:8,borderBottom:`1px solid ${t.border}`}}>
+                    <Inp value={pickerSearch} onChange={e=>setPickerSearch(e.target.value)} placeholder={`Search ${mode==="part"?"parts":"builds"}…`} icon={Search} aria-label={`Search ${mode==="part"?"parts":"builds"} to sell`}/>
+                  </div>
+                  <div role="listbox" aria-label={mode==="part"?"Available parts":"Available builds"} style={{overflowY:"auto"}}>
                   {list.length===0?(
-                    <div style={{padding:14,color:t.textFaint,fontSize:13}}>Nothing available to sell.</div>
+                    <div style={{padding:14,color:t.textFaint,fontSize:13}}>{pickerSearch?"No matching items.":"Nothing available to sell."}</div>
                   ):list.map(item=>(
                     <button key={item.id} type="button" role="option" aria-selected={selId===item.id} onClick={()=>pickItem(item.id)}
                       style={{width:"100%",display:"flex",alignItems:"center",gap:10,background:selId===item.id?t.accentSoft:"transparent",
@@ -111,6 +116,7 @@ export function Sell({state,dispatch,toast,openLightbox}) {
                       <span style={{fontFamily:FONT_MONO,fontSize:12,color:t.textMuted}}>{mode==="part"?fmt(item.allocatedCost):""}</span>
                     </button>
                   ))}
+                  </div>
                 </div>
               </>
             )}
@@ -135,22 +141,22 @@ export function Sell({state,dispatch,toast,openLightbox}) {
             </div>
           )}
           <Inp label="Sale price (₱)" type="number" min="0.01" step="0.01" value={salePrice} onChange={e=>setSalePrice(e.target.value)} placeholder="5000" data-sell-price-input="1" error={attempted&&!(sp>0)?"Enter an amount above ₱0.":undefined}/>
-          <div><div style={{fontSize:12.5,color:t.textMuted,fontWeight:500,marginBottom:6}}>Receive payment into</div><Segmented ariaLabel="Receive payment into" value={paymentAccount} onChange={setPaymentAccount} options={[["bank","Business Bank",Wallet],["cash","Cash",Banknote]]}/></div>
-          <Inp label="Buyer name (optional)" value={buyer} onChange={e=>setBuyer(e.target.value)} placeholder="Juan dela Cruz"/>
-          <Inp label="Conversation link (optional)" value={convoLink} onChange={e=>setConvoLink(e.target.value)} placeholder="https://m.me/... or FB Marketplace chat link" icon={LinkIcon}/>
-          <PhotoUpload label="Proof of transaction (optional) — screenshot or photo" photoUrl={proofPhoto.photoUrl} photoRecordId={proofPhoto.photoRecordId} onChange={setProofPhoto}/>
           {selId&&sp>0&&(
             <div style={{background:t.surfaceSunken,borderRadius:9,padding:13,border:`1px solid ${t.border}`,animation:"blFadeUp 0.2s ease"}}>
-              {[["Cost",fmt(cost),t.text],["Sale price",fmt(sp),t.text],
-                ["Profit",`${profit>=0?"+":""}${fmt(profit)} (${pct(margin)})`,profit>=0?t.positive:t.negative]
-              ].map(([l,v,c],i)=>(
-                <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:i<2?6:0,paddingTop:i===2?8:0,borderTop:i===2?`1px solid ${t.border}`:"none"}}>
-                  <span style={{color:t.textMuted}}>{l}</span>
-                  <span style={{fontFamily:FONT_MONO,fontWeight:i===2?700:400,color:c}}>{v}</span>
-                </div>
-              ))}
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:6}}><span style={{color:t.textMuted}}>Cost</span><span style={{fontFamily:FONT_MONO}}>{fmt(cost)}</span></div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:6}}><span style={{color:t.textMuted}}>Sale price</span><span style={{fontFamily:FONT_MONO}}>{fmt(sp)}</span></div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13,paddingTop:8,borderTop:`1px solid ${t.border}`}}><span style={{color:t.textMuted}}>Profit</span><span style={{fontFamily:FONT_MONO,fontWeight:700,color:profit>=0?t.positive:t.negative}}>{profit>=0?"+":""}{fmt(profit)} ({pct(margin)})</span></div>
             </div>
           )}
+          <div><div style={{fontSize:12.5,color:t.textMuted,fontWeight:500,marginBottom:6}}>Receive payment into</div><Segmented ariaLabel="Receive payment into" value={paymentAccount} onChange={setPaymentAccount} options={[["bank","Business Bank",Wallet],["cash","Cash",Banknote]]}/></div>
+          <details style={{fontSize:12,color:t.textMuted}}>
+            <summary style={{cursor:"pointer",width:"fit-content"}}>Sale details (optional)</summary>
+            <div style={{display:"flex",flexDirection:"column",gap:14,marginTop:12}}>
+              <Inp label="Buyer name" value={buyer} onChange={e=>setBuyer(e.target.value)} placeholder="Juan dela Cruz"/>
+              <Inp label="Conversation link" value={convoLink} onChange={e=>setConvoLink(e.target.value)} placeholder="https://m.me/... or FB Marketplace chat link" icon={LinkIcon}/>
+              <PhotoUpload label="Proof of transaction — screenshot or photo" photoUrl={proofPhoto.photoUrl} photoRecordId={proofPhoto.photoRecordId} onChange={setProofPhoto}/>
+            </div>
+          </details>
           <Btn variant="success" icon={Check} loading={loading} onClick={submit} disabled={loading} style={{width:"100%"}}>Record sale</Btn>
         </div>
       </Card>

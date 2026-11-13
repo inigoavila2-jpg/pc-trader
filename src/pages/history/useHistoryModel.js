@@ -1,11 +1,11 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { today, normalizeAccount } from "../../data/model.js";
 import { useTheme } from "../../components/index.js";
 
 export function useHistoryModel(props) {
-  const { state, dispatch, toast, openLightbox, jumpRequest } = props;
+  const { state, dispatch, toast, openLightbox, jumpRequest, onRecordChange, onViewChange } = props;
   const t=useTheme();
-  const [view,setView]=useState("transactions"); // "transactions" | "partTimeline" | "ledger"
+  const [view,setView]=useState(()=>jumpRequest?.view||"transactions"); // "transactions" | "partTimeline" | "ledger"
   const [walletFilter,setWalletFilter]=useState("all");
   const [sel,setSel]=useState("");
   const [search,setSearch]=useState("");
@@ -14,13 +14,24 @@ export function useHistoryModel(props) {
   const [dateTo,setDateTo]=useState("");
   useEffect(()=>{
     if(jumpRequest){
-      setView("transactions");
-      setSearch(jumpRequest.query);
+      setView(jumpRequest.view||"transactions");
+      setSearch(jumpRequest.query||"");
       setTypeFilter("all");
     }
   },[jumpRequest]);
   const [plFilter,setPlFilter]=useState("all");
   const [viewingSale,setViewingSale]=useState(null);
+  const lastSaleId=useRef(null);
+  useEffect(()=>{
+    if(jumpRequest?.saleId){const sale=state.sales.find(item=>item.id===jumpRequest.saleId);if(sale)setViewingSale(sale);}
+    else if(jumpRequest)setViewingSale(null);
+  },[jumpRequest,state.sales]);
+  useEffect(()=>{
+    if(lastSaleId.current===viewingSale?.id)return;
+    lastSaleId.current=viewingSale?.id||null;
+    onRecordChange?.("sale",viewingSale?.id);
+  },[viewingSale?.id,onRecordChange]);
+  const changeView=nextView=>{setView(nextView);onViewChange?.(nextView);};
   const [editingSale,setEditingSale]=useState(null);
   const [undoingSale,setUndoingSale]=useState(null);
   const [deletingSale,setDeletingSale]=useState(null);
@@ -178,5 +189,5 @@ export function useHistoryModel(props) {
   const statusOf=s=>s.deleted?"deleted":s.returned?"returned":"completed";
 
 
-  return { jumpRequest, openLightbox, toast, dispatch, state, view, setView, walletFilter, setWalletFilter, sel, setSel, search, setSearch, typeFilter, setTypeFilter, dateFrom, setDateFrom, dateTo, setDateTo, plFilter, setPlFilter, viewingSale, setViewingSale, editingSale, setEditingSale, undoingSale, setUndoingSale, deletingSale, setDeletingSale, ledgerSort, setLedgerSort, ledgerFlow, setLedgerFlow, ledgerRange, setLedgerRange, t, part, allSales, activeSales, ledgerEntries, filteredLedgerEntries, filtered, totalRevenue, totalProfitAll, totalLosses, partsSoldCount, buildsSoldCount, avgProfit, catTotals, bestCategory, bestItem, undoSale, saveEdit, deleteRecordOnly, deleteAndReturnDisassemble, deleteAndReactivateBuild, exportCSV, statusOf };
+  return { jumpRequest, openLightbox, toast, dispatch, state, view, setView:changeView, walletFilter, setWalletFilter, sel, setSel, search, setSearch, typeFilter, setTypeFilter, dateFrom, setDateFrom, dateTo, setDateTo, plFilter, setPlFilter, viewingSale, setViewingSale, editingSale, setEditingSale, undoingSale, setUndoingSale, deletingSale, setDeletingSale, ledgerSort, setLedgerSort, ledgerFlow, setLedgerFlow, ledgerRange, setLedgerRange, t, part, allSales, activeSales, ledgerEntries, filteredLedgerEntries, filtered, totalRevenue, totalProfitAll, totalLosses, partsSoldCount, buildsSoldCount, avgProfit, catTotals, bestCategory, bestItem, undoSale, saveEdit, deleteRecordOnly, deleteAndReturnDisassemble, deleteAndReactivateBuild, exportCSV, statusOf };
 }
