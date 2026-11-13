@@ -1,7 +1,7 @@
 
 
 import { Boxes, Banknote, Plus, Minus, AlertTriangle, ArrowLeftRight, TrendingUp } from "lucide-react";
-import { fmt, pct, today } from "../../data/model.js";
+import { fmt, pct } from "../../data/model.js";
 import { FONT_MONO, AnimNum, Card, Btn, SectionHeader, PageHeader, HeroNumber, PeriodSwitch, KPICard, CapitalFlowDiagram, NetWorthHistoryChart } from "../../components/index.js";
 
 export function DashboardTop({model}) {
@@ -25,7 +25,7 @@ export function DashboardTop({model}) {
         border:`1px solid ${t.border}`,borderRadius:16,padding:"24px 24px"}}>
         <div style={{fontSize:12,color:t.textMuted,fontWeight:600,marginBottom:9}}>Total business net worth</div>
         <div style={{fontSize:40,lineHeight:1}}><HeroNumber><AnimNum value={netWorth}/></HeroNumber></div>
-        <div style={{fontSize:12,color:t.textFaint,marginTop:11}}>Business Bank ({fmt(businessBank)}) + Cash ({fmt(cashOnHand)}) + inventory at market value ({fmt(inventoryMarketValue)}) + receivables ({fmt(outstandingReceivables)}) − debt ({fmt(totalDebt)})</div>
+        <div style={{fontSize:13,color:t.textMuted,marginTop:11,lineHeight:1.5}}>Business Bank ({fmt(businessBank)}) + Cash ({fmt(cashOnHand)}) + unsold inventory at market value (or cost if unknown: {fmt(inventoryMarketValue)}) + receivables ({fmt(outstandingReceivables)}) − debt ({fmt(totalDebt)})</div>
         {netWorthDailyChange!==null&&(
           <div style={{fontSize:11.5,color:netWorthDailyChange>=0?t.positive:t.negative,marginTop:8,fontFamily:FONT_MONO,fontWeight:600}}>
             {netWorthDailyChange>=0?"▲":"▼"} {fmt(Math.abs(netWorthDailyChange))} vs. previous saved snapshot
@@ -33,7 +33,19 @@ export function DashboardTop({model}) {
         )}
       </div>
 
-      {/* Historical net-worth snapshots */}
+      {/* First-scan summary: current balances plus selected-period results. */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10}}>
+        <KPICard label="Available money" value={fmt(totalLiquid)} color={isUnderCapital?t.negative:t.positive} accent={isUnderCapital?t.negativeSoftBorder:undefined}
+          question="Business bank balance plus physical cash, as of today"/>
+        <KPICard label="Unsold inventory" value={fmt(inventoryMarketValue)} color={t.accent}
+          question="Available and in-build stock at market value (fallback: cost)"/>
+        <KPICard label={`${periodLabel} profit`} value={`${totalProfit>=0?"+":""}${fmt(totalProfit)}`} color={totalProfit>=0?t.positive:t.negative}
+          question="Sale proceeds minus cost of goods sold in the selected period"/>
+        <KPICard label={`${periodLabel} ROI`} value={pct(roi)} color={roi>=0?t.positive:t.negative}
+          question="Selected-period profit divided by cost of goods sold"/>
+      </div>
+
+      {/* Detailed history follows the at-a-glance business summary. */}
       <Card>
         <SectionHeader icon={TrendingUp} title="Net worth history" sub="Saved financial snapshots — latest value captured for each calendar month" action={
           <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -53,24 +65,8 @@ export function DashboardTop({model}) {
         </div>
       </Card>
 
-      {/* KPI Row */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10}}>
-        <KPICard label="Business Bank" value={fmt(businessBank)} color={t.info}
-          question="Actual balance in the business bank account"/>
-        <KPICard label="Cash" value={fmt(cashOnHand)} color={t.accent}
-          question="Physical cash you have on hand"/>
-        <KPICard label="Total Liquid" value={fmt(totalLiquid)} color={isUnderCapital?t.negative:t.positive} accent={isUnderCapital?t.negativeSoftBorder:undefined}
-          question="Business Bank plus physical Cash"/>
-        <KPICard label="Inventory value" value={fmt(inventoryMarketValue)} color={t.accent}
-          question="Current market value if sold today"/>
-        <KPICard label="Total profit" value={`${totalProfit>=0?"+":""}${fmt(totalProfit)}`} color={totalProfit>=0?t.positive:t.negative}
-          question={`Net earnings, ${periodLabel}`}/>
-        <KPICard label="ROI" value={pct(roi)} color={roi>=0?t.positive:t.negative}
-          question={`Return on capital sold, ${periodLabel}`}/>
-      </div>
-
       {/* ── Group: Capital & cash ── */}
-      <div style={{display:"flex",flexDirection:"column",gap:14,marginTop:10}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,320px),1fr))",gap:14,marginTop:10}}>
         <Card>
           <SectionHeader icon={Boxes} title="Business capital overview" sub="Where all-time capital actually sits right now"/>
           {(()=>{

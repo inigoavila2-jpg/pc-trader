@@ -14,9 +14,12 @@ export function AddIncomeModal({onClose,dispatch,toast}) {
   const [account,setAccount]=usePersistentState("pctrader:lastIncomeAccount","bank");
   const [desc,setDesc]=useState("");
   const [amount,setAmount]=useState("");
+  const [attempted,setAttempted]=useState(false);
+  const numericAmount=Number(amount);
   const handleAdd=()=>{
-    const amt=Number(amount);
-    if(!amt||!desc.trim())return toast("Fill all fields","error");
+    setAttempted(true);
+    const amt=numericAmount;
+    if(!amt||amt<=0||!desc.trim())return toast("Enter a description and an amount above zero","error");
     dispatch({type:"ADD_INCOME",account,amount:amt,description:desc.trim()});
     toast(`+${fmt(amt)} added to ${accountLabel(account)}`);
     onClose();
@@ -27,9 +30,10 @@ export function AddIncomeModal({onClose,dispatch,toast}) {
     <div style={{fontSize:12.5,color:t.textMuted,fontWeight:500,marginBottom:6}}>Deposit into</div>
     <Segmented ariaLabel="Deposit into" value={account} onChange={setAccount} options={[["bank","Business Bank",Wallet],["cash","Cash",Banknote]]}/>
     <div style={{display:"flex",flexDirection:"column",gap:12,marginTop:12}}>
-      <Inp label="Description" value={desc} onChange={e=>setDesc(e.target.value)} placeholder="e.g. Fixed a PC for a client"/>
-      <Inp label="Amount (₱)" type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0"/>
+      <Inp label="Description" value={desc} onChange={e=>setDesc(e.target.value)} placeholder="e.g. Fixed a PC for a client" error={attempted&&!desc.trim()?"Add a short description.":undefined}/>
+      <Inp label="Amount (₱)" type="number" min="0.01" step="0.01" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0" error={attempted&&(!numericAmount||numericAmount<=0)?"Enter an amount greater than ₱0.":undefined}/>
     </div>
+    {numericAmount>0&&<div style={{marginTop:12,padding:"10px 12px",borderRadius:9,background:t.surfaceSunken,border:`1px solid ${t.border}`,fontSize:12.5,color:t.textMuted}}>Money added to {accountLabel(account)}: <strong style={{color:t.positive}}>+{fmt(numericAmount)}</strong></div>}
     <div style={{marginTop:16,display:"flex",gap:8}}><Btn variant="success" icon={Plus} onClick={handleAdd} style={{flex:1}}>Log income</Btn><Btn variant="ghost" onClick={onClose}>Cancel</Btn></div>
   </ModalShell>;
 }

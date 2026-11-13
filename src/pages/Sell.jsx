@@ -15,6 +15,7 @@ export function Sell({state,dispatch,toast,openLightbox}) {
   const [convoLink,setConvoLink]=useState("");
   const [proofPhoto,setProofPhoto]=useState({photoUrl:"",photoRecordId:""});
   const [loading,setLoading]=useState(false);
+  const [attempted,setAttempted]=useState(false);
   const [pickerOpen,setPickerOpen]=useState(false);
   const targetMargin=state.settings?.targetMargin||30;
 
@@ -32,7 +33,8 @@ export function Sell({state,dispatch,toast,openLightbox}) {
   const selectedLabel=mode==="part"?tp?.name:tb?.name;
 
   const submit=()=>{
-    if(!selId||!salePrice){toast("Select item and enter price","error");return;}
+    setAttempted(true);
+    if(!selId||!(sp>0)){toast("Select an item and enter a sale price above zero","error");return;}
     setLoading(true);
     const name=mode==="part"?tp?.name:tb?.name;
     const buildPartsSnapshot=mode==="build"&&tb
@@ -43,7 +45,7 @@ export function Sell({state,dispatch,toast,openLightbox}) {
         buildPartsSnapshot,
         convoLink:convoLink.trim(),proofPhotoUrl:proofPhoto.photoUrl,proofPhotoRecordId:proofPhoto.photoRecordId}});
       toast(`${name} sold for ${fmt(sp)} — profit ${fmt(profit)}`,profit>=0?"success":"warn");
-      setSelId("");setSalePrice("");setBuyer("");setConvoLink("");setProofPhoto({photoUrl:"",photoRecordId:""});setLoading(false);
+      setSelId("");setSalePrice("");setBuyer("");setConvoLink("");setProofPhoto({photoUrl:"",photoRecordId:""});setLoading(false);setAttempted(false);
     },400);
   };
 
@@ -68,7 +70,7 @@ export function Sell({state,dispatch,toast,openLightbox}) {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
       <PageHeader title="Sell" sub="Record a sale and lock in your profit."/>
-      <Segmented ariaLabel="What are you selling" value={mode} onChange={m=>{setMode(m);setSelId("");setPickerOpen(false);}}
+      <Segmented ariaLabel="What are you selling" value={mode} onChange={m=>{setMode(m);setSelId("");setPickerOpen(false);setAttempted(false);}}
         options={[["part","Sell part",Cpu],["build","Sell build",Monitor]]}/>
       <Card>
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
@@ -89,6 +91,7 @@ export function Sell({state,dispatch,toast,openLightbox}) {
               ):<span style={{color:t.textFaint,fontSize:13,flex:1}}>— choose —</span>}
               <ChevronDown size={15} color={t.textMuted} style={{transform:pickerOpen?"rotate(180deg)":"none",transition:"transform 0.15s",flexShrink:0}}/>
             </button>
+            {attempted&&!selId&&<div role="alert" style={{fontSize:12,color:t.negative,marginTop:5}}>Choose an item to sell.</div>}
             {pickerOpen&&(
               <>
                 <div onClick={()=>setPickerOpen(false)} aria-hidden="true" style={{position:"fixed",inset:0,zIndex:40}}/>
@@ -131,7 +134,7 @@ export function Sell({state,dispatch,toast,openLightbox}) {
               )}
             </div>
           )}
-          <Inp label="Sale price (₱)" type="number" value={salePrice} onChange={e=>setSalePrice(e.target.value)} placeholder="5000" data-sell-price-input="1"/>
+          <Inp label="Sale price (₱)" type="number" min="0.01" step="0.01" value={salePrice} onChange={e=>setSalePrice(e.target.value)} placeholder="5000" data-sell-price-input="1" error={attempted&&!(sp>0)?"Enter an amount above ₱0.":undefined}/>
           <div><div style={{fontSize:12.5,color:t.textMuted,fontWeight:500,marginBottom:6}}>Receive payment into</div><Segmented ariaLabel="Receive payment into" value={paymentAccount} onChange={setPaymentAccount} options={[["bank","Business Bank",Wallet],["cash","Cash",Banknote]]}/></div>
           <Inp label="Buyer name (optional)" value={buyer} onChange={e=>setBuyer(e.target.value)} placeholder="Juan dela Cruz"/>
           <Inp label="Conversation link (optional)" value={convoLink} onChange={e=>setConvoLink(e.target.value)} placeholder="https://m.me/... or FB Marketplace chat link" icon={LinkIcon}/>
@@ -148,7 +151,7 @@ export function Sell({state,dispatch,toast,openLightbox}) {
               ))}
             </div>
           )}
-          <Btn variant="success" icon={Check} loading={loading} onClick={submit} disabled={!selId||!salePrice} style={{width:"100%"}}>Record sale</Btn>
+          <Btn variant="success" icon={Check} loading={loading} onClick={submit} disabled={loading} style={{width:"100%"}}>Record sale</Btn>
         </div>
       </Card>
     </div>

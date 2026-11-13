@@ -153,31 +153,41 @@ export function DashboardBottom({model}) {
           const bundlePnl=bundles.map(b=>{
             const bParts=parts.filter(p=>p.bundleId===b.id);
             const soldParts=bParts.filter(p=>p.status==="sold");
-            const unsoldParts=bParts.filter(p=>p.status!=="sold");
-            const recoveredAmt=soldParts.reduce((s,p)=>{
-              const sale=allSales.find(s=>s.partId===p.id)||allSales.find(s=>s.name===p.name);
-              return s+(sale?sale.salePrice:0);
+            const unsoldParts=bParts.filter(p=>p.status==="available"||p.status==="in_build");
+            const recoveredAmt=soldParts.reduce((sum,p)=>{
+              const directSale=allSales.find(s=>s.partId===p.id);
+              if(directSale)return sum+Number(directSale.salePrice||0);
+              const buildSale=allSales.find(s=>s.buildPartsSnapshot?.some(part=>part.id===p.id));
+              if(!buildSale)return sum;
+              const snapshot=buildSale.buildPartsSnapshot||[];
+              const totalMarket=snapshot.reduce((value,part)=>value+Number(part.marketValue||0),0);
+              const part=snapshot.find(item=>item.id===p.id);
+              const share=totalMarket>0?Number(part?.marketValue||0)/totalMarket:(snapshot.length?1/snapshot.length:0);
+              return sum+Number(buildSale.salePrice||0)*share;
             },0);
             const unsoldMarket=unsoldParts.reduce((s,p)=>s+p.marketValue,0);
             return {...b,bParts,soldParts,unsoldParts,recoveredAmt,unsoldMarket};
           });
           return (
             <Card>
-              <SectionHeader icon={PackageCheck} title="Bundle recovery"/>
+              <SectionHeader icon={PackageCheck} title="Bundle recovery" sub="Bar = sale proceeds divided by original bundle cost. Build-sale proceeds are shared by each part’s market-value share."/>
               <div style={{display:"flex",flexDirection:"column",gap:13}}>
                 {bundlePnl.map(b=>{
                   const recPct=b.purchasePrice>0?Math.min(b.recoveredAmt/b.purchasePrice*100,100):0;
                   return (
                     <div key={b.id}>
-                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-                        <span style={{fontSize:13,color:t.text,fontWeight:500}}>{b.name}</span>
-                        <span style={{fontSize:12,color:t.textFaint,fontFamily:FONT_MONO}}>{fmt(b.recoveredAmt)} / {fmt(b.purchasePrice)}</span>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:5,gap:10}}>
+                        <span style={{fontSize:13,color:t.text,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis"}}>{b.name}</span>
+                        <span style={{fontSize:12,color:t.text,fontFamily:FONT_MONO,flexShrink:0}}>{fmt(b.purchasePrice)} original cost</span>
                       </div>
                       <div style={{height:5,background:t.surfaceSunken,borderRadius:99}}>
                         <div style={{height:"100%",width:`${recPct}%`,background:recPct>=100?t.positive:t.accent,borderRadius:99,transition:"width 0.8s ease"}}/>
                       </div>
-                      <div style={{fontSize:10.5,color:t.textFaint,marginTop:4}}>
-                        {b.soldParts.length}/{b.bParts.length} parts sold · {b.unsoldParts.length} remaining ~{fmt(b.unsoldMarket)} market
+                      <div style={{fontSize:11.5,color:t.textMuted,marginTop:7,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:"4px 12px"}}>
+                        <span>Sale proceeds: <strong style={{fontFamily:FONT_MONO,color:t.text}}>{fmt(b.recoveredAmt)}</strong></span>
+                        <span>Parts sold: <strong style={{color:t.text}}>{b.soldParts.length}/{b.bParts.length}</strong></span>
+                        <span>Still unsold: <strong style={{color:t.text}}>{b.unsoldParts.length} parts · {fmt(b.unsoldMarket)} market value</strong></span>
+                        <span>Cost recovered: <strong style={{color:recPct>=100?t.positive:t.text}}>{Math.round(recPct)}%</strong></span>
                       </div>
                     </div>
                   );

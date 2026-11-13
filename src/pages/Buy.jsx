@@ -31,6 +31,8 @@ export function Buy({state,dispatch,toast}) {
   const [singleNotes,setSingleNotes]=useState("");
   const [singlePhoto,setSinglePhoto]=useState({photoUrl:"",photoRecordId:""});
   const [loading,setLoading]=useState(false);
+  const [bundleAttempted,setBundleAttempted]=useState(false);
+  const [singleAttempted,setSingleAttempted]=useState(false);
   const lastRowMarketRef=useRef(null);
 
   const totalMarket=partRows.reduce((s,r)=>s+(parseFloat(r.marketValue)||0),0);
@@ -108,7 +110,10 @@ export function Buy({state,dispatch,toast}) {
   };
 
   const submitBundle=()=>{
-    if(!bundleName||!purchasePrice||totalMarket===0){toast("Fill all fields and add part values","error");return;}
+    setBundleAttempted(true);
+    const filledRows=partRows.filter(r=>r.name.trim()||r.marketValue);
+    const incompleteRow=filledRows.some(r=>!r.name.trim()||!(Number(r.marketValue)>0));
+    if(!bundleName.trim()||!(paid>0)||totalMarket===0||incompleteRow){toast("Enter a source, purchase price, and complete part names and market values","error");return;}
     setLoading(true);
     setTimeout(()=>{
       const bundleId=uid();
@@ -129,12 +134,14 @@ export function Buy({state,dispatch,toast}) {
       if(newParts.length)setLastCategory(newParts[newParts.length-1].category);
       setBundleName("");setPurchasePrice("");setPartRows([{id:uid(),name:"",category:newParts.length?newParts[newParts.length-1].category:lastCategory,marketValue:"",notes:"",photoUrl:"",photoRecordId:""}]);
       setBundlePhoto({photoUrl:"",photoRecordId:""});
+      setBundleAttempted(false);
       setLoading(false);
     },400);
   };
 
   const submitSingle=()=>{
-    if(!singleName||!singleCost){toast("Enter name and cost","error");return;}
+    setSingleAttempted(true);
+    if(!singleName.trim()||!(Number(singleCost)>0)){toast("Enter a part name and a cost above zero","error");return;}
     setLoading(true);
     setTimeout(()=>{
       const cost=parseFloat(singleCost);
@@ -153,6 +160,7 @@ export function Buy({state,dispatch,toast}) {
       toast(qty>1?`${qty}× ${singleName} added`:`${singleName} added`);
       setLastCategory(singleCat);
       setSingleName("");setSingleCost("");setSingleMarket("");setSingleQty("1");setSingleNotes("");
+      setSingleAttempted(false);
       setSinglePhoto({photoUrl:"",photoRecordId:""});
       setLoading(false);
     },300);
@@ -179,8 +187,8 @@ export function Buy({state,dispatch,toast}) {
             <PhotoUpload label="Bundle photo (optional)" photoUrl={bundlePhoto.photoUrl} photoRecordId={bundlePhoto.photoRecordId} onChange={setBundlePhoto} onAnalyze={analyzeBundlePhoto}/>
           </div>
           <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
-            <Inp label="Source / seller" value={bundleName} onChange={e=>setBundleName(e.target.value)} placeholder="FB Marketplace – Juan"/>
-            <Inp label="You paid (₱)" type="number" value={purchasePrice} onChange={e=>setPurchasePrice(e.target.value)} placeholder="8000"/>
+            <Inp label="Source / seller" value={bundleName} onChange={e=>setBundleName(e.target.value)} placeholder="FB Marketplace – Juan" error={bundleAttempted&&!bundleName.trim()?"Enter who or where you bought it from.":undefined}/>
+            <Inp label="Purchase price (₱)" type="number" min="0.01" step="0.01" value={purchasePrice} onChange={e=>setPurchasePrice(e.target.value)} placeholder="8000" error={bundleAttempted&&!(paid>0)?"Enter an amount above ₱0.":undefined}/>
           </div>
           <div style={{fontWeight:700,fontSize:13,color:t.text,marginBottom:12,fontFamily:FONT_DISPLAY}}>Parts — enter estimated market value</div>
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
@@ -188,9 +196,9 @@ export function Buy({state,dispatch,toast}) {
               <div key={row.id} style={{display:"flex",gap:10,alignItems:"flex-start",animation:"blFadeUp 0.15s ease",paddingBottom:14,borderBottom:idx<partRows.length-1?`1px solid ${t.border}`:"none"}}>
                 <PhotoUpload label="" photoUrl={row.photoUrl} photoRecordId={row.photoRecordId} onChange={({photoUrl,photoRecordId})=>{updateRow(row.id,"photoUrl",photoUrl);updateRow(row.id,"photoRecordId",photoRecordId);}} onAnalyze={analyzeRowPhoto(row.id)}/>
                 <div className="part-row" style={{display:"grid",gridTemplateColumns:"1fr auto 90px 90px auto",gap:8,alignItems:"end",flex:1}}>
-                  <Inp label={idx===0?"Part name":""} value={row.name} onChange={e=>updateRow(row.id,"name",e.target.value)} placeholder="RX 580" data-buy-row-name="1"/>
+                  <Inp label={idx===0?"Part name":""} value={row.name} onChange={e=>updateRow(row.id,"name",e.target.value)} placeholder="RX 580" data-buy-row-name="1" error={bundleAttempted&&(row.name.trim()||row.marketValue)&&!row.name.trim()?"Add a part name.":undefined}/>
                   <CategoryPicker label={idx===0?"Category":"​"} value={row.category} onChange={v=>updateRow(row.id,"category",v)} customCategories={state.customCategories} hiddenCategories={state.hiddenCategories||[]} dispatch={dispatch} style={{minWidth:90}}/>
-                  <Inp label={idx===0?"Market (₱)":""} type="number" value={row.marketValue} onChange={e=>updateRow(row.id,"marketValue",e.target.value)} placeholder="4000"
+                  <Inp label={idx===0?"Market (₱)":""} type="number" min="0.01" step="0.01" value={row.marketValue} onChange={e=>updateRow(row.id,"marketValue",e.target.value)} placeholder="4000" error={bundleAttempted&&(row.name.trim()||row.marketValue)&&!(Number(row.marketValue)>0)?"Enter a value above ₱0.":undefined}
                     onKeyDown={idx===partRows.length-1?handleLastRowKeyDown:undefined}/>
                   <Inp label={idx===0?"Notes":""} value={row.notes||""} onChange={e=>updateRow(row.id,"notes",e.target.value)} placeholder="condition"/>
                   <IconBtn icon={Trash2} label={`Remove ${row.name||"part row"}`} variant="danger" onClick={()=>removeRow(row.id)} style={{alignSelf:idx===0?"end":"start",marginBottom:idx===0?2:0}}/>
@@ -200,7 +208,7 @@ export function Buy({state,dispatch,toast}) {
           </div>
           <div style={{marginTop:12}}><Btn small variant="ghost" icon={Plus} onClick={addRow}>Add part <span style={{opacity:0.6,fontWeight:400}}>(or press Enter in Market)</span></Btn></div>
 
-          {dealScore!==null&&(
+          {(paid>0||totalMarket>0)&&(
             <div style={{marginTop:16,background:t.surfaceSunken,borderRadius:10,padding:14,border:`1px solid ${t.border}`}}>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:6}}>
                 <span style={{color:t.textMuted}}>Market value</span><span style={{fontFamily:FONT_MONO,color:t.text}}>{fmt(totalMarket)}</span>
@@ -208,8 +216,9 @@ export function Buy({state,dispatch,toast}) {
               <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:10}}>
                 <span style={{color:t.textMuted}}>You pay</span><span style={{fontFamily:FONT_MONO,color:t.text}}>{fmt(paid)}</span>
               </div>
-              <DealBar score={dealScore}/>
-              <div style={{marginTop:12,borderTop:`1px solid ${t.border}`,paddingTop:10}}>
+              {dealScore!==null&&<DealBar score={dealScore}/>}
+              {paid>0&&totalMarket>0&&<div style={{fontSize:12,color:totalMarket>=paid?t.positive:t.negative,marginTop:8}}>Estimated value above purchase cost: {fmt(totalMarket-paid)}</div>}
+              {dealScore!==null&&<div style={{marginTop:12,borderTop:`1px solid ${t.border}`,paddingTop:10}}>
                 {partRows.filter(r=>r.name&&r.marketValue).map(r=>{
                   const mv=parseFloat(r.marketValue)||0;
                   const share=totalMarket>0?mv/totalMarket:0;
@@ -218,14 +227,14 @@ export function Buy({state,dispatch,toast}) {
                     <span style={{fontFamily:FONT_MONO,color:t.textMuted}}>{fmt(share*paid)}</span>
                   </div>;
                 })}
-              </div>
+              </div>}
             </div>
           )}
           <div style={{marginTop:14,marginBottom:14}}>
             <div style={{fontSize:11.5,color:t.textMuted,marginBottom:6,fontWeight:600}}>Payment source</div>
             <Segmented ariaLabel="Payment source" value={purchaseAccount} onChange={setPurchaseAccount} options={[["bank","Business Bank",Wallet],["cash","Cash",Banknote]]}/>
           </div>
-          <div style={{marginTop:16}}><Btn loading={loading} onClick={submitBundle} disabled={!bundleName||!purchasePrice||totalMarket===0} style={{width:"100%"}}>Add bundle to inventory</Btn></div>
+          <div style={{marginTop:16}}><Btn loading={loading} onClick={submitBundle} disabled={loading} style={{width:"100%"}}>Add bundle to inventory</Btn></div>
         </Card>
       )}
 
@@ -236,13 +245,13 @@ export function Buy({state,dispatch,toast}) {
             <PhotoUpload label="Photo (optional)" photoUrl={singlePhoto.photoUrl} photoRecordId={singlePhoto.photoRecordId} onChange={setSinglePhoto} onAnalyze={analyzeSinglePhoto}/>
           </div>
           <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-            <Inp label="Part name" value={singleName} onChange={e=>setSingleName(e.target.value)} placeholder="GTX 1060 6GB"/>
+            <Inp label="Part name" value={singleName} onChange={e=>setSingleName(e.target.value)} placeholder="GTX 1060 6GB" error={singleAttempted&&!singleName.trim()?"Enter a part name.":undefined}/>
             <CategoryPicker label="Category" value={singleCat} onChange={setSingleCat} customCategories={state.customCategories} hiddenCategories={state.hiddenCategories||[]} dispatch={dispatch}/>
-            <Inp label="Cost (₱, per unit)" type="number" value={singleCost} onChange={e=>setSingleCost(e.target.value)} placeholder="3000"/>
+            <Inp label="Cost (₱, per unit)" type="number" min="0.01" step="0.01" value={singleCost} onChange={e=>setSingleCost(e.target.value)} placeholder="3000" error={singleAttempted&&!(Number(singleCost)>0)?"Enter an amount above ₱0.":undefined}/>
             <Inp label="Market value (₱, per unit, optional)" type="number" value={singleMarket} onChange={e=>setSingleMarket(e.target.value)} placeholder="3500"/>
             <Inp label="Quantity" type="number" min="1" value={singleQty} onChange={e=>setSingleQty(e.target.value)} placeholder="1"/>
           </div>
-          {parseInt(singleQty,10)>1&&singleCost&&(
+          {singleCost&&Number(singleCost)>0&&(
             <div style={{marginTop:12,background:t.surfaceSunken,border:`1px solid ${t.border}`,borderRadius:9,padding:"10px 12px",
               display:"flex",justifyContent:"space-between",fontSize:12}}>
               <span style={{color:t.textMuted}}>{Math.max(1,parseInt(singleQty,10)||1)} units × {fmt(parseFloat(singleCost)||0)}</span>
@@ -256,7 +265,7 @@ export function Buy({state,dispatch,toast}) {
           <div style={{marginTop:14}}>
             <Inp label="Notes — condition, extras, observations" value={singleNotes} onChange={e=>setSingleNotes(e.target.value)} placeholder="Tested working. Includes original box."/>
           </div>
-          <div style={{marginTop:16}}><Btn loading={loading} onClick={submitSingle} disabled={!singleName||!singleCost} style={{width:"100%"}}>{parseInt(singleQty,10)>1?`Add ${Math.max(1,parseInt(singleQty,10)||1)} to inventory`:"Add to inventory"}</Btn></div>
+          <div style={{marginTop:16}}><Btn loading={loading} onClick={submitSingle} disabled={loading} style={{width:"100%"}}>{parseInt(singleQty,10)>1?`Add ${Math.max(1,parseInt(singleQty,10)||1)} to inventory`:"Add to inventory"}</Btn></div>
         </Card>
       )}
     </div>

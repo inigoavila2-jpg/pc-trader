@@ -8,6 +8,7 @@ export function Builds({state,dispatch,toast,openLightbox}) {
   const t=useTheme();
   const [creating,setCreating]=useState(false);
   const [buildName,setBuildName]=useState("");
+  const [attemptedSave,setAttemptedSave]=useState(false);
   const [sel,setSel]=useState([]);
   const [activeCat,setActiveCat]=useState(null);
   const [pickerSearch,setPickerSearch]=useState("");
@@ -29,7 +30,8 @@ export function Builds({state,dispatch,toast,openLightbox}) {
   const selectedCountByCat=cat=>avail.filter(p=>p.category===cat&&sel.includes(p.id)).length;
 
   const submit=()=>{
-    if(!buildName||sel.length===0){toast("Name the build and pick parts","error");return;}
+    setAttemptedSave(true);
+    if(!buildName.trim()||sel.length===0){toast("Name the build and pick parts","error");return;}
     dispatch({type:"CREATE_BUILD",build:{id:uid(),name:buildName,partIds:sel,date:today(),photoUrl:buildPhoto.photoUrl,photoRecordId:buildPhoto.photoRecordId}});
     toast(`Build "${buildName}" created`);
     setBuildName("");setSel([]);setCreating(false);setBuildPhoto({photoUrl:"",photoRecordId:""});setActiveCat(null);
@@ -97,7 +99,7 @@ export function Builds({state,dispatch,toast,openLightbox}) {
           receiptRows={buildReceipt.rows} onClose={()=>setBuildReceipt(null)}/>
       )}
 
-      <PageHeader title="Builds" sub="Group parts into a sellable PC." action={!creating&&<Btn icon={Plus} onClick={()=>setCreating(true)}>New build</Btn>}/>
+      <PageHeader title="Builds" sub="Group parts into a sellable PC." action={!creating&&<Btn icon={Plus} onClick={()=>{setAttemptedSave(false);setCreating(true);}}>New build</Btn>}/>
 
       {creating&&(
         <Card>
@@ -105,11 +107,12 @@ export function Builds({state,dispatch,toast,openLightbox}) {
           <div style={{marginBottom:16}}>
             <PhotoUpload label="Build photo (optional) — the finished PC" photoUrl={buildPhoto.photoUrl} photoRecordId={buildPhoto.photoRecordId} onChange={setBuildPhoto}/>
           </div>
-          <Inp label="Build name" value={buildName} onChange={e=>setBuildName(e.target.value)} placeholder="Gaming Rig #1" autoFocus/>
+          <Inp label="Build name" value={buildName} onChange={e=>setBuildName(e.target.value)} placeholder="Gaming Rig #1" autoFocus error={attemptedSave&&!buildName.trim()?"Enter a name for this build.":undefined}/>
 
           <div style={{fontSize:12,color:t.textMuted,fontWeight:600,margin:"16px 0 9px"}}>Pick parts by category:</div>
           <CategoryPartPicker avail={avail} categoriesPresent={categoriesPresent} activeCat={activeCat} setActiveCat={setActiveCat}
             search={pickerSearch} setSearch={setPickerSearch} selectedIds={sel} onToggle={toggle} selectedCountByCat={selectedCountByCat}/>
+          {attemptedSave&&sel.length===0&&<div role="alert" style={{fontSize:12,color:t.negative,marginTop:8}}>Choose at least one part for this build.</div>}
 
           {sel.length>0&&(
             <div style={{marginTop:4,paddingTop:14,borderTop:`1px solid ${t.border}`}}>
@@ -128,13 +131,13 @@ export function Builds({state,dispatch,toast,openLightbox}) {
                 <span style={{color:t.textMuted}}>Build cost so far</span><span style={{fontFamily:FONT_MONO,fontWeight:700,color:t.text}}>{fmt(buildCost)}</span>
               </div>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}>
-                <span style={{color:t.textMuted}}>Market value</span><span style={{fontFamily:FONT_MONO,color:t.textMuted}}>{fmt(buildMarket)}</span>
+                <span style={{color:t.textMuted}}>Estimated market value</span><span style={{fontFamily:FONT_MONO,color:t.textMuted}}>{fmt(buildMarket)}</span>
               </div>
             </div>
           )}
           <div style={{display:"flex",gap:8,marginTop:16}}>
             <Btn onClick={submit} disabled={!buildName||sel.length===0}>Save build</Btn>
-            <Btn variant="ghost" onClick={()=>{setCreating(false);setSel([]);setBuildName("");setActiveCat(null);}}>Cancel</Btn>
+            <Btn variant="ghost" onClick={()=>{setCreating(false);setSel([]);setBuildName("");setActiveCat(null);setAttemptedSave(false);}}>Cancel</Btn>
           </div>
         </Card>
       )}
