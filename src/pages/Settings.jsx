@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
-import { Check, Trash2, AlertTriangle, Wallet, Sun, Moon, Undo2, Tag, SlidersHorizontal, History, HardDriveDownload, RotateCcw } from "lucide-react";
+import { Check, Trash2, AlertTriangle, Wallet, Sun, Moon, Undo2, Tag, SlidersHorizontal, History, HardDriveDownload, RotateCcw, Download, Upload } from "lucide-react";
 import { fmt, initialState } from "../data/model.js";
-import { readBackups, saveBackup } from "../data/backups.js";
+import { readBackups, saveBackup, downloadBackup, readBackupArchive } from "../data/backups.js";
 import { THEME, THEME_COLOR_FIELDS, normalizeHex, FONT_MONO, useTheme, ConfirmModal, Card, Btn, Inp, SectionHeader, PageHeader, Segmented } from "../components/index.js";
 import { Sell } from "./Sell.jsx";
 
@@ -13,6 +13,8 @@ export function Settings({state,dispatch,toast,theme,setTheme,themeColors,themeP
   const [backups,setBackups]=useState(()=>readBackups());
   const [restoreTarget,setRestoreTarget]=useState(null);
   const [restoring,setRestoring]=useState(false);
+  const [draggingBackup,setDraggingBackup]=useState(false);
+  const backupFileInput=useRef(null);
   const activeSlot=Number(state.activeThemeSlot||1);
   const [targetSlot,setTargetSlot]=useState(activeSlot);
   const [colorDraft,setColorDraft]=useState(()=>({...((themeColors||{})[theme]||{})}));
@@ -126,6 +128,37 @@ export function Settings({state,dispatch,toast,theme,setTheme,themeColors,themeP
       toast("Backup saved on this device");
     }catch{
       toast("Could not save backup. This device may be out of storage.","error");
+    }
+  };
+
+  const downloadCurrentBackup=async()=>{
+    try{
+      const backup=saveBackup(state);
+      setBackups(readBackups());
+      const blob=await downloadBackup(backup);
+      const url=URL.createObjectURL(blob);
+      const link=document.createElement("a");
+      link.href=url;
+      link.download=`pc-trader-backup-${backup.createdAt.replace(/[:.]/g,"-")}.zip`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast("ZIP backup downloaded and saved to this device","success");
+    }catch{
+      toast("Could not create the ZIP backup. Try again or check device storage.","error");
+    }
+  };
+
+  const importBackupFile=async(file)=>{
+    if(!file)return;
+    try{
+      const backup=await readBackupArchive(file);
+      setRestoreTarget(backup);
+      toast("Backup checked. Review the date and confirm before loading it.","success");
+    }catch(error){
+      toast(error.message,"error");
+    }finally{
+      if(backupFileInput.current)backupFileInput.current.value="";
+      setDraggingBackup(false);
     }
   };
 
@@ -247,8 +280,21 @@ export function Settings({state,dispatch,toast,theme,setTheme,themeColors,themeP
 
       <Card>
         <SectionHeader icon={History} title="Backup history" sub="Dated restore points saved in this browser on this device." action={
-          <Btn small icon={HardDriveDownload} onClick={createBackup}>Save backup now</Btn>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <Btn small variant="ghost" icon={HardDriveDownload} onClick={createBackup}>Save restore point</Btn>
+            <Btn small icon={Download} onClick={downloadCurrentBackup}>Download ZIP</Btn>
+          </div>
         }/>
+        <input ref={backupFileInput} type="file" accept=".zip,application/zip" aria-label="Choose a PC Trader ZIP backup"
+          onChange={event=>importBackupFile(event.target.files?.[0])} style={{display:"none"}}/>
+        <div onDragOver={event=>{event.preventDefault();setDraggingBackup(true);}} onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget))setDraggingBackup(false);}}
+          onDrop={event=>{event.preventDefault();setDraggingBackup(false);importBackupFile(event.dataTransfer.files?.[0]);}}
+          style={{border:`1px dashed ${draggingBackup?t.accent:t.borderStrong}`,borderRadius:11,padding:"16px 14px",marginBottom:14,textAlign:"center",background:draggingBackup?t.accentSoft:t.surfaceSunken,transition:"background 0.15s,border-color 0.15s"}}>
+          <Upload size={18} color={t.accent} aria-hidden="true" style={{marginBottom:5}}/>
+          <div style={{fontSize:13,fontWeight:600,color:t.text}}>{draggingBackup?"Drop the ZIP backup here":"Restore from a downloaded ZIP"}</div>
+          <div style={{fontSize:11.5,color:t.textMuted,margin:"4px 0 9px"}}>Drop a PC Trader backup here, or choose the file. ZIP files up to 25 MB.</div>
+          <Btn small variant="ghost" onClick={()=>backupFileInput.current?.click()}>Choose ZIP file</Btn>
+        </div>
         {backups.length===0?<div style={{fontSize:13,color:t.textMuted,lineHeight:1.5}}>No backups yet. Save one now to create your first restore point.</div>:(
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {backups.map(backup=><div key={backup.createdAt} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",padding:"10px 12px",border:`1px solid ${t.border}`,borderRadius:10,background:t.surfaceSunken}}>
