@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { X, Plus, Pencil, Receipt, Monitor } from "lucide-react";
+import { X, Plus, Pencil, Receipt, Monitor, Search } from "lucide-react";
 import { fmt, today, uid, CATEGORIES, categoryKey, domainOf } from "../data/model.js";
 import { FONT_DISPLAY, FONT_MONO, useTheme, PhotoUpload, PhotoThumb, ConfirmModal, Card, Btn, IconBtn, Inp, PageHeader, CategoryPartPicker, EditBuildPartsModal, ReceiptPricePromptModal, BuildDetailSheet, ReceiptModal } from "../components/index.js";
 
@@ -12,6 +12,7 @@ export function Builds({state,dispatch,toast,openLightbox}) {
   const [sel,setSel]=useState([]);
   const [activeCat,setActiveCat]=useState(null);
   const [pickerSearch,setPickerSearch]=useState("");
+  const [buildSearch,setBuildSearch]=useState("");
   const [buildPhoto,setBuildPhoto]=useState({photoUrl:"",photoRecordId:""});
   const [deletingBuild,setDeletingBuild]=useState(null);
   const [viewingBuild,setViewingBuild]=useState(null);
@@ -20,6 +21,8 @@ export function Builds({state,dispatch,toast,openLightbox}) {
   const [buildReceipt,setBuildReceipt]=useState(null);
   // Domain Firewall: Builds must never see General Assets (phones, vehicles, etc.), only PC Parts.
   const avail=state.parts.filter(p=>p.status==="available"&&domainOf(p.category,state.customCategories)==="pc_part");
+  const activeBuilds=state.builds.filter(b=>!b.dissolved&&!b.sold);
+  const visibleBuilds=activeBuilds.filter(b=>b.name.toLowerCase().includes(buildSearch.trim().toLowerCase()));
   const buildCost=avail.filter(p=>sel.includes(p.id)).reduce((s,p)=>s+p.allocatedCost,0);
   const buildMarket=avail.filter(p=>sel.includes(p.id)).reduce((s,p)=>s+p.marketValue,0);
   const toggle=id=>setSel(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
@@ -142,14 +145,17 @@ export function Builds({state,dispatch,toast,openLightbox}) {
         </Card>
       )}
 
-      {state.builds.filter(b=>!b.dissolved&&!b.sold).length===0&&!creating?(
+      {activeBuilds.length>0&&<Inp value={buildSearch} onChange={e=>setBuildSearch(e.target.value)} placeholder="Search active builds…" icon={Search} aria-label="Search active builds"/>}
+      {activeBuilds.length===0&&!creating?(
         <Card style={{textAlign:"center",padding:36}}>
           <Monitor size={28} strokeWidth={1.5} color={t.textFaint} style={{marginBottom:10}}/>
           <div style={{color:t.textFaint}}>No active builds.</div>
         </Card>
+      ):visibleBuilds.length===0&&!creating?(
+        <Card style={{textAlign:"center",padding:28}}><div style={{color:t.text,fontWeight:600}}>No builds match “{buildSearch}”.</div><Btn small variant="ghost" onClick={()=>setBuildSearch("")} style={{marginTop:10}}>Clear search</Btn></Card>
       ):(
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
-          {state.builds.filter(b=>!b.dissolved&&!b.sold).map(build=>{
+          {visibleBuilds.map(build=>{
             const bp=state.parts.filter(p=>build.partIds.includes(p.id));
             const cost=bp.reduce((s,p)=>s+p.allocatedCost,0);
             const market=bp.reduce((s,p)=>s+p.marketValue,0);

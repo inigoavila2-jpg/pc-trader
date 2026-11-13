@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 
 import { Boxes, Wrench, Settings as SettingsIcon, Search, X, Trash2, PackageX } from "lucide-react";
 import { fmt, today, uid } from "../data/model.js";
-import { FONT_DISPLAY, FONT_BODY, FONT_MONO, useTheme, STATUS_LABEL, StatusBadge, PhotoThumb, ConfirmModal, Card, Btn, IconBtn, Inp, PageHeader, DefectiveModal, QuickSellModal, EditPartModal, PartDetailSheet, PartGroupSheet } from "../components/index.js";
+import { FONT_DISPLAY, FONT_BODY, FONT_MONO, useTheme, STATUS_LABEL, StatusBadge, PhotoThumb, ConfirmModal, Card, Btn, IconBtn, Inp, Sel, PageHeader, DefectiveModal, QuickSellModal, EditPartModal, PartDetailSheet, PartGroupSheet } from "../components/index.js";
 import { CategoryManager } from "../components/CategoryManager.jsx";
 import { Builds } from "./Builds.jsx";
 
@@ -12,6 +12,7 @@ export function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}
   const [statusFilter,setStatusFilter]=useState("all");
   const [catFilter,setCatFilter]=useState("all");
   const [search,setSearch]=useState("");
+  const [sortBy,setSortBy]=useState("name");
   const [viewing,setViewing]=useState(null); // part shown in the detail sheet
   const [viewingGroup,setViewingGroup]=useState(null); // group of identical parts shown in the group sheet
   const [bundleView,setBundleView]=useState(false);
@@ -45,7 +46,7 @@ export function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}
     if(catFilter!=="all"&&p.category!==catFilter)return false;
     if(search&&!p.name.toLowerCase().includes(search.toLowerCase())&&!p.category.toLowerCase().includes(search.toLowerCase()))return false;
     return true;
-  });
+  }).sort((a,b)=>sortBy==="cost-high"?b.allocatedCost-a.allocatedCost:sortBy==="cost-low"?a.allocatedCost-b.allocatedCost:sortBy==="market-high"?b.marketValue-a.marketValue:sortBy==="status"?(STATUS_LABEL[a.status]||a.status).localeCompare(STATUS_LABEL[b.status]||b.status):a.name.localeCompare(b.name));
 
   // Restocking the same item (e.g. buying 20 identical power cables) still creates 20
   // independently-trackable part records under the hood — each can still be sold, built, or
@@ -164,6 +165,12 @@ export function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}
       <div style={{display:"flex",justifyContent:"flex-end",marginTop:-8}}><Btn small variant="ghost" icon={SettingsIcon} onClick={()=>setCategoryManagerOpen(true)}>Manage categories</Btn></div>
 
       <Inp value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name or category…" icon={Search} aria-label="Search inventory"/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,190px),1fr))",gap:10}}>
+        <Sel label="Sort inventory" value={sortBy} onChange={e=>setSortBy(e.target.value)} aria-label="Sort inventory">
+          <option value="name">Name A–Z</option><option value="cost-high">Cost: high to low</option><option value="cost-low">Cost: low to high</option><option value="market-high">Market value: high to low</option><option value="status">Status</option>
+        </Sel>
+        {(search||catFilter!=="all"||statusFilter!=="all"||bundleView)&&<Btn variant="ghost" icon={X} onClick={()=>{setSearch("");setCatFilter("all");setStatusFilter("all");setBundleView(false);}}>Clear filters</Btn>}
+      </div>
 
       {categoriesPresent.length>0&&(
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -230,6 +237,7 @@ export function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}
         <Card style={{textAlign:"center",padding:36}}>
           <PackageX size={28} strokeWidth={1.5} color={t.textFaint} style={{marginBottom:10}}/>
           <div style={{color:t.textFaint}}>{search?"No parts match your search.":"No parts here yet."}</div>
+          {(search||catFilter!=="all"||statusFilter!=="all")&&<Btn small variant="ghost" icon={X} onClick={()=>{setSearch("");setCatFilter("all");setStatusFilter("all");}} style={{marginTop:12}}>Clear filters</Btn>}
         </Card>
       ):(
         /* Marketplace-style card grid — replaces the old always-expanded list so scanning

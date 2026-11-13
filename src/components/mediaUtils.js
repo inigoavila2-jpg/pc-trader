@@ -1,14 +1,14 @@
 
 import { Monitor } from "lucide-react";
 
-import { _buyVisionClient } from "./_buyVisionClient.jsx";
+import { _buyVisionClient, setBuyVisionClient } from "./_buyVisionClient.jsx";
 
 export async function getGeminiVisionClient(){
   const apiKey = import.meta.env?.VITE_GEMINI_KEY || import.meta.env?.VITE_GEMINI_API_KEY || import.meta.env?.GEMINI_API_KEY || process?.env?.VITE_GEMINI_KEY || process?.env?.GEMINI_API_KEY;
   if(!apiKey) return null;
   if(!_buyVisionClient){
     const { GoogleGenAI } = await import("@google/genai");
-    if(!_buyVisionClient) _buyVisionClient = new GoogleGenAI({apiKey});
+    if(!_buyVisionClient) setBuyVisionClient(new GoogleGenAI({apiKey}));
   }
   return _buyVisionClient;
 }

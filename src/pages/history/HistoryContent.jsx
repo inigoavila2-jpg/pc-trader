@@ -195,7 +195,9 @@ export function HistoryContent({model}) {
           {filtered.length===0?(
             <Card style={{textAlign:"center",padding:36}}>
               <ClipboardList size={28} strokeWidth={1.5} color={t.textFaint} style={{marginBottom:10}}/>
-              <div style={{color:t.textFaint}}>No transactions match.</div>
+              <div style={{color:t.text,fontWeight:600}}>No transactions match these filters.</div>
+              <div style={{color:t.textMuted,fontSize:12.5,marginTop:5}}>Try another search or clear the filters to see all activity.</div>
+              <Btn small variant="ghost" onClick={()=>{setSearch("");setTypeFilter("all");setPlFilter("all");setDateFrom("");setDateTo("");}}>Clear filters</Btn>
             </Card>
           ):(
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10}}>

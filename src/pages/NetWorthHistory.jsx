@@ -51,7 +51,7 @@ export function NetWorthHistory({ state }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <PageHeader title="Net worth history" sub="See how your business finances change over time." />
       <Card>
-        <SectionHeader icon={TrendingUp} title="Progress" sub="Daily snapshots saved by the app" />
+        <SectionHeader icon={TrendingUp} title="Progress" sub={`${visible.length} daily snapshots shown; the date range is anchored to the latest saved snapshot. The table below lists every saved value in that range.`} />
         <div role="group" aria-label="History date range" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
           {RANGES.map((option) => (
             <Btn key={option.label} small variant={range === option.days ? "primary" : "ghost"}
