@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 
-import { Check, Trash2, AlertTriangle, Wallet, Sun, Moon, Undo2, Tag, SlidersHorizontal } from "lucide-react";
+import { Check, Trash2, AlertTriangle, Wallet, Sun, Moon, Undo2, Tag, SlidersHorizontal, History, HardDriveDownload, RotateCcw } from "lucide-react";
 import { fmt, initialState } from "../data/model.js";
+import { readBackups, saveBackup } from "../data/backups.js";
 import { THEME, THEME_COLOR_FIELDS, normalizeHex, FONT_MONO, useTheme, ConfirmModal, Card, Btn, Inp, SectionHeader, PageHeader, Segmented } from "../components/index.js";
 import { Sell } from "./Sell.jsx";
 
@@ -9,6 +10,9 @@ export function Settings({state,dispatch,toast,theme,setTheme,themeColors,themeP
   const t=useTheme();
   const [margin,setMargin]=useState(String(state.settings?.targetMargin||30));
   const [confirmingClear,setConfirmingClear]=useState(false);
+  const [backups,setBackups]=useState(()=>readBackups());
+  const [restoreTarget,setRestoreTarget]=useState(null);
+  const [restoring,setRestoring]=useState(false);
   const activeSlot=Number(state.activeThemeSlot||1);
   const [targetSlot,setTargetSlot]=useState(activeSlot);
   const [colorDraft,setColorDraft]=useState(()=>({...((themeColors||{})[theme]||{})}));
@@ -115,11 +119,42 @@ export function Settings({state,dispatch,toast,theme,setTheme,themeColors,themeP
       .catch(()=>toast("Failed to clear data — check server connection","error"));
   };
 
+  const createBackup=()=>{
+    try{
+      saveBackup(state);
+      setBackups(readBackups());
+      toast("Backup saved on this device");
+    }catch{
+      toast("Could not save backup. This device may be out of storage.","error");
+    }
+  };
+
+  const restoreBackup=async()=>{
+    if(!restoreTarget)return;
+    setRestoring(true);
+    try{
+      saveBackup(state);
+      const response=await fetch("/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(restoreTarget.state)});
+      if(!response.ok)throw new Error(`Server returned ${response.status}`);
+      toast("Backup restored. Reloading your saved version.","success");
+      window.location.reload();
+    }catch(error){
+      setRestoring(false);
+      setRestoreTarget(null);
+      setBackups(readBackups());
+      toast(`Restore failed: ${error.message}. Your current data is still open; try again.`,"error");
+    }
+  };
+
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
       {confirmingClear&&(
         <ConfirmModal title="Delete all data?" message="This permanently erases every part, build, sale, and wallet balance. This cannot be undone."
           confirmLabel="Delete everything" onConfirm={clearData} onCancel={()=>setConfirmingClear(false)}/>
+      )}
+      {restoreTarget&&(
+        <ConfirmModal title="Load this backup?" message={`This replaces the current saved data with the version from ${new Date(restoreTarget.createdAt).toLocaleString()}. A safety backup of the current version will be saved on this device first.`}
+          confirmLabel={restoring?"Restoring…":"Load this version"} danger={false} onConfirm={restoreBackup} onCancel={()=>!restoring&&setRestoreTarget(null)}/>
       )}
       <PageHeader title="Settings" sub="App preferences."/>
       <Card>
@@ -211,8 +246,25 @@ export function Settings({state,dispatch,toast,theme,setTheme,themeColors,themeP
       </Card>
 
       <Card>
+        <SectionHeader icon={History} title="Backup history" sub="Dated restore points saved in this browser on this device." action={
+          <Btn small icon={HardDriveDownload} onClick={createBackup}>Save backup now</Btn>
+        }/>
+        {backups.length===0?<div style={{fontSize:13,color:t.textMuted,lineHeight:1.5}}>No backups yet. Save one now to create your first restore point.</div>:(
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {backups.map(backup=><div key={backup.createdAt} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",padding:"10px 12px",border:`1px solid ${t.border}`,borderRadius:10,background:t.surfaceSunken}}>
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:600,color:t.text}}>{new Date(backup.createdAt).toLocaleString()}</div>
+                <div style={{fontSize:11.5,color:t.textMuted,marginTop:3}}>{backup.state.parts.length} parts · {backup.state.sales.length} sales</div>
+              </div>
+              <Btn small variant="ghost" icon={RotateCcw} disabled={restoring} onClick={()=>setRestoreTarget(backup)}>Load this version</Btn>
+            </div>)}
+          </div>
+        )}
+      </Card>
+
+      <Card>
         <SectionHeader icon={AlertTriangle} title="Data"/>
-        <div style={{fontSize:12,color:t.textMuted,marginBottom:14}}>All data is saved to your database and synced across devices.</div>
+        <div style={{fontSize:12,color:t.textMuted,marginBottom:14}}>Business data is saved to your database and synced across devices. Backup history is stored separately on this device and browser.</div>
         <Btn variant="danger" icon={Trash2} onClick={()=>setConfirmingClear(true)}>Clear all data</Btn>
       </Card>
     </div>

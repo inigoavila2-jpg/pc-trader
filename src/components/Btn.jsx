@@ -26,7 +26,7 @@ export function Btn({children,variant="primary",onClick,disabled=false,loading=f
       onMouseLeave={e=>{e.currentTarget.style.background=c.bg;}}
       style={{background:c.bg,color:disabled?t.textFaint:c.txt,border:`1px solid ${c.bdr}`,borderRadius:9,
         padding:small?"7px 12px":"10px 17px",fontSize:small?12:13.5,fontWeight:600,cursor:disabled?"not-allowed":"pointer",
-        fontFamily:FONT_BODY,minHeight:small?32:44,
+        fontFamily:FONT_BODY,minHeight:44,
         transition:"background 0.12s,transform 0.1s",transform:pressed?"scale(0.96)":"scale(1)",opacity:disabled?0.5:1,
         display:"inline-flex",alignItems:"center",justifyContent:"center",gap:6,...style}} {...rest}>
       {loading?<Loader2 size={small?13:15} className="bl-spin"/>:Icon?<Icon size={small?14:16} strokeWidth={2.25}/>:null}

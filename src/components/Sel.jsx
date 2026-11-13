@@ -8,7 +8,7 @@ export function Sel({label,children,style,...props}) {
   const t=useTheme();
   const [f,setF]=useState(false);
   return (
-    <label style={{display:"flex",flexDirection:"column",gap:5,fontSize:12.5,color:t.textMuted,fontFamily:FONT_BODY,fontWeight:500}}>
+    <label style={{display:"flex",flexDirection:"column",gap:6,fontSize:13.5,color:t.textMuted,fontFamily:FONT_BODY,fontWeight:600}}>
       {label}
       <select {...props} onFocus={()=>setF(true)} onBlur={()=>setF(false)}
         style={{background:t.surfaceSunken,border:`1px solid ${f?t.accent:t.border}`,borderRadius:9,

@@ -6,7 +6,7 @@ import { useTheme } from "./theme.js";
 
 export function Card({children,style={},as:As="div",...rest}) {
   const t=useTheme();
-  return <As style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:14,padding:18,...style}} {...rest}>{children}</As>;
+  return <As style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:14,padding:18,boxShadow:t.shadowSm,...style}} {...rest}>{children}</As>;
 }
 
 /* ═══════════════════════════════════════════
