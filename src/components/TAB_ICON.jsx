@@ -1,6 +1,6 @@
 
 
-import { LayoutDashboard, ShoppingCart, Boxes, Wrench, Banknote, History as HistoryIcon, Settings as SettingsIcon } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Boxes, Wrench, Banknote, History as HistoryIcon, Settings as SettingsIcon, TrendingUp } from "lucide-react";
 
 import { Dashboard } from "../pages/Dashboard.jsx";
 import { Buy } from "../pages/Buy.jsx";
@@ -10,7 +10,7 @@ import { Sell } from "../pages/Sell.jsx";
 import { History } from "../pages/History.jsx";
 import { Settings } from "../pages/Settings.jsx";
 
-export const TAB_ICON={Dashboard:LayoutDashboard,Buy:ShoppingCart,Inventory:Boxes,Builds:Wrench,Sell:Banknote,History:HistoryIcon,Settings:SettingsIcon};
+export const TAB_ICON={Dashboard:LayoutDashboard,Buy:ShoppingCart,Inventory:Boxes,Builds:Wrench,Sell:Banknote,History:HistoryIcon,"Net Worth":TrendingUp,Settings:SettingsIcon};
 
 /* ═══════════════════════════════════════════
    GLOBAL SEARCH — the fix for "finding things is clunky": one search box, reachable from

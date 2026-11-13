@@ -9,3 +9,4 @@ export const Builds = lazy(() => import("./Builds.jsx").then((page) => ({ defaul
 export const Sell = lazy(() => import("./Sell.jsx").then((page) => ({ default: page.Sell })));
 export const History = lazy(() => import("./History.jsx").then((page) => ({ default: page.History })));
 export const Settings = lazy(() => import("./Settings.jsx").then((page) => ({ default: page.Settings })));
+export const NetWorthHistory = lazy(() => import("./NetWorthHistory.jsx").then((page) => ({ default: page.NetWorthHistory })));

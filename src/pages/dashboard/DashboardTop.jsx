@@ -36,7 +36,10 @@ export function DashboardTop({model}) {
       {/* Historical net-worth snapshots */}
       <Card>
         <SectionHeader icon={TrendingUp} title="Net worth history" sub="Saved financial snapshots — latest value captured for each calendar month" action={
-          <div style={{fontFamily:FONT_MONO,fontSize:12,color:t.textMuted}}>{netWorthSnapshots.length} snapshot{netWorthSnapshots.length===1?"":"s"}</div>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{fontFamily:FONT_MONO,fontSize:12,color:t.textMuted}}>{netWorthSnapshots.length} snapshot{netWorthSnapshots.length===1?"":"s"}</div>
+            <Btn small variant="ghost" icon={TrendingUp} onClick={()=>setTab("Net Worth")}>View all</Btn>
+          </div>
         }/>
         {sixMonthNetWorthRows.length>=2
           ? <NetWorthHistoryChart rows={sixMonthNetWorthRows}/>

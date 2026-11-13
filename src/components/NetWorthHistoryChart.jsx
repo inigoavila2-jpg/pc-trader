@@ -37,7 +37,7 @@ export function NetWorthHistoryChart({rows}) {
         {rows.map(r=><div key={r.key} style={{fontSize:9.5,color:t.textFaint,textAlign:"center",flex:1,whiteSpace:"nowrap"}}>{r.label}</div>)}
       </div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:12}}>
-        <span style={{fontSize:11,color:t.textFaint}}>First → latest saved monthly value</span>
+        <span style={{fontSize:11,color:t.textFaint}}>First → latest saved value</span>
         <span style={{fontSize:12,fontFamily:FONT_MONO,fontWeight:700,color}}>{trend>=0?"+":"−"}{fmt(Math.abs(trend))}</span>
       </div>
     </div>

@@ -7,7 +7,7 @@ import { Search } from "lucide-react";
 
 import { THEME, buildTheme, FONT_BODY, FONT_MONO, ThemeCtx, ToastContainer, AnimNum, Lightbox, IconBtn, QuickActionsFab, ALL_TABS, TAB_ICON, GlobalSearchModal, BrandMark, SyncStatus, LoadingScreen, ErrorScreen } from "./components/index.js";
 import { useMediaQuery, usePersistentState, useToast } from "./hooks/appHooks.js";
-import { Dashboard, Buy, Inventory, Builds, Sell, History, Settings } from "./pages/lazyPages.js";
+import { Dashboard, Buy, Inventory, Builds, Sell, History, Settings, NetWorthHistory } from "./pages/lazyPages.js";
 
 export default function App() {
   const { state, dispatch, loadStatus, saveStatus } = useAppData();
@@ -82,6 +82,7 @@ export default function App() {
     Builds:<Builds state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/>,
     Sell:<Sell state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/>,
     History:<History state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox} jumpRequest={historyJump}/>,
+    "Net Worth":<NetWorthHistory state={state}/>,
     Settings:<Settings state={state} dispatch={dispatch} toast={toast} theme={theme} setTheme={setTheme} themeColors={themeColors} themePreviewColors={themePreviewColors} setThemePreviewColors={setThemePreviewColors}/>,
   };
   const panels=visitedTabs.map(name=>(
