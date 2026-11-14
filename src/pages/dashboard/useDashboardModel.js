@@ -5,7 +5,7 @@ import { useTheme } from "../../components/index.js";
 export function useDashboardModel(props) {
   const { state, dispatch, toast, setTab, openLightbox } = props;
   const t=useTheme();
-  const [addingExpense,setAddingExpense]=useState(false);
+  const [addingExpense,setAddingExpense]=useState(()=>new URLSearchParams(window.location.search).get("quick")==="expense");
   const [addingIncome,setAddingIncome]=useState(false);
   const [transferring,setTransferring]=useState(false);
   const [period,setPeriod]=useState("all"); // "month" | "quarter" | "all" — governs flow metrics only
