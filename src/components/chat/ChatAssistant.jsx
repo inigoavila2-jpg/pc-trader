@@ -57,7 +57,7 @@ export function ChatAssistant({
      a dangling, never-answered function call in its history. Rebuilding it from whatever's
      already persisted is how we recover, instead of every message failing until refresh.
   ─────────────────────────────────────────── */
-  const initGemini = useCallback(async () => {
+  const initGemini = useCallback(async (historyOverride) => {
     try {
       const apiKey = import.meta.env?.VITE_GEMINI_KEY || import.meta.env?.VITE_GEMINI_API_KEY || import.meta.env?.GEMINI_API_KEY || process?.env?.VITE_GEMINI_KEY || process?.env?.GEMINI_API_KEY;
       if (!apiKey) {
@@ -69,7 +69,7 @@ export function ChatAssistant({
       const { GoogleGenAI } = await import('@google/genai');
       const ai = new GoogleGenAI({ apiKey });
 
-      const sdkHistory = (formattedHistory || []).map((item) => ({
+      const sdkHistory = (historyOverride || formattedHistory || []).slice(-16).map((item) => ({
         role: item.role === 'user' ? 'user' : 'model',
         parts: item.parts || [{ text: item.text || '' }],
       }));
@@ -231,11 +231,18 @@ export function ChatAssistant({
       const finalText = response.text || '';
       if (finalText) {
         await addMessage('model', finalText);
+        const recentHistory = [
+          ...(formattedHistory || []),
+          { role: 'user', parts: [{ text: userText }] },
+          { role: 'model', parts: [{ text: finalText }] },
+        ].slice(-16);
+        chatSessionRef.current = null;
+        await initGemini(recentHistory);
       }
     } catch (err) {
       console.error('Error during agent interaction loop:', err);
       if (isRateLimitError(err)) {
-        toast?.("You're sending messages faster than the free Gemini tier allows. Wait about 15 seconds and try again.", 'error');
+        toast?.("Gemini's request quota is full right now. Wait for it to reset, then try again.", 'error');
       } else {
         toast?.('Something went wrong talking to the assistant. Resetting — please try again.', 'error');
       }

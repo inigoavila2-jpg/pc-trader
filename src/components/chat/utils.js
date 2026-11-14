@@ -29,7 +29,7 @@ export const isRateLimitError = (err) => {
   return err?.status === 429 || err?.code === 429 || msg.includes('429') || msg.includes('resource_exhausted') || msg.includes('too many requests');
 };
 
-export const sendWithRetry = async (sendFn, maxRetries = 2) => {
+export const sendWithRetry = async (sendFn, maxRetries = 0) => {
   let lastErr;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {

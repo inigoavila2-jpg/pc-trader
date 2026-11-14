@@ -79,7 +79,7 @@ export const toolsConfig = [
             properties: {
               scope: { type: 'string', enum: ['summary','inventory','sales','transactions','expenses','bundles','builds','item_history','quick_notes','all'] },
               query: { type: 'string', description: 'Optional free-text search across names, descriptions, buyers, notes, sources, bundle names, build names, and transaction descriptions.' },
-              limit: { type: 'number', description: 'Maximum records to return. Defaults to 25; capped at 100.' },
+              limit: { type: 'number', description: 'Maximum records to return. Defaults to 25; capped at 30 to keep history queries concise.' },
               includeReturned: { type: 'boolean', description: 'For sales searches, include returned/undone sales as well as active sales.' }
             },
             required: ['scope'],

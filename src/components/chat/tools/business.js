@@ -7,7 +7,7 @@ export async function handleBusinessTool(toolName, toolInput, ctx) {
           case 'query_business_database': {
             const scope = toolInput.scope || 'summary';
             const query = String(toolInput.query || '').trim().toLowerCase();
-            const limit = Math.min(100, Math.max(1, Math.floor(Number(toolInput.limit) || 25)));
+            const limit = Math.min(30, Math.max(1, Math.floor(Number(toolInput.limit) || 25)));
 
             let dbState = liveState;
             try {
@@ -87,7 +87,7 @@ export async function handleBusinessTool(toolName, toolInput, ctx) {
 
             if (scope === 'transactions') {
               const txns = (dbState.transactions || []).filter(t => matches(t));
-              return JSON.stringify({count: txns.length, transactions: txns.slice(0, limit).map(cleanTxn)});
+              return JSON.stringify({count: txns.length, returned: Math.min(txns.length, limit), truncated: txns.length > limit, transactions: txns.slice(0, limit).map(cleanTxn)});
             }
 
             if (scope === 'expenses') {

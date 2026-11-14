@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ArrowDownRight, ArrowUpRight, CalendarDays, Sparkles, TrendingUp } from "lucide-react";
 import { fmt, pct } from "../data/model.js";
 import { Btn, Card, NetWorthHistoryChart, PageHeader, SectionHeader, useTheme } from "../components/index.js";
@@ -97,6 +97,7 @@ export function NetWorthHistory({ state }) {
   const [aiExplanation, setAiExplanation] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+  const aiCache = useRef(new Map());
   const snapshots = useMemo(() => (Array.isArray(state?.netWorthSnapshots) ? state.netWorthSnapshots : [])
     .filter((snapshot) => snapshot?.date && Number.isFinite(Number(snapshot.netWorth)))
     .slice()
@@ -140,6 +141,11 @@ export function NetWorthHistory({ state }) {
         componentChanges: changeRows.map(([name, amount]) => ({ name, amount })),
         recordedActivity: activities.map(({ type, date, description, amount, itemNames }) => ({ type, date, description, amount: Number(amount), exactItems: itemNames })),
       };
+      const cacheKey = JSON.stringify(facts);
+      if (aiCache.current.has(cacheKey)) {
+        setAiExplanation({ date: selected.date, text: aiCache.current.get(cacheKey) });
+        return;
+      }
       const result = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: `Explain this net-worth change in 2 short sentences using only these facts. Name the exact items listed in exactItems and describe the recorded actions. If exactItems is empty, say the item was not identified. Never infer a cause that is not explicitly supported; if activity is missing, say the records do not show why. Do not calculate or change the supplied amounts.\n${JSON.stringify(facts)}`,
@@ -147,6 +153,7 @@ export function NetWorthHistory({ state }) {
       });
       const text = String(result?.text || "").trim();
       if (!text) throw new Error("Gemini returned an empty explanation.");
+      aiCache.current.set(cacheKey, text);
       setAiExplanation({ date: selected.date, text });
     } catch (error) {
       setAiError(error?.message || "Could not generate an explanation. Please try again.");
