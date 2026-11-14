@@ -183,41 +183,30 @@ export function Buy({state,dispatch,toast}) {
               <Btn small variant="ghost" icon={Copy} onClick={duplicateLastBundle}>Duplicate last bundle</Btn>
             )}
           </div>
-          <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,marginBottom:20}}>
+          <div style={{marginBottom:16}}>
+            <PhotoUpload label="Bundle photo (optional)" photoUrl={bundlePhoto.photoUrl} photoRecordId={bundlePhoto.photoRecordId} onChange={setBundlePhoto} onAnalyze={analyzeBundlePhoto}/>
+          </div>
+          <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
             <Inp label="Source / seller" value={bundleName} onChange={e=>setBundleName(e.target.value)} placeholder="FB Marketplace – Juan" error={bundleAttempted&&!bundleName.trim()?"Enter who or where you bought it from.":undefined}/>
             <Inp label="Purchase price (₱)" type="number" min="0.01" step="0.01" value={purchasePrice} onChange={e=>setPurchasePrice(e.target.value)} placeholder="8000" error={bundleAttempted&&!(paid>0)?"Enter an amount above ₱0.":undefined}/>
-            <div>
-              <div style={{fontSize:11.5,color:t.textMuted,marginBottom:6,fontWeight:600}}>Payment source</div>
-              <Segmented ariaLabel="Payment source" value={purchaseAccount} onChange={setPurchaseAccount} options={[["bank","Business Bank",Wallet],["cash","Cash",Banknote]]}/>
-            </div>
           </div>
           <div style={{fontWeight:700,fontSize:13,color:t.text,marginBottom:12,fontFamily:FONT_DISPLAY}}>Parts — enter estimated market value</div>
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
             {partRows.map((row,idx)=>(
               <div key={row.id} style={{display:"flex",gap:10,alignItems:"flex-start",animation:"blFadeUp 0.15s ease",paddingBottom:14,borderBottom:idx<partRows.length-1?`1px solid ${t.border}`:"none"}}>
-                <div className="part-row" style={{display:"grid",gridTemplateColumns:"1fr auto 90px auto",gap:8,alignItems:"end",flex:1}}>
+                <PhotoUpload label="" photoUrl={row.photoUrl} photoRecordId={row.photoRecordId} onChange={({photoUrl,photoRecordId})=>{updateRow(row.id,"photoUrl",photoUrl);updateRow(row.id,"photoRecordId",photoRecordId);}} onAnalyze={analyzeRowPhoto(row.id)}/>
+                <div className="part-row" style={{display:"grid",gridTemplateColumns:"1fr auto 90px 90px auto",gap:8,alignItems:"end",flex:1}}>
                   <Inp label={idx===0?"Part name":""} value={row.name} onChange={e=>updateRow(row.id,"name",e.target.value)} placeholder="RX 580" data-buy-row-name="1" error={bundleAttempted&&(row.name.trim()||row.marketValue)&&!row.name.trim()?"Add a part name.":undefined}/>
                   <CategoryPicker label={idx===0?"Category":"​"} value={row.category} onChange={v=>updateRow(row.id,"category",v)} customCategories={state.customCategories} hiddenCategories={state.hiddenCategories||[]} dispatch={dispatch} style={{minWidth:90}}/>
                   <Inp label={idx===0?"Market (₱)":""} type="number" min="0.01" step="0.01" value={row.marketValue} onChange={e=>updateRow(row.id,"marketValue",e.target.value)} placeholder="4000" error={bundleAttempted&&(row.name.trim()||row.marketValue)&&!(Number(row.marketValue)>0)?"Enter a value above ₱0.":undefined}
                     onKeyDown={idx===partRows.length-1?handleLastRowKeyDown:undefined}/>
+                  <Inp label={idx===0?"Notes":""} value={row.notes||""} onChange={e=>updateRow(row.id,"notes",e.target.value)} placeholder="condition"/>
                   <IconBtn icon={Trash2} label={`Remove ${row.name||"part row"}`} variant="danger" onClick={()=>removeRow(row.id)} style={{alignSelf:idx===0?"end":"start",marginBottom:idx===0?2:0}}/>
-                  <details style={{gridColumn:"1 / -1",fontSize:12,color:t.textMuted}}>
-                    <summary style={{cursor:"pointer",width:"fit-content"}}>Photo and notes (optional)</summary>
-                    <div style={{display:"flex",alignItems:"flex-end",gap:12,flexWrap:"wrap",marginTop:10}}>
-                      <PhotoUpload label={`Photo for ${row.name||"part"}`} photoUrl={row.photoUrl} photoRecordId={row.photoRecordId} onChange={({photoUrl,photoRecordId})=>{updateRow(row.id,"photoUrl",photoUrl);updateRow(row.id,"photoRecordId",photoRecordId);}} onAnalyze={analyzeRowPhoto(row.id)}/>
-                      <div style={{flex:"1 1 180px"}}><Inp label="Notes" value={row.notes||""} onChange={e=>updateRow(row.id,"notes",e.target.value)} placeholder="Condition, extras"/></div>
-                    </div>
-                  </details>
                 </div>
               </div>
             ))}
           </div>
           <div style={{marginTop:12}}><Btn small variant="ghost" icon={Plus} onClick={addRow}>Add part <span style={{opacity:0.6,fontWeight:400}}>(or press Enter in Market)</span></Btn></div>
-
-          <details style={{marginTop:14,fontSize:12,color:t.textMuted}}>
-            <summary style={{cursor:"pointer",width:"fit-content"}}>Bundle photo and AI entry (optional)</summary>
-            <div style={{marginTop:10}}><PhotoUpload label="Bundle photo" photoUrl={bundlePhoto.photoUrl} photoRecordId={bundlePhoto.photoRecordId} onChange={setBundlePhoto} onAnalyze={analyzeBundlePhoto}/></div>
-          </details>
 
           {(paid>0||totalMarket>0)&&(
             <div style={{marginTop:16,background:t.surfaceSunken,borderRadius:10,padding:14,border:`1px solid ${t.border}`}}>
@@ -241,6 +230,10 @@ export function Buy({state,dispatch,toast}) {
               </div>}
             </div>
           )}
+          <div style={{marginTop:14,marginBottom:14}}>
+            <div style={{fontSize:11.5,color:t.textMuted,marginBottom:6,fontWeight:600}}>Payment source</div>
+            <Segmented ariaLabel="Payment source" value={purchaseAccount} onChange={setPurchaseAccount} options={[["bank","Business Bank",Wallet],["cash","Cash",Banknote]]}/>
+          </div>
           <div style={{marginTop:16}}><Btn loading={loading} onClick={submitBundle} disabled={loading} style={{width:"100%"}}>Add bundle to inventory</Btn></div>
         </Card>
       )}
@@ -248,10 +241,14 @@ export function Buy({state,dispatch,toast}) {
       {mode==="single"&&(
         <Card>
           <div style={{fontWeight:700,fontSize:13.5,color:t.text,marginBottom:16,fontFamily:FONT_DISPLAY}}>Single part</div>
+          <div style={{marginBottom:16}}>
+            <PhotoUpload label="Photo (optional)" photoUrl={singlePhoto.photoUrl} photoRecordId={singlePhoto.photoRecordId} onChange={setSinglePhoto} onAnalyze={analyzeSinglePhoto}/>
+          </div>
           <div className="responsive-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             <Inp label="Part name" value={singleName} onChange={e=>setSingleName(e.target.value)} placeholder="GTX 1060 6GB" error={singleAttempted&&!singleName.trim()?"Enter a part name.":undefined}/>
             <CategoryPicker label="Category" value={singleCat} onChange={setSingleCat} customCategories={state.customCategories} hiddenCategories={state.hiddenCategories||[]} dispatch={dispatch}/>
             <Inp label="Cost (₱, per unit)" type="number" min="0.01" step="0.01" value={singleCost} onChange={e=>setSingleCost(e.target.value)} placeholder="3000" error={singleAttempted&&!(Number(singleCost)>0)?"Enter an amount above ₱0.":undefined}/>
+            <Inp label="Market value (₱, per unit, optional)" type="number" value={singleMarket} onChange={e=>setSingleMarket(e.target.value)} placeholder="3500"/>
             <Inp label="Quantity" type="number" min="1" value={singleQty} onChange={e=>setSingleQty(e.target.value)} placeholder="1"/>
           </div>
           {singleCost&&Number(singleCost)>0&&(
@@ -265,14 +262,9 @@ export function Buy({state,dispatch,toast}) {
             <div style={{fontSize:11.5,color:t.textMuted,marginBottom:6,fontWeight:600}}>Payment source</div>
             <Segmented ariaLabel="Payment source" value={purchaseAccount} onChange={setPurchaseAccount} options={[["bank","Business Bank",Wallet],["cash","Cash",Banknote]]}/>
           </div>
-          <details style={{marginTop:14,fontSize:12,color:t.textMuted}}>
-            <summary style={{cursor:"pointer",width:"fit-content"}}>Market value, photo, and notes (optional)</summary>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,marginTop:10}}>
-              <Inp label="Market value (₱, per unit)" type="number" value={singleMarket} onChange={e=>setSingleMarket(e.target.value)} placeholder="3500"/>
-              <Inp label="Notes" value={singleNotes} onChange={e=>setSingleNotes(e.target.value)} placeholder="Tested working. Includes original box."/>
-              <PhotoUpload label="Photo" photoUrl={singlePhoto.photoUrl} photoRecordId={singlePhoto.photoRecordId} onChange={setSinglePhoto} onAnalyze={analyzeSinglePhoto}/>
-            </div>
-          </details>
+          <div style={{marginTop:14}}>
+            <Inp label="Notes — condition, extras, observations" value={singleNotes} onChange={e=>setSingleNotes(e.target.value)} placeholder="Tested working. Includes original box."/>
+          </div>
           <div style={{marginTop:16}}><Btn loading={loading} onClick={submitSingle} disabled={loading} style={{width:"100%"}}>{parseInt(singleQty,10)>1?`Add ${Math.max(1,parseInt(singleQty,10)||1)} to inventory`:"Add to inventory"}</Btn></div>
         </Card>
       )}

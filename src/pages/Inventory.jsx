@@ -1,23 +1,19 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 
 import { Boxes, Wrench, Settings as SettingsIcon, Search, X, Trash2, PackageX } from "lucide-react";
 import { fmt, today, uid } from "../data/model.js";
 import { FONT_DISPLAY, FONT_BODY, FONT_MONO, useTheme, STATUS_LABEL, StatusBadge, PhotoThumb, ConfirmModal, Card, Btn, IconBtn, Inp, Sel, PageHeader, DefectiveModal, QuickSellModal, EditPartModal, PartDetailSheet, PartGroupSheet } from "../components/index.js";
 import { CategoryManager } from "../components/CategoryManager.jsx";
 import { Builds } from "./Builds.jsx";
-import { useMediaQuery } from "../hooks/appHooks.js";
 
-export function Inventory({state,dispatch,toast,setTab,jumpTo,openLightbox,jumpRequest,onRecordChange}) {
+export function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}) {
   const t=useTheme();
-  const isDesktop=useMediaQuery("(min-width: 1024px)");
   const [categoryManagerOpen,setCategoryManagerOpen]=useState(false);
   const [statusFilter,setStatusFilter]=useState("all");
   const [catFilter,setCatFilter]=useState("all");
   const [search,setSearch]=useState("");
-  const [partIdsFilter,setPartIdsFilter]=useState(null);
   const [sortBy,setSortBy]=useState("name");
   const [viewing,setViewing]=useState(null); // part shown in the detail sheet
-  const lastPartId=useRef(null);
   const [viewingGroup,setViewingGroup]=useState(null); // group of identical parts shown in the group sheet
   const [bundleView,setBundleView]=useState(false);
   const [quickSell,setQuickSell]=useState(null);
@@ -27,24 +23,12 @@ export function Inventory({state,dispatch,toast,setTab,jumpTo,openLightbox,jumpR
   // result the person tapped is actually visible, not hidden behind a leftover status filter.
   useEffect(()=>{
     if(jumpRequest){
-      if(jumpRequest.query||jumpRequest.partIds||jumpRequest.partId){
-        setSearch(jumpRequest.query||"");
-        setStatusFilter("all");
-        setCatFilter("all");
-        setBundleView(false);
-        setPartIdsFilter(jumpRequest.partIds||null);
-      }
-      if(jumpRequest.partId){
-        const selected=state.parts.find(part=>part.id===jumpRequest.partId);
-        if(selected)setViewing(selected);
-      }else setViewing(null);
+      setSearch(jumpRequest.query);
+      setStatusFilter("all");
+      setCatFilter("all");
+      setBundleView(false);
     }
-  },[jumpRequest,state.parts]);
-  useEffect(()=>{
-    if(lastPartId.current===viewing?.id)return;
-    lastPartId.current=viewing?.id||null;
-    onRecordChange?.("part",viewing?.id);
-  },[viewing?.id,onRecordChange]);
+  },[jumpRequest]);
   const [defectiveTarget,setDefectiveTarget]=useState(null); // part pending defective confirmation
   const {parts,settings,builds,bundles}=state;
 
@@ -58,7 +42,6 @@ export function Inventory({state,dispatch,toast,setTab,jumpTo,openLightbox,jumpR
   const categoriesPresent=[...new Set(parts.map(p=>p.category))];
 
   const filtered=parts.filter(p=>{
-    if(partIdsFilter&&!partIdsFilter.includes(p.id))return false;
     if(statusFilter!=="all"&&p.status!==statusFilter)return false;
     if(catFilter!=="all"&&p.category!==catFilter)return false;
     if(search&&!p.name.toLowerCase().includes(search.toLowerCase())&&!p.category.toLowerCase().includes(search.toLowerCase()))return false;
@@ -131,11 +114,9 @@ export function Inventory({state,dispatch,toast,setTab,jumpTo,openLightbox,jumpR
   };
 
   const goAddToBuild=()=>{
-    const partId=viewing?.id;
     setViewing(null);
-    toast("This part is selected. Add any other parts, then name the build.");
-    if(jumpTo)jumpTo("Builds",{addPartId:partId});
-    else setTab("Builds");
+    toast("Pick this part (and any others) on the Builds tab to assemble a PC");
+    setTab("Builds");
   };
 
   const goToBuild=()=>{
@@ -188,7 +169,7 @@ export function Inventory({state,dispatch,toast,setTab,jumpTo,openLightbox,jumpR
         <Sel label="Sort inventory" value={sortBy} onChange={e=>setSortBy(e.target.value)} aria-label="Sort inventory">
           <option value="name">Name A–Z</option><option value="cost-high">Cost: high to low</option><option value="cost-low">Cost: low to high</option><option value="market-high">Market value: high to low</option><option value="status">Status</option>
         </Sel>
-        {(search||catFilter!=="all"||statusFilter!=="all"||bundleView||partIdsFilter)&&<Btn variant="ghost" icon={X} onClick={()=>{setSearch("");setCatFilter("all");setStatusFilter("all");setBundleView(false);setPartIdsFilter(null);}}>Clear filters</Btn>}
+        {(search||catFilter!=="all"||statusFilter!=="all"||bundleView)&&<Btn variant="ghost" icon={X} onClick={()=>{setSearch("");setCatFilter("all");setStatusFilter("all");setBundleView(false);}}>Clear filters</Btn>}
       </div>
 
       {categoriesPresent.length>0&&(
@@ -262,26 +243,6 @@ export function Inventory({state,dispatch,toast,setTab,jumpTo,openLightbox,jumpR
         /* Marketplace-style card grid — replaces the old always-expanded list so scanning
            50-100+ parts is fast, with full detail only a tap away. Column count now scales
            with available width instead of being frozen at 2, so it uses desktop space. */
-        isDesktop?(
-        <div style={{display:"flex",flexDirection:"column",border:`1px solid ${t.border}`,borderRadius:12,overflow:"hidden",background:t.surface}}>
-          <div style={{display:"grid",gridTemplateColumns:"minmax(170px,2fr) minmax(90px,1fr) minmax(80px,1fr) minmax(95px,1fr) minmax(125px,1.4fr)",gap:12,padding:"10px 14px",background:t.surfaceSunken,color:t.textFaint,fontSize:11,fontWeight:700}}>
-            <span>ITEM</span><span>STATUS</span><span>CATEGORY</span><span style={{textAlign:"right"}}>COST</span><span style={{textAlign:"right"}}>MARKET / UPSIDE</span>
-          </div>
-          {groupedCards.map(group=>{
-            const p=group[0];
-            const count=group.length;
-            const potential=(p.marketValue-p.allocatedCost)*count;
-            return <button key={groupKey(p)} onClick={()=>count>1?setViewingGroup(group):setViewing(p)} aria-label={`${p.name}${count>1?`, ${count} units`:""}, ${STATUS_LABEL[p.status]||p.status}, cost ${fmt(p.allocatedCost)}`} className="bl-focusable"
-              style={{display:"grid",gridTemplateColumns:"minmax(170px,2fr) minmax(90px,1fr) minmax(80px,1fr) minmax(95px,1fr) minmax(125px,1.4fr)",gap:12,alignItems:"center",padding:"10px 14px",border:0,borderBottom:`1px solid ${t.border}`,background:"transparent",textAlign:"left",cursor:"pointer",fontFamily:FONT_BODY}}>
-              <span style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}><PhotoThumb url={p.photoUrl} size={38} seed={p.id.length}/><span style={{minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontSize:13,fontWeight:600,color:t.text}}>{p.name}{count>1&&<span style={{marginLeft:6,color:t.accent}}>×{count}</span>}</span></span>
-              <StatusBadge s={p.status}/>
-              <span style={{fontSize:12,color:t.textMuted,overflow:"hidden",textOverflow:"ellipsis"}}>{p.category}</span>
-              <span style={{fontFamily:FONT_MONO,fontSize:12,textAlign:"right",color:t.text}}>{fmt(p.allocatedCost*count)}</span>
-              <span style={{fontFamily:FONT_MONO,fontSize:12,textAlign:"right",color:potential>=0?t.positive:t.negative}}>{fmt(p.marketValue*count)} · {potential>=0?"+":""}{fmt(potential)}</span>
-            </button>;
-          })}
-        </div>
-        ):(
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10}}>
           {groupedCards.map((group,i)=>{
             const p=group[0]; // representative — identical across the whole group by definition
@@ -330,7 +291,6 @@ export function Inventory({state,dispatch,toast,setTab,jumpTo,openLightbox,jumpR
             );
           })}
         </div>
-        )
       )}
     </div>
   );

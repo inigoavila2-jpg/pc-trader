@@ -31,7 +31,7 @@ export function HistoryContent({model}) {
           ]}/>
       )}
 
-      <PageHeader title={view==="ledger"?"Cash ledger":"Activity"} sub={view==="ledger"?"Business account movements and cash flow.":"Sales, part timelines, and transaction records."}
+      <PageHeader title="History" sub="Transactions, sales analytics, and part movement."
         action={<Btn variant="ghost" icon={FileDown} onClick={exportCSV} disabled={state.parts.length===0}>CSV</Btn>}/>
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>

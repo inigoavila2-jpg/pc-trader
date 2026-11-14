@@ -3,7 +3,7 @@ import { fmt, pct, localISODate } from "../../data/model.js";
 import { useTheme } from "../../components/index.js";
 
 export function useDashboardModel(props) {
-  const { state, dispatch, toast, setTab, jumpTo, openLightbox } = props;
+  const { state, dispatch, toast, setTab, openLightbox } = props;
   const t=useTheme();
   const [addingExpense,setAddingExpense]=useState(false);
   const [addingIncome,setAddingIncome]=useState(false);
@@ -199,5 +199,5 @@ export function useDashboardModel(props) {
   const periodLabel=period==="month"?"this month":period==="quarter"?"this quarter":"all time";
 
 
-  return { openLightbox, setTab, jumpTo, toast, dispatch, state, addingExpense, setAddingExpense, addingIncome, setAddingIncome, transferring, setTransferring, period, setPeriod, sortKey, setSortKey, sortDir, setSortDir, parts, bundles, builds, t, allSales, parseDate, now, inPeriod, sales, activeInventory, inventoryMarketValue, inventoryCost, businessBank, cashOnHand, totalLiquid, outstandingReceivables, totalDebt, netWorth, netWorthSnapshots, sixMonthNetWorthRows, previousNetWorth, netWorthDailyChange, fundsToRecover, isUnderCapital, available, inBuild, soldCount, totalCapitalAllTime, atRisk, recoveredCostAllTime, writeOffLoss, writeOffCount, DEAD_DAYS, deadInventory, deadInventoryValue, invested, recovered, periodCOGS, totalProfit, roi, inventoryTurnoverRate, avgProfitPerSale, highestProfitSale, holdDurations, avgDaysToSell, monthMap, monthRows, thisMonthKey, lastMonthDate, lastMonthKey, thisMonthProfit, lastMonthProfit, momGrowthPct, bestMonth, running, cumPoints, categoryProfit, categoryRows, maxCatProfit, insights, roiScore, turnoverScore, cashScore, growthScore, healthScore, healthTier, getDaysHeld, txRows, sortedTx, toggleSort, periodLabel };
+  return { openLightbox, setTab, toast, dispatch, state, addingExpense, setAddingExpense, addingIncome, setAddingIncome, transferring, setTransferring, period, setPeriod, sortKey, setSortKey, sortDir, setSortDir, parts, bundles, builds, t, allSales, parseDate, now, inPeriod, sales, activeInventory, inventoryMarketValue, inventoryCost, businessBank, cashOnHand, totalLiquid, outstandingReceivables, totalDebt, netWorth, netWorthSnapshots, sixMonthNetWorthRows, previousNetWorth, netWorthDailyChange, fundsToRecover, isUnderCapital, available, inBuild, soldCount, totalCapitalAllTime, atRisk, recoveredCostAllTime, writeOffLoss, writeOffCount, DEAD_DAYS, deadInventory, deadInventoryValue, invested, recovered, periodCOGS, totalProfit, roi, inventoryTurnoverRate, avgProfitPerSale, highestProfitSale, holdDurations, avgDaysToSell, monthMap, monthRows, thisMonthKey, lastMonthDate, lastMonthKey, thisMonthProfit, lastMonthProfit, momGrowthPct, bestMonth, running, cumPoints, categoryProfit, categoryRows, maxCatProfit, insights, roiScore, turnoverScore, cashScore, growthScore, healthScore, healthTier, getDaysHeld, txRows, sortedTx, toggleSort, periodLabel };
 }

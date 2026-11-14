@@ -1,11 +1,14 @@
 import { useState } from "react";
 
 import { Search, Receipt, Monitor } from "lucide-react";
-import { fmt } from "../data/model.js";
+import { fmt, uid } from "../data/model.js";
 import { FONT_BODY, FONT_MONO, useTheme } from "./theme.js";
 import { StatusBadge } from "./StatusBadge.jsx";
 import { PhotoThumb } from "./PhotoThumb.jsx";
 import { ModalShell } from "./ModalShell.jsx";
+import { Inventory } from "../pages/Inventory.jsx";
+import { Builds } from "../pages/Builds.jsx";
+import { History } from "../pages/History.jsx";
 
 export function GlobalSearchModal({state,onClose,onJump}) {
   const t=useTheme();
@@ -17,6 +20,9 @@ export function GlobalSearchModal({state,onClose,onJump}) {
   const saleResults=query?state.sales.filter(s=>!s.deleted&&(s.name.toLowerCase().includes(query)||(s.buyerName||"").toLowerCase().includes(query))).slice(0,5):[];
   const noResults=query&&partResults.length===0&&buildResults.length===0&&saleResults.length===0;
 
+  const goInventory=()=>onJump("Inventory",{query:q,nonce:uid()});
+  const goHistory=()=>onJump("History",{query:q,nonce:uid()});
+  const goBuilds=()=>onJump("Builds",null);
 
   return (
     <ModalShell onClose={onClose} label="Search" maxWidth={480} padding={0}>
@@ -36,7 +42,7 @@ export function GlobalSearchModal({state,onClose,onJump}) {
           <div style={{marginBottom:10}}>
             <div style={{fontSize:10.5,fontWeight:700,color:t.textFaint,padding:"8px 10px 4px",letterSpacing:"0.03em"}}>PARTS</div>
             {partResults.map(p=>(
-              <button key={p.id} onClick={()=>onJump("Inventory",{partId:p.id,query:q})} className="bl-focusable" style={{width:"100%",display:"flex",alignItems:"center",gap:10,
+              <button key={p.id} onClick={goInventory} className="bl-focusable" style={{width:"100%",display:"flex",alignItems:"center",gap:10,
                 padding:"9px 10px",borderRadius:8,border:"none",background:"transparent",cursor:"pointer",textAlign:"left",fontFamily:FONT_BODY,minHeight:44}}
                 onMouseEnter={e=>e.currentTarget.style.background=t.surfaceHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                 <PhotoThumb url={p.photoUrl} size={30} seed={p.id.length}/>
@@ -51,7 +57,7 @@ export function GlobalSearchModal({state,onClose,onJump}) {
           <div style={{marginBottom:10}}>
             <div style={{fontSize:10.5,fontWeight:700,color:t.textFaint,padding:"8px 10px 4px",letterSpacing:"0.03em"}}>BUILDS</div>
             {buildResults.map(b=>(
-              <button key={b.id} onClick={()=>onJump("Builds",{buildId:b.id})} className="bl-focusable" style={{width:"100%",display:"flex",alignItems:"center",gap:10,
+              <button key={b.id} onClick={goBuilds} className="bl-focusable" style={{width:"100%",display:"flex",alignItems:"center",gap:10,
                 padding:"9px 10px",borderRadius:8,border:"none",background:"transparent",cursor:"pointer",textAlign:"left",fontFamily:FONT_BODY,minHeight:44}}
                 onMouseEnter={e=>e.currentTarget.style.background=t.surfaceHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                 <PhotoThumb url={b.photoUrl} size={30} seed={b.id.length}/>
@@ -66,7 +72,7 @@ export function GlobalSearchModal({state,onClose,onJump}) {
           <div>
             <div style={{fontSize:10.5,fontWeight:700,color:t.textFaint,padding:"8px 10px 4px",letterSpacing:"0.03em"}}>SALES</div>
             {saleResults.map(s=>(
-              <button key={s.id} onClick={()=>onJump("History",{saleId:s.id,query:q,view:"transactions"})} className="bl-focusable" style={{width:"100%",display:"flex",alignItems:"center",gap:10,
+              <button key={s.id} onClick={goHistory} className="bl-focusable" style={{width:"100%",display:"flex",alignItems:"center",gap:10,
                 padding:"9px 10px",borderRadius:8,border:"none",background:"transparent",cursor:"pointer",textAlign:"left",fontFamily:FONT_BODY,minHeight:44}}
                 onMouseEnter={e=>e.currentTarget.style.background=t.surfaceHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                 <Receipt size={16} color={t.textFaint} style={{flexShrink:0}}/>

@@ -6,46 +6,20 @@ import { useAppData } from "./data/useAppData.js";
 import { Search, ChevronDown, MoreHorizontal } from "lucide-react";
 
 import { THEME, buildTheme, FONT_BODY, FONT_MONO, ThemeCtx, ToastContainer, AnimNum, Lightbox, IconBtn, QuickActionsFab, ALL_TABS, TAB_ICON, GlobalSearchModal, BrandMark, SyncStatus, LoadingScreen, ErrorScreen } from "./components/index.js";
-import { TAB_GROUPS } from "./components/ALL_TABS.jsx";
 import { useMediaQuery, usePersistentState, useToast } from "./hooks/appHooks.js";
 import { Dashboard, Buy, Inventory, Builds, Sell, History, Settings, NetWorthHistory } from "./pages/lazyPages.js";
 
-const ROUTE_KEYS=["q","ids","part","addPart","build","sale","view"];
-function readRoute(){
-  const params=new URLSearchParams(window.location.search);
-  const requested=params.get("tab");
-  const tab=ALL_TABS.includes(requested)?requested:"Dashboard";
-  return {tab,request:{
-    query:params.get("q")||"",
-    partIds:params.get("ids")?params.get("ids").split(",").filter(Boolean):undefined,
-    partId:params.get("part")||undefined,
-    addPartId:params.get("addPart")||undefined,
-    buildId:params.get("build")||undefined,
-    saleId:params.get("sale")||undefined,
-    view:params.get("view")||undefined,
-  }};
-}
-function writeRoute(tab,request={}){
-  const params=new URLSearchParams(window.location.search);
-  params.set("tab",tab);
-  for(const key of ROUTE_KEYS)params.delete(key);
-  if(request.query)params.set("q",request.query);
-  if(request.partIds?.length)params.set("ids",request.partIds.join(","));
-  if(request.partId)params.set("part",request.partId);
-  if(request.addPartId)params.set("addPart",request.addPartId);
-  if(request.buildId)params.set("build",request.buildId);
-  if(request.saleId)params.set("sale",request.saleId);
-  if(request.view)params.set("view",request.view);
-  const search=params.toString();
-  window.history.pushState({},"",`${window.location.pathname}${search?`?${search}`:""}${window.location.hash}`);
-}
-
 export default function App() {
   const { state, dispatch, loadStatus, saveStatus } = useAppData();
-  const [initialRoute]=useState(readRoute);
-  const [tab,setActiveTab]=useState(initialRoute.tab);
-  const [visitedTabs,setVisitedTabs]=useState([initialRoute.tab]);
+
+  const [tab,setActiveTab]=useState("Dashboard");
+  const [visitedTabs,setVisitedTabs]=useState(["Dashboard"]);
   const [mobileMoreOpen,setMobileMoreOpen]=useState(false);
+  const setTab=useCallback(nextTab=>{
+    setActiveTab(nextTab);
+    setVisitedTabs(previous=>previous.includes(nextTab)?previous:[...previous,nextTab]);
+    setMobileMoreOpen(false);
+  },[]);
   const {toasts,toast}=useToast();
   const [localTheme,setLocalTheme]=usePersistentState("pc-trader-theme-mode","dark");
   const [legacyThemeColors,setLegacyThemeColors]=usePersistentState("pc-trader-theme-colors",{});
@@ -60,33 +34,8 @@ export default function App() {
   const openLightbox=useCallback(url=>setLightboxUrl(url),[]);
   const [searchOpen,setSearchOpen]=useState(false);
   const mobileMoreRef=useRef(null);
-  const [inventoryJump,setInventoryJump]=useState(()=>initialRoute.tab==="Inventory"?initialRoute.request:null);
-  const [buildJump,setBuildJump]=useState(()=>initialRoute.tab==="Builds"?initialRoute.request:null);
-  const [historyJump,setHistoryJump]=useState(()=>initialRoute.tab==="History"?initialRoute.request:null);
-
-  useEffect(()=>{
-    const onPopState=()=>{
-      const route=readRoute();
-      setActiveTab(route.tab);
-      setVisitedTabs(previous=>previous.includes(route.tab)?previous:[...previous,route.tab]);
-      setInventoryJump(route.tab==="Inventory"?route.request:null);
-      setBuildJump(route.tab==="Builds"?route.request:null);
-      setHistoryJump(route.tab==="History"?route.request:null);
-      setMobileMoreOpen(false);
-    };
-    window.addEventListener("popstate",onPopState);
-    return()=>window.removeEventListener("popstate",onPopState);
-  },[]);
-
-  const setTab=useCallback(nextTab=>{
-    if(!ALL_TABS.includes(nextTab))return;
-    const request=nextTab==="History"?{view:"transactions"}:undefined;
-    setActiveTab(nextTab);
-    setVisitedTabs(previous=>previous.includes(nextTab)?previous:[...previous,nextTab]);
-    setInventoryJump(null);setBuildJump(null);setHistoryJump(request||null);
-    setMobileMoreOpen(false);
-    writeRoute(nextTab,request);
-  },[]);
+  const [inventoryJump,setInventoryJump]=useState(null);
+  const [historyJump,setHistoryJump]=useState(null);
 
   // Global search — Ctrl/Cmd+K from anywhere opens it, addressing "finding things is clunky"
   // without adding yet another button to hunt for.
@@ -109,29 +58,10 @@ export default function App() {
     };
   },[mobileMoreOpen]);
   const jumpTo=useCallback((targetTab,request)=>{
-    if(!ALL_TABS.includes(targetTab))return;
-    setActiveTab(targetTab);
-    setVisitedTabs(previous=>previous.includes(targetTab)?previous:[...previous,targetTab]);
-    setInventoryJump(targetTab==="Inventory"?request:null);
-    setBuildJump(targetTab==="Builds"?request:null);
-    setHistoryJump(targetTab==="History"?request:null);
+    setTab(targetTab);
+    if(targetTab==="Inventory")setInventoryJump(request);
+    if(targetTab==="History")setHistoryJump(request);
     setSearchOpen(false);
-    setMobileMoreOpen(false);
-    writeRoute(targetTab,request);
-  },[]);
-  const onRecordChange=useCallback((kind,id)=>{
-    const route=readRoute();
-    const request={...route.request};
-    delete request.partId;delete request.buildId;delete request.saleId;
-    if(id)request[`${kind}Id`]=id;
-    if(!id)delete request[`${kind}Id`];
-    const current=readRoute().request;
-    if(current.partId===request.partId&&current.buildId===request.buildId&&current.saleId===request.saleId)return;
-    writeRoute(route.tab,request);
-  },[]);
-  const onHistoryViewChange=useCallback(view=>{
-    setHistoryJump({view});
-    writeRoute("History",{view});
   },[]);
 
   // Helper for chatbox to pre-fill form fields on AI commands
@@ -161,12 +91,12 @@ export default function App() {
   const contentMaxWidth=isDesktop?1120:740;
 
   const pageContent={
-    Dashboard:<Dashboard state={state} dispatch={dispatch} toast={toast} setTab={setTab} jumpTo={jumpTo} openLightbox={openLightbox}/>,
+    Dashboard:<Dashboard state={state} dispatch={dispatch} toast={toast} setTab={setTab} openLightbox={openLightbox}/>,
     Buy:<Buy state={state} dispatch={dispatch} toast={toast}/>,
-    Inventory:<Inventory state={state} dispatch={dispatch} toast={toast} setTab={setTab} jumpTo={jumpTo} openLightbox={openLightbox} jumpRequest={inventoryJump} onRecordChange={onRecordChange}/>,
-    Builds:<Builds state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox} jumpRequest={buildJump} onRecordChange={onRecordChange}/>,
+    Inventory:<Inventory state={state} dispatch={dispatch} toast={toast} setTab={setTab} openLightbox={openLightbox} jumpRequest={inventoryJump}/>,
+    Builds:<Builds state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/>,
     Sell:<Sell state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox}/>,
-    History:<History state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox} jumpRequest={historyJump} onRecordChange={onRecordChange} onViewChange={onHistoryViewChange}/>,
+    History:<History state={state} dispatch={dispatch} toast={toast} openLightbox={openLightbox} jumpRequest={historyJump}/>,
     "Net Worth":<NetWorthHistory state={state}/>,
     Settings:<Settings state={state} dispatch={dispatch} toast={toast} theme={theme} setTheme={setTheme} themeColors={themeColors} themePreviewColors={themePreviewColors} setThemePreviewColors={setThemePreviewColors}/>,
   };
@@ -223,22 +153,20 @@ export default function App() {
                 </button>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2,padding:"6px 10px",flex:1,overflowY:"auto"}}>
-                {TAB_GROUPS.map(group=><div key={group.label} style={{marginBottom:12}}>
-                  <div style={{padding:"8px 12px 5px",fontSize:10,color:t.textFaint,fontWeight:700,letterSpacing:".08em",textTransform:"uppercase"}}>{group.label}</div>
-                  {group.items.map(item=>{
-                  const Icon=TAB_ICON[item.tab];
-                  const active=tab===item.tab&&(item.tab!=="History"||(historyJump?.view||"transactions")===item.request.view);
+                {ALL_TABS.map(name=>{
+                  const Icon=TAB_ICON[name];
+                  const active=tab===name;
                   return (
-                    <button key={`${item.tab}-${item.label}`} onClick={()=>item.request?jumpTo(item.tab,item.request):setTab(item.tab)} aria-current={active?"page":undefined} className="bl-focusable"
+                    <button key={name} onClick={()=>setTab(name)} aria-current={active?"page":undefined} className="bl-focusable"
                       style={{display:"flex",alignItems:"center",gap:11,padding:"10px 12px",borderRadius:9,border:"none",cursor:"pointer",
                         background:active?t.accentSoft:"transparent",color:active?t.accent:t.textMuted,fontSize:13.5,fontWeight:600,
                         fontFamily:FONT_BODY,textAlign:"left",transition:"background 0.12s,color 0.12s"}}
                       onMouseEnter={e=>{if(!active)e.currentTarget.style.background=t.surfaceHover;}}
                       onMouseLeave={e=>{if(!active)e.currentTarget.style.background="transparent";}}>
-                      <Icon size={17} strokeWidth={2}/>{item.label}
+                      <Icon size={17} strokeWidth={2}/>{name}
                     </button>
                   );
-                })}</div>)}
+                })}
               </div>
               <div style={{padding:"14px 18px",borderTop:`1px solid ${t.border}`,display:"flex",flexDirection:"column",gap:8}}>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:11.5}}>
@@ -282,7 +210,7 @@ export default function App() {
 
             <div ref={mobileMoreRef} style={{borderBottom:`1px solid ${t.border}`,background:t.bgElevated,position:"relative"}}>
               <nav aria-label="Main sections" style={{maxWidth:contentMaxWidth,margin:"0 auto",display:"flex",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-                {["Dashboard","Buy","Inventory","Sell"].map(name=>{
+                {ALL_TABS.filter(name=>["Dashboard","Buy","Inventory","Sell"].includes(name)).map(name=>{
                   const Icon=TAB_ICON[name];
                   const active=tab===name;
                   return (
@@ -298,22 +226,21 @@ export default function App() {
                     </button>
                   );
                 })}
-                {!(["Dashboard","Buy","Inventory","Sell"].includes(tab))&&(
+                {ALL_TABS.filter(name=>["Builds","History","Net Worth","Settings"].includes(name)).includes(tab)&&(
                   <button type="button" aria-current="page" aria-expanded={mobileMoreOpen} aria-controls="mobile-more-sections" onClick={()=>setMobileMoreOpen(open=>!open)} className="bl-focusable" style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"10px 12px",fontSize:12,fontWeight:600,border:"none",cursor:"pointer",background:"none",whiteSpace:"nowrap",color:t.accent,borderBottom:`2px solid ${t.accent}`,minHeight:48,fontFamily:FONT_BODY}}>
-                    <MoreHorizontal size={15} aria-hidden="true"/>More<ChevronDown size={13} aria-hidden="true"/>
+                    <MoreHorizontal size={15} aria-hidden="true"/>{tab}<ChevronDown size={13} aria-hidden="true"/>
                   </button>
                 )}
-                {(["Dashboard","Buy","Inventory","Sell"].includes(tab))&&(
+                {!ALL_TABS.filter(name=>["Builds","History","Net Worth","Settings"].includes(name)).includes(tab)&&(
                   <button type="button" aria-expanded={mobileMoreOpen} aria-controls="mobile-more-sections" onClick={()=>setMobileMoreOpen(open=>!open)} className="bl-focusable" style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"10px 12px",fontSize:12,fontWeight:600,border:"none",cursor:"pointer",background:"none",whiteSpace:"nowrap",color:mobileMoreOpen?t.accent:t.textMuted,minHeight:48,fontFamily:FONT_BODY}}>
                     <MoreHorizontal size={15} aria-hidden="true"/>More
                   </button>
                 )}
               </nav>
-              {mobileMoreOpen&&<div id="mobile-more-sections" aria-label="More sections" style={{position:"absolute",zIndex:30,right:12,top:"calc(100% + 6px)",minWidth:210,padding:6,border:`1px solid ${t.border}`,borderRadius:12,background:t.bgElevated,boxShadow:t.shadow}}>
-                {TAB_GROUPS.flatMap(group=>group.items).filter(item=>!["Dashboard","Buy","Inventory","Sell"].includes(item.tab)).map(item=>{
-                  const Icon=TAB_ICON[item.tab];
-                  const active=tab===item.tab&&(item.tab!=="History"||(historyJump?.view||"transactions")===item.request.view);
-                  return <button key={`${item.tab}-${item.label}`} type="button" aria-current={active?"page":undefined} onClick={()=>item.request?jumpTo(item.tab,item.request):setTab(item.tab)} className="bl-focusable" style={{display:"flex",alignItems:"center",gap:10,width:"100%",minHeight:44,padding:"8px 10px",border:0,borderRadius:8,cursor:"pointer",background:active?t.accentSoft:"transparent",color:active?t.accent:t.text,fontFamily:FONT_BODY,fontSize:13,textAlign:"left"}}><Icon size={16} aria-hidden="true"/>{item.label}</button>;
+              {mobileMoreOpen&&<div id="mobile-more-sections" aria-label="More sections" style={{position:"absolute",zIndex:30,right:12,top:"calc(100% + 6px)",minWidth:190,padding:6,border:`1px solid ${t.border}`,borderRadius:12,background:t.bgElevated,boxShadow:t.shadow}}>
+                {ALL_TABS.filter(name=>["Builds","History","Net Worth","Settings"].includes(name)).map(name=>{
+                  const Icon=TAB_ICON[name];
+                  return <button key={name} type="button" aria-current={tab===name?"page":undefined} onClick={()=>{setTab(name);setMobileMoreOpen(false);}} className="bl-focusable" style={{display:"flex",alignItems:"center",gap:10,width:"100%",minHeight:44,padding:"8px 10px",border:0,borderRadius:8,cursor:"pointer",background:tab===name?t.accentSoft:"transparent",color:tab===name?t.accent:t.text,fontFamily:FONT_BODY,fontSize:13,textAlign:"left"}}><Icon size={16} aria-hidden="true"/>{name}</button>;
                 })}
               </div>}
             </div>

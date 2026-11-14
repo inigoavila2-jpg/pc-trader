@@ -1,15 +1,11 @@
 
 
-import { Boxes, Banknote, Plus, Minus, AlertTriangle, ArrowLeftRight, TrendingUp, PackageCheck } from "lucide-react";
+import { Boxes, Banknote, Plus, Minus, AlertTriangle, ArrowLeftRight, TrendingUp } from "lucide-react";
 import { fmt, pct } from "../../data/model.js";
 import { FONT_MONO, AnimNum, Card, Btn, SectionHeader, PageHeader, HeroNumber, PeriodSwitch, KPICard, CapitalFlowDiagram, NetWorthHistoryChart } from "../../components/index.js";
 
 export function DashboardTop({model}) {
-  const { openLightbox, setTab, jumpTo, toast, dispatch, state, addingExpense, setAddingExpense, addingIncome, setAddingIncome, transferring, setTransferring, period, setPeriod, sortKey, setSortKey, sortDir, setSortDir, parts, bundles, builds, t, allSales, parseDate, now, inPeriod, sales, activeInventory, inventoryMarketValue, inventoryCost, businessBank, cashOnHand, totalLiquid, outstandingReceivables, totalDebt, netWorth, netWorthSnapshots, sixMonthNetWorthRows, previousNetWorth, netWorthDailyChange, fundsToRecover, isUnderCapital, available, inBuild, soldCount, totalCapitalAllTime, atRisk, recoveredCostAllTime, writeOffLoss, writeOffCount, DEAD_DAYS, deadInventory, deadInventoryValue, invested, recovered, periodCOGS, totalProfit, roi, inventoryTurnoverRate, avgProfitPerSale, highestProfitSale, holdDurations, avgDaysToSell, monthMap, monthRows, thisMonthKey, lastMonthDate, lastMonthKey, thisMonthProfit, lastMonthProfit, momGrowthPct, bestMonth, running, cumPoints, categoryProfit, categoryRows, maxCatProfit, insights, roiScore, turnoverScore, cashScore, growthScore, healthScore, healthTier, getDaysHeld, txRows, sortedTx, toggleSort, periodLabel } = model;
-  const agingIds=deadInventory.map(part=>part.id);
-  const unpricedIds=activeInventory.filter(part=>!(Number(part.marketValue)>0)).map(part=>part.id);
-  const attentionIds=agingIds.length?agingIds:unpricedIds;
-  const attentionTitle=agingIds.length?"Review aging inventory":"Add missing market values";
+  const { openLightbox, setTab, toast, dispatch, state, addingExpense, setAddingExpense, addingIncome, setAddingIncome, transferring, setTransferring, period, setPeriod, sortKey, setSortKey, sortDir, setSortDir, parts, bundles, builds, t, allSales, parseDate, now, inPeriod, sales, activeInventory, inventoryMarketValue, inventoryCost, businessBank, cashOnHand, totalLiquid, outstandingReceivables, totalDebt, netWorth, netWorthSnapshots, sixMonthNetWorthRows, previousNetWorth, netWorthDailyChange, fundsToRecover, isUnderCapital, available, inBuild, soldCount, totalCapitalAllTime, atRisk, recoveredCostAllTime, writeOffLoss, writeOffCount, DEAD_DAYS, deadInventory, deadInventoryValue, invested, recovered, periodCOGS, totalProfit, roi, inventoryTurnoverRate, avgProfitPerSale, highestProfitSale, holdDurations, avgDaysToSell, monthMap, monthRows, thisMonthKey, lastMonthDate, lastMonthKey, thisMonthProfit, lastMonthProfit, momGrowthPct, bestMonth, running, cumPoints, categoryProfit, categoryRows, maxCatProfit, insights, roiScore, turnoverScore, cashScore, growthScore, healthScore, healthTier, getDaysHeld, txRows, sortedTx, toggleSort, periodLabel } = model;
   return (<>
       {/* Header */}
       <div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -24,28 +20,12 @@ export function DashboardTop({model}) {
         <PeriodSwitch period={period} setPeriod={setPeriod}/>
       </div>
 
-      {attentionIds.length>0&&(
-        <Card style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:14,borderColor:t.warningSoftBorder,background:t.warningSoft}}>
-          <div style={{display:"flex",alignItems:"flex-start",gap:10,minWidth:0}}>
-            <PackageCheck size={18} color={t.warning} style={{flexShrink:0,marginTop:2}}/>
-            <div>
-              <div style={{fontSize:14,fontWeight:700,color:t.text}}>{attentionTitle}</div>
-              <div style={{fontSize:12.5,color:t.textMuted,marginTop:3}}>{attentionIds.length} item{attentionIds.length===1?"":"s"} need attention</div>
-            </div>
-          </div>
-          <Btn small variant="ghost" onClick={()=>jumpTo?.("Inventory",{partIds:attentionIds})}>Review</Btn>
-        </Card>
-      )}
-
       {/* Net Worth Hero */}
       <div style={{background:t.mode==="dark"?`linear-gradient(155deg,${t.surface} 0%,${t.surfaceSunken} 100%)`:`linear-gradient(155deg,${t.surface} 0%,${t.bg} 100%)`,
         border:`1px solid ${t.border}`,borderRadius:16,padding:"24px 24px"}}>
         <div style={{fontSize:12,color:t.textMuted,fontWeight:600,marginBottom:9}}>Total business net worth</div>
         <div style={{fontSize:40,lineHeight:1}}><HeroNumber><AnimNum value={netWorth}/></HeroNumber></div>
-        <details style={{marginTop:10,color:t.textMuted,fontSize:12.5,lineHeight:1.5}}>
-          <summary style={{cursor:"pointer",width:"fit-content"}}>How this is calculated</summary>
-          <div style={{marginTop:6}}>Business Bank + Cash + unsold inventory at market value (or cost if unknown) + receivables − debt.</div>
-        </details>
+        <div style={{fontSize:13,color:t.textMuted,marginTop:11,lineHeight:1.5}}>Business Bank ({fmt(businessBank)}) + Cash ({fmt(cashOnHand)}) + unsold inventory at market value (or cost if unknown: {fmt(inventoryMarketValue)}) + receivables ({fmt(outstandingReceivables)}) − debt ({fmt(totalDebt)})</div>
         {netWorthDailyChange!==null&&(
           <div style={{fontSize:11.5,color:netWorthDailyChange>=0?t.positive:t.negative,marginTop:8,fontFamily:FONT_MONO,fontWeight:600}}>
             {netWorthDailyChange>=0?"▲":"▼"} {fmt(Math.abs(netWorthDailyChange))} vs. previous saved snapshot
@@ -79,6 +59,7 @@ export function DashboardTop({model}) {
               Your financial history starts with today’s baseline. Keep using the app and this chart will build automatically day by day.
             </div>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:14,marginTop:16,paddingTop:14,borderTop:`1px solid ${t.border}`}}>
+          <div><div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Current net worth</div><div style={{fontSize:15,fontWeight:700,fontFamily:FONT_MONO,color:t.text}}>{fmt(netWorth)}</div></div>
           <div><div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Saved snapshots</div><div style={{fontSize:15,fontWeight:700,fontFamily:FONT_MONO,color:t.info}}>{netWorthSnapshots.length}</div></div>
           <div><div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Latest snapshot</div><div style={{fontSize:15,fontWeight:700,fontFamily:FONT_MONO,color:t.text}}>{netWorthSnapshots.length?netWorthSnapshots[netWorthSnapshots.length-1].date:"—"}</div></div>
         </div>
