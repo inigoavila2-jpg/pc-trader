@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 
 import { AIAgentChatbox } from "./components/AIAgentChatbox";
 import { fmt } from "./data/model.js";
 import { useAppData } from "./data/useAppData.js";
-import { Search, ChevronDown, MoreHorizontal } from "lucide-react";
+import { Search } from "lucide-react";
 
 import { THEME, buildTheme, FONT_BODY, FONT_MONO, ThemeCtx, ToastContainer, AnimNum, Lightbox, IconBtn, QuickActionsFab, ALL_TABS, TAB_ICON, GlobalSearchModal, BrandMark, SyncStatus, LoadingScreen, ErrorScreen } from "./components/index.js";
 import { useMediaQuery, usePersistentState, useToast } from "./hooks/appHooks.js";
@@ -14,11 +14,9 @@ export default function App() {
 
   const [tab,setActiveTab]=useState("Dashboard");
   const [visitedTabs,setVisitedTabs]=useState(["Dashboard"]);
-  const [mobileMoreOpen,setMobileMoreOpen]=useState(false);
   const setTab=useCallback(nextTab=>{
     setActiveTab(nextTab);
     setVisitedTabs(previous=>previous.includes(nextTab)?previous:[...previous,nextTab]);
-    setMobileMoreOpen(false);
   },[]);
   const {toasts,toast}=useToast();
   const [localTheme,setLocalTheme]=usePersistentState("pc-trader-theme-mode","dark");
@@ -33,7 +31,6 @@ export default function App() {
   const [lightboxUrl,setLightboxUrl]=useState(null);
   const openLightbox=useCallback(url=>setLightboxUrl(url),[]);
   const [searchOpen,setSearchOpen]=useState(false);
-  const mobileMoreRef=useRef(null);
   const [inventoryJump,setInventoryJump]=useState(null);
   const [historyJump,setHistoryJump]=useState(null);
 
@@ -46,17 +43,6 @@ export default function App() {
     document.addEventListener("keydown",onKey);
     return()=>document.removeEventListener("keydown",onKey);
   },[]);
-  useEffect(()=>{
-    if(!mobileMoreOpen)return undefined;
-    const closeOnOutside=e=>{if(!mobileMoreRef.current?.contains(e.target))setMobileMoreOpen(false);};
-    const closeOnEscape=e=>{if(e.key==="Escape")setMobileMoreOpen(false);};
-    document.addEventListener("pointerdown",closeOnOutside);
-    document.addEventListener("keydown",closeOnEscape);
-    return()=>{
-      document.removeEventListener("pointerdown",closeOnOutside);
-      document.removeEventListener("keydown",closeOnEscape);
-    };
-  },[mobileMoreOpen]);
   const jumpTo=useCallback((targetTab,request)=>{
     setTab(targetTab);
     if(targetTab==="Inventory")setInventoryJump(request);
@@ -208,15 +194,15 @@ export default function App() {
               </div>
             </div>
 
-            <div ref={mobileMoreRef} style={{borderBottom:`1px solid ${t.border}`,background:t.bgElevated,position:"relative"}}>
-              <nav aria-label="Main sections" style={{maxWidth:contentMaxWidth,margin:"0 auto",display:"flex",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-                {ALL_TABS.filter(name=>["Dashboard","Buy","Inventory","Sell"].includes(name)).map(name=>{
+            <div style={{borderBottom:`1px solid ${t.border}`,background:t.bgElevated}}>
+              <nav aria-label="Main sections — swipe horizontally for more" style={{maxWidth:contentMaxWidth,margin:"0 auto",display:"flex",overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",overscrollBehaviorX:"contain",touchAction:"pan-x"}}>
+                {ALL_TABS.map(name=>{
                   const Icon=TAB_ICON[name];
                   const active=tab===name;
                   return (
                     <button key={name} type="button" aria-current={active?"page":undefined} onClick={()=>{setTab(name);setMobileMoreOpen(false);}} className="bl-focusable" style={{
                       display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px 12px",fontSize:12,fontWeight:600,border:"none",cursor:"pointer",background:"none",
-                      whiteSpace:"nowrap",transition:"color 0.15s",flexShrink:0,fontFamily:FONT_BODY,minHeight:48,
+                      whiteSpace:"nowrap",transition:"color 0.15s",flexShrink:0,fontFamily:FONT_BODY,minHeight:48,scrollSnapAlign:"start",
                       color:active?t.accent:t.textMuted,
                       borderBottom:`2px solid ${active?t.accent:"transparent"}`,
                     }}
@@ -226,23 +212,7 @@ export default function App() {
                     </button>
                   );
                 })}
-                {ALL_TABS.filter(name=>["Builds","History","Net Worth","Settings"].includes(name)).includes(tab)&&(
-                  <button type="button" aria-current="page" aria-expanded={mobileMoreOpen} aria-controls="mobile-more-sections" onClick={()=>setMobileMoreOpen(open=>!open)} className="bl-focusable" style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"10px 12px",fontSize:12,fontWeight:600,border:"none",cursor:"pointer",background:"none",whiteSpace:"nowrap",color:t.accent,borderBottom:`2px solid ${t.accent}`,minHeight:48,fontFamily:FONT_BODY}}>
-                    <MoreHorizontal size={15} aria-hidden="true"/>{tab}<ChevronDown size={13} aria-hidden="true"/>
-                  </button>
-                )}
-                {!ALL_TABS.filter(name=>["Builds","History","Net Worth","Settings"].includes(name)).includes(tab)&&(
-                  <button type="button" aria-expanded={mobileMoreOpen} aria-controls="mobile-more-sections" onClick={()=>setMobileMoreOpen(open=>!open)} className="bl-focusable" style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"10px 12px",fontSize:12,fontWeight:600,border:"none",cursor:"pointer",background:"none",whiteSpace:"nowrap",color:mobileMoreOpen?t.accent:t.textMuted,minHeight:48,fontFamily:FONT_BODY}}>
-                    <MoreHorizontal size={15} aria-hidden="true"/>More
-                  </button>
-                )}
               </nav>
-              {mobileMoreOpen&&<div id="mobile-more-sections" aria-label="More sections" style={{position:"absolute",zIndex:30,right:12,top:"calc(100% + 6px)",minWidth:190,padding:6,border:`1px solid ${t.border}`,borderRadius:12,background:t.bgElevated,boxShadow:t.shadow}}>
-                {ALL_TABS.filter(name=>["Builds","History","Net Worth","Settings"].includes(name)).map(name=>{
-                  const Icon=TAB_ICON[name];
-                  return <button key={name} type="button" aria-current={tab===name?"page":undefined} onClick={()=>{setTab(name);setMobileMoreOpen(false);}} className="bl-focusable" style={{display:"flex",alignItems:"center",gap:10,width:"100%",minHeight:44,padding:"8px 10px",border:0,borderRadius:8,cursor:"pointer",background:tab===name?t.accentSoft:"transparent",color:tab===name?t.accent:t.text,fontFamily:FONT_BODY,fontSize:13,textAlign:"left"}}><Icon size={16} aria-hidden="true"/>{name}</button>;
-                })}
-              </div>}
             </div>
 
             <div style={{maxWidth:contentMaxWidth,margin:"0 auto",padding:"22px 16px calc(90px + env(safe-area-inset-bottom))"}}>
