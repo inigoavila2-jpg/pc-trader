@@ -5,6 +5,12 @@ export const CURRENCY = "₱";
 export const fmt = (n) => `${CURRENCY}${Number(n).toLocaleString("en-PH",{minimumFractionDigits:0,maximumFractionDigits:0})}`;
 export const pct = (n) => `${(n*100).toFixed(1)}%`;
 export const today = () => new Date().toLocaleDateString("en-PH",{year:"numeric",month:"short",day:"numeric"});
+export const PREMIUM_LIGHT_COLORS = {
+  bg:"#F4F2ED", bgElevated:"#FCFBF8", surface:"#FFFFFF", surfaceSunken:"#F0EEE8", surfaceHover:"#EAE7DF",
+  border:"#DED9CE", borderStrong:"#C7BFAF", text:"#252821", textMuted:"#596158", textFaint:"#70766D",
+  accent:"#B7823E", accentStrong:"#795522", accentContrast:"#FFFFFF", info:"#337184", infoStrong:"#245766",
+  positive:"#23734D", positiveStrong:"#18583A", negative:"#B4423C", negativeStrong:"#91322E", warning:"#94611F",
+};
 let _id = Date.now();
 export const uid = () => `id_${_id++}`;
 export const CATEGORIES = ["GPU","CPU","Motherboard","CPU+MB","RAM","PSU","Storage","Cooler","Case","Monitor","Mouse","Keyboard","Other"];
@@ -22,7 +28,7 @@ export function domainOf(category, customCategories){
   const custom=findCustomCategory(category,customCategories);
   return custom?custom.domain:"pc_part";
 }
-export const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ targetMargin:30 }, customCategories:[], quickNotes:[], hiddenCategories:[], businessCash:14500, cashOnHand:0, personalCash:0, expenses:[], transactions:[], netWorthSnapshots:[], outstandingReceivables:0, totalDebt:0, themeMode:"dark", activeThemeSlot:1, themePaletteSlots:{2:null,3:null,4:null,5:null} };
+export const initialState = { bundles:[], parts:[], builds:[], sales:[], settings:{ targetMargin:30 }, customCategories:[], quickNotes:[], hiddenCategories:[], businessCash:14500, cashOnHand:0, personalCash:0, expenses:[], transactions:[], netWorthSnapshots:[], outstandingReceivables:0, totalDebt:0, themeMode:"light", activeThemeSlot:3, themePaletteSlots:{2:null,3:{name:"Premium Light",mode:"light",colors:PREMIUM_LIGHT_COLORS},4:null,5:null}, premiumLightThemeSeeded:true };
 
 // New account model: businessCash is retained as the storage field for Business Bank.
 // cashOnHand is physical cash. Legacy personal records remain stored but are hidden from UI.
