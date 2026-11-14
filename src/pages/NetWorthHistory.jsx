@@ -34,15 +34,40 @@ function activityDate(value) {
 
 function intervalActivities(state, previousDate, selectedDate, labels) {
   const transactions = Array.isArray(state?.transactions) ? state.transactions : [];
+  const parts = Array.isArray(state?.parts) ? state.parts : [];
+  const sales = Array.isArray(state?.sales) ? state.sales : [];
+  const builds = Array.isArray(state?.builds) ? state.builds : [];
+  const saleItems = (sale) => {
+    if (!sale) return [];
+    if (Array.isArray(sale.buildPartsSnapshot) && sale.buildPartsSnapshot.length) return sale.buildPartsSnapshot.map((part) => part.name).filter(Boolean);
+    if (sale.partId) return parts.filter((part) => part.id === sale.partId).map((part) => part.name).filter(Boolean);
+    const build = builds.find((row) => row.id === sale.buildId);
+    return parts.filter((part) => build?.partIds?.includes(part.id)).map((part) => part.name).filter(Boolean);
+  };
   const isInRange = (date) => date > previousDate && date <= selectedDate;
   const ledger = transactions.filter((row) => isInRange(activityDate(row.date)) && labels[String(row.type).toUpperCase()])
-    .map((row) => ({ ...row, type: String(row.type).toUpperCase(), date: activityDate(row.date) }));
+    .map((row) => {
+      const type = String(row.type).toUpperCase();
+      const date = activityDate(row.date);
+      const sale = type === "SALE" ? sales.find((item) => activityDate(item.date) === date
+        && Number(item.salePrice) === Number(row.amount)
+        && String(row.description || "").includes(String(item.name || ""))) : null;
+      const bundle = type === "PURCHASE" ? (Array.isArray(state?.bundles) ? state.bundles : []).find((item) =>
+        activityDate(item.date) === date && Number(item.purchasePrice) === Number(row.amount)
+        && String(row.description || "").includes(String(item.name || ""))) : null;
+      const itemNames = type === "SALE" ? saleItems(sale) : type === "PURCHASE" && bundle
+        ? parts.filter((part) => part.bundleId === bundle.id).map((part) => part.name).filter(Boolean)
+        : type === "PURCHASE" ? parts.filter((part) => activityDate(part.history?.[0]?.date) === date
+          && String(row.description || "").toLowerCase().includes(String(part.name || "").toLowerCase())).map((part) => part.name).filter(Boolean)
+          : [];
+      return { ...row, type, date, description: String(row.description || "").replace(/^(Bought|Sold|Spent|Received)\s+/i, ""), itemNames };
+    });
   const hasLedgerEntry = (type, date) => ledger.some((row) => row.type === type && row.date === date);
   const legacy = [];
-  for (const sale of Array.isArray(state?.sales) ? state.sales : []) {
+  for (const sale of sales) {
     const date = activityDate(sale.date);
     if (isInRange(date) && !hasLedgerEntry("SALE", date) && Number(sale.salePrice) > 0) {
-      legacy.push({ id: sale.id, type: "SALE", amount: sale.salePrice, description: `Sold ${sale.name || "item"}`, date });
+      legacy.push({ id: sale.id, type: "SALE", amount: sale.salePrice, description: sale.name || "item", date, itemNames: saleItems(sale) });
     }
   }
   for (const expense of Array.isArray(state?.expenses) ? state.expenses : []) {
@@ -51,13 +76,13 @@ function intervalActivities(state, previousDate, selectedDate, labels) {
       legacy.push({ id: expense.id, type: "EXPENSE", amount: expense.amount, description: expense.description || "Expense", date });
     }
   }
-  for (const part of Array.isArray(state?.parts) ? state.parts : []) {
+  for (const part of parts) {
     for (const entry of Array.isArray(part.history) ? part.history : []) {
       const date = activityDate(entry.date);
       const event = String(entry.event || "");
       const amount = Number((event.match(/₱\s*([\d,]+(?:\.\d+)?)/) || [])[1]?.replace(/,/g, ""));
       if (/\bBought\b/i.test(event) && isInRange(date) && !hasLedgerEntry("PURCHASE", date) && amount > 0) {
-        legacy.push({ id: `${part.id}-${date}-${event}`, type: "PURCHASE", amount, description: `Bought ${part.name || "item"}`, date });
+        legacy.push({ id: `${part.id}-${date}-${event}`, type: "PURCHASE", amount, description: part.name || "item", date, itemNames: [part.name].filter(Boolean) });
       }
     }
   }
@@ -113,11 +138,11 @@ export function NetWorthHistory({ state }) {
         interval: `${previous.date} to ${selected.date}`,
         netWorthChange: Number(selected.netWorth) - Number(previous.netWorth),
         componentChanges: changeRows.map(([name, amount]) => ({ name, amount })),
-        recordedActivity: activities.map(({ type, date, description, amount }) => ({ type, date, description, amount: Number(amount) })),
+        recordedActivity: activities.map(({ type, date, description, amount, itemNames }) => ({ type, date, description, amount: Number(amount), exactItems: itemNames })),
       };
       const result = await ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: `Explain this net-worth change in 2 short sentences using only these facts. Say which recorded events and balance changes contributed. Never infer a cause that is not explicitly supported; if activity is missing, say the records do not show why. Do not calculate or change the supplied amounts.\n${JSON.stringify(facts)}`,
+        contents: `Explain this net-worth change in 2 short sentences using only these facts. Name the exact items listed in exactItems and describe the recorded actions. If exactItems is empty, say the item was not identified. Never infer a cause that is not explicitly supported; if activity is missing, say the records do not show why. Do not calculate or change the supplied amounts.\n${JSON.stringify(facts)}`,
         config: { temperature: 0.2 },
       });
       const text = String(result?.text || "").trim();
@@ -155,7 +180,7 @@ export function NetWorthHistory({ state }) {
           {previous&&<>
             <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:14}}>{changeRows.map(([label,value])=><div key={label} style={{display:"flex",justifyContent:"space-between",gap:12,fontSize:12.5}}><span style={{color:t.textMuted}}>{label}</span><span style={{fontFamily:"monospace",fontWeight:650,color:value>=0?t.positive:t.negative}}>{value>=0?"+":"−"}{fmt(Math.abs(value))}</span></div>)}</div>
             <div style={{fontSize:12,fontWeight:700,color:t.text,marginBottom:7}}>Recorded activity</div>
-            {activities.length? <div style={{display:"flex",flexDirection:"column",gap:6}}>{activities.map((event)=><div key={event.id} style={{display:"flex",justifyContent:"space-between",gap:10,background:t.surfaceSunken,borderRadius:8,padding:"9px 10px",fontSize:12}}><span style={{color:t.text,minWidth:0}}>{activityTypes[event.type]} · {event.description||event.type}</span><span style={{fontFamily:"monospace",whiteSpace:"nowrap",color:event.type==="SALE"||event.type==="INCOME"?t.positive:event.type==="TRANSFER"?t.textMuted:t.negative}}>{event.type==="TRANSFER"?"No net-worth change":`${["SALE","INCOME"].includes(event.type)?"+":"−"}${fmt(event.amount)}`}</span></div>)}</div> : <div style={{fontSize:12,color:t.textMuted}}>No purchase, sale, income, or expense records in this interval.</div>}
+            {activities.length? <div style={{display:"flex",flexDirection:"column",gap:6}}>{activities.map((event)=><div key={event.id} style={{display:"flex",justifyContent:"space-between",gap:10,background:t.surfaceSunken,borderRadius:8,padding:"9px 10px",fontSize:12}}><span style={{color:t.text,minWidth:0}}><span>{activityTypes[event.type]} · {event.description||event.type}</span>{event.itemNames?.length>0&&<span style={{display:"block",marginTop:3,color:t.textMuted,fontSize:11}}>Items: {event.itemNames.join(", ")}</span>}</span><span style={{fontFamily:"monospace",whiteSpace:"nowrap",color:event.type==="SALE"||event.type==="INCOME"?t.positive:event.type==="TRANSFER"?t.textMuted:t.negative}}>{event.type==="TRANSFER"?"No net-worth change":`${["SALE","INCOME"].includes(event.type)?"+":"−"}${fmt(event.amount)}`}</span></div>)}</div> : <div style={{fontSize:12,color:t.textMuted}}>No purchase, sale, income, or expense records in this interval.</div>}
             <div style={{marginTop:10}}><Btn small variant="ghost" icon={Sparkles} loading={aiLoading} onClick={explainChange}>Explain this change</Btn></div>
             {aiExplanation?.date===selected.date&&<div role="status" aria-live="polite" style={{marginTop:9,padding:10,borderRadius:8,background:t.surfaceSunken,color:t.text,fontSize:12,lineHeight:1.5}}><strong style={{display:"block",marginBottom:4}}>AI explanation</strong>{aiExplanation.text}</div>}
             {aiError&&<div role="alert" style={{marginTop:7,color:t.negative,fontSize:12}}>{aiError}</div>}
