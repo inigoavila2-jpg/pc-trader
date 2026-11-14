@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { ArrowDownRight, ArrowUpRight, CalendarDays, TrendingUp } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, CalendarDays, Sparkles, TrendingUp } from "lucide-react";
 import { fmt, pct } from "../data/model.js";
 import { Btn, Card, NetWorthHistoryChart, PageHeader, SectionHeader, useTheme } from "../components/index.js";
+import { getGeminiVisionClient } from "../components/mediaUtils.js";
 import { useMediaQuery } from "../hooks/appHooks.js";
 
 const RANGES = [
@@ -23,11 +24,54 @@ function chartPoints(rows) {
   return Array.from({ length: 12 }, (_, index) => rows[Math.round(index * (rows.length - 1) / 11)]);
 }
 
+function activityDate(value) {
+  const text = String(value || "").trim();
+  const iso = text.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? "" : `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+}
+
+function intervalActivities(state, previousDate, selectedDate, labels) {
+  const transactions = Array.isArray(state?.transactions) ? state.transactions : [];
+  const isInRange = (date) => date > previousDate && date <= selectedDate;
+  const ledger = transactions.filter((row) => isInRange(activityDate(row.date)) && labels[String(row.type).toUpperCase()])
+    .map((row) => ({ ...row, type: String(row.type).toUpperCase(), date: activityDate(row.date) }));
+  const hasLedgerEntry = (type, date) => ledger.some((row) => row.type === type && row.date === date);
+  const legacy = [];
+  for (const sale of Array.isArray(state?.sales) ? state.sales : []) {
+    const date = activityDate(sale.date);
+    if (isInRange(date) && !hasLedgerEntry("SALE", date) && Number(sale.salePrice) > 0) {
+      legacy.push({ id: sale.id, type: "SALE", amount: sale.salePrice, description: `Sold ${sale.name || "item"}`, date });
+    }
+  }
+  for (const expense of Array.isArray(state?.expenses) ? state.expenses : []) {
+    const date = activityDate(expense.date);
+    if (isInRange(date) && !hasLedgerEntry("EXPENSE", date) && Number(expense.amount) > 0) {
+      legacy.push({ id: expense.id, type: "EXPENSE", amount: expense.amount, description: expense.description || "Expense", date });
+    }
+  }
+  for (const part of Array.isArray(state?.parts) ? state.parts : []) {
+    for (const entry of Array.isArray(part.history) ? part.history : []) {
+      const date = activityDate(entry.date);
+      const event = String(entry.event || "");
+      const amount = Number((event.match(/₱\s*([\d,]+(?:\.\d+)?)/) || [])[1]?.replace(/,/g, ""));
+      if (/\bBought\b/i.test(event) && isInRange(date) && !hasLedgerEntry("PURCHASE", date) && amount > 0) {
+        legacy.push({ id: `${part.id}-${date}-${event}`, type: "PURCHASE", amount, description: `Bought ${part.name || "item"}`, date });
+      }
+    }
+  }
+  return [...ledger, ...legacy].sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export function NetWorthHistory({ state }) {
   const t = useTheme();
   const isSmallScreen = useMediaQuery("(max-width: 640px)");
   const [range, setRange] = useState(30);
   const [selectedDate, setSelectedDate] = useState(null);
+  const [aiExplanation, setAiExplanation] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
   const snapshots = useMemo(() => (Array.isArray(state?.netWorthSnapshots) ? state.netWorthSnapshots : [])
     .filter((snapshot) => snapshot?.date && Number.isFinite(Number(snapshot.netWorth)))
     .slice()
@@ -56,15 +100,35 @@ export function NetWorthHistory({ state }) {
     ["Receivables", Number(selected.outstandingReceivables||0)-Number(previous.outstandingReceivables||0)],
     ["Debt", Number(previous.totalDebt||0)-Number(selected.totalDebt||0)],
   ] : [];
-  const isoDate = (value) => {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? "" : `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
-  };
   const activityTypes = { PURCHASE:"Bought", SALE:"Sold", EXPENSE:"Spent", INCOME:"Received", REVERSAL:"Reversal", TRANSFER:"Transfer" };
-  const activities = previous && selected ? (state?.transactions||[]).filter((transaction) => {
-    const date=isoDate(transaction.date);
-    return date>previous.date && date<=selected.date && activityTypes[transaction.type];
-  }).sort((a,b)=>isoDate(a.date).localeCompare(isoDate(b.date))) : [];
+  const activities = previous && selected ? intervalActivities(state, previous.date, selected.date, activityTypes) : [];
+  const explainChange = async () => {
+    if (!previous || !selected) return;
+    setAiLoading(true);
+    setAiError("");
+    try {
+      const ai = await getGeminiVisionClient();
+      if (!ai) throw new Error("Gemini is not configured.");
+      const facts = {
+        interval: `${previous.date} to ${selected.date}`,
+        netWorthChange: Number(selected.netWorth) - Number(previous.netWorth),
+        componentChanges: changeRows.map(([name, amount]) => ({ name, amount })),
+        recordedActivity: activities.map(({ type, date, description, amount }) => ({ type, date, description, amount: Number(amount) })),
+      };
+      const result = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `Explain this net-worth change in 2 short sentences using only these facts. Say which recorded events and balance changes contributed. Never infer a cause that is not explicitly supported; if activity is missing, say the records do not show why. Do not calculate or change the supplied amounts.\n${JSON.stringify(facts)}`,
+        config: { temperature: 0.2 },
+      });
+      const text = String(result?.text || "").trim();
+      if (!text) throw new Error("Gemini returned an empty explanation.");
+      setAiExplanation({ date: selected.date, text });
+    } catch (error) {
+      setAiError(error?.message || "Could not generate an explanation. Please try again.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
   const change = first && latest ? Number(latest.netWorth) - Number(first.netWorth) : 0;
   const changePct = first && Number(first.netWorth) !== 0 ? change / Math.abs(Number(first.netWorth)) : null;
   const previousByDate = new Map(snapshots.map((snapshot, index) => [snapshot.date, snapshots[index - 1]]));
@@ -92,6 +156,9 @@ export function NetWorthHistory({ state }) {
             <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:14}}>{changeRows.map(([label,value])=><div key={label} style={{display:"flex",justifyContent:"space-between",gap:12,fontSize:12.5}}><span style={{color:t.textMuted}}>{label}</span><span style={{fontFamily:"monospace",fontWeight:650,color:value>=0?t.positive:t.negative}}>{value>=0?"+":"−"}{fmt(Math.abs(value))}</span></div>)}</div>
             <div style={{fontSize:12,fontWeight:700,color:t.text,marginBottom:7}}>Recorded activity</div>
             {activities.length? <div style={{display:"flex",flexDirection:"column",gap:6}}>{activities.map((event)=><div key={event.id} style={{display:"flex",justifyContent:"space-between",gap:10,background:t.surfaceSunken,borderRadius:8,padding:"9px 10px",fontSize:12}}><span style={{color:t.text,minWidth:0}}>{activityTypes[event.type]} · {event.description||event.type}</span><span style={{fontFamily:"monospace",whiteSpace:"nowrap",color:event.type==="SALE"||event.type==="INCOME"?t.positive:event.type==="TRANSFER"?t.textMuted:t.negative}}>{event.type==="TRANSFER"?"No net-worth change":`${["SALE","INCOME"].includes(event.type)?"+":"−"}${fmt(event.amount)}`}</span></div>)}</div> : <div style={{fontSize:12,color:t.textMuted}}>No purchase, sale, income, or expense records in this interval.</div>}
+            <div style={{marginTop:10}}><Btn small variant="ghost" icon={Sparkles} loading={aiLoading} onClick={explainChange}>Explain this change</Btn></div>
+            {aiExplanation?.date===selected.date&&<div role="status" aria-live="polite" style={{marginTop:9,padding:10,borderRadius:8,background:t.surfaceSunken,color:t.text,fontSize:12,lineHeight:1.5}}><strong style={{display:"block",marginBottom:4}}>AI explanation</strong>{aiExplanation.text}</div>}
+            {aiError&&<div role="alert" style={{marginTop:7,color:t.negative,fontSize:12}}>{aiError}</div>}
             <div style={{fontSize:11,color:t.textFaint,marginTop:9}}>Activity amounts show cash movement. Inventory value can also change as items enter, leave, or are revalued; saved history may not identify the exact item for older dates.</div>
           </>}
         </div>}
