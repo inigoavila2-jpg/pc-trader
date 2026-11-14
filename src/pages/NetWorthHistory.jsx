@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { ArrowDownRight, ArrowUpRight, CalendarDays, TrendingUp } from "lucide-react";
 import { fmt, pct } from "../data/model.js";
 import { Btn, Card, NetWorthHistoryChart, PageHeader, SectionHeader, useTheme } from "../components/index.js";
+import { useMediaQuery } from "../hooks/appHooks.js";
 
 const RANGES = [
   { label: "30 days", days: 30 },
@@ -24,6 +25,7 @@ function chartPoints(rows) {
 
 export function NetWorthHistory({ state }) {
   const t = useTheme();
+  const isSmallScreen = useMediaQuery("(max-width: 640px)");
   const [range, setRange] = useState(30);
   const snapshots = useMemo(() => (Array.isArray(state?.netWorthSnapshots) ? state.netWorthSnapshots : [])
     .filter((snapshot) => snapshot?.date && Number.isFinite(Number(snapshot.netWorth)))
@@ -39,6 +41,7 @@ export function NetWorthHistory({ state }) {
   const points = chartPoints(visible).map((snapshot) => ({
     key: snapshot.id || snapshot.date,
     label: new Date(`${snapshot.date}T00:00:00`).toLocaleDateString("en-PH", { month: "short", day: "numeric" }),
+    date: snapshot.date,
     value: Number(snapshot.netWorth),
   }));
   const first = visible[0];
@@ -51,7 +54,7 @@ export function NetWorthHistory({ state }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <PageHeader title="Net worth history" sub="See how your business finances change over time." />
       <Card>
-        <SectionHeader icon={TrendingUp} title="Progress" sub={`${visible.length} daily snapshots shown; the date range is anchored to the latest saved snapshot. The table below lists every saved value in that range.`} />
+        <SectionHeader icon={TrendingUp} title="Progress" sub={`${visible.length} daily snapshots in this range; the chart samples the trend and the list below shows every saved value.`} />
         <div role="group" aria-label="History date range" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
           {RANGES.map((option) => (
             <Btn key={option.label} small variant={range === option.days ? "primary" : "ghost"}
@@ -81,7 +84,24 @@ export function NetWorthHistory({ state }) {
         {visible.length === 0 ? (
           <div style={{ color: t.textFaint, fontSize: 13, padding: "8px 0" }}>Your history will appear here as daily snapshots are saved.</div>
         ) : (
-          <div style={{ overflowX: "auto" }}>
+          isSmallScreen ? <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {[...visible].reverse().map((snapshot) => {
+              const previous = previousByDate.get(snapshot.date);
+              const dailyChange = previous ? Number(snapshot.netWorth) - Number(previous.netWorth) : null;
+              const ChangeIcon = dailyChange !== null && dailyChange < 0 ? ArrowDownRight : ArrowUpRight;
+              const tone = dailyChange === null ? t.textFaint : dailyChange >= 0 ? t.positive : t.negative;
+              return <div key={snapshot.id || snapshot.date} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12,
+                padding: "11px 12px", borderRadius: 9, background: t.surfaceSunken, border: `1px solid ${t.border}` }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ color: t.text, fontSize: 12.5, fontWeight: 600 }}>{formatDate(snapshot.date)}</div>
+                  <div style={{ color: tone, fontSize: 11.5, fontFamily: "monospace", marginTop: 3 }}>
+                    {dailyChange === null ? "Baseline" : <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><ChangeIcon size={13}/>{dailyChange >= 0 ? "+" : "−"}{fmt(Math.abs(dailyChange))}</span>}
+                  </div>
+                </div>
+                <div style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 700, color: t.text, whiteSpace: "nowrap" }}>{fmt(snapshot.netWorth)}</div>
+              </div>;
+            })}
+          </div> : <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 420, fontSize: 12.5 }}>
               <thead><tr style={{ color: t.textFaint, textAlign: "left" }}>
                 <th style={cellStyle}>Date</th><th style={{ ...cellStyle, textAlign: "right" }}>Net worth</th>
