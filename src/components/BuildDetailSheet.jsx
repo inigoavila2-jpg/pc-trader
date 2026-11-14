@@ -59,6 +59,16 @@ export function BuildDetailSheet({build,parts,onClose,openLightbox,onDissolve,on
           ))}
         </div>
 
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
+          <Btn variant="primary" icon={Pencil} onClick={onEdit} style={{width:"100%"}}>Edit parts — add or remove</Btn>
+          <Btn variant="ghost" icon={Receipt} onClick={()=>setShowReceiptPrompt(true)} style={{width:"100%"}}>Make a receipt</Btn>
+          <Btn variant="ghost" icon={Undo2} onClick={onDissolve} style={{width:"100%"}}>Dissolve build — return parts to inventory</Btn>
+          <Btn variant="ghost" icon={ClipboardList} onClick={onCopySpecs} style={{width:"100%"}}>Copy specs for listing</Btn>
+          <div style={{paddingTop:6,borderTop:`1px solid ${t.border}`,marginTop:6}}>
+            <Btn variant="danger" icon={Trash2} onClick={onDelete} style={{width:"100%"}}>Delete build</Btn>
+          </div>
+        </div>
+
         <div style={{marginBottom:14}}>
           <div style={{fontSize:12,fontWeight:600,color:t.textMuted,marginBottom:10}}>Components ({parts.length})</div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -79,15 +89,6 @@ export function BuildDetailSheet({build,parts,onClose,openLightbox,onDissolve,on
           <DetailRow label="Created" value={build.date}/>
         </div>
 
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          <Btn variant="primary" icon={Pencil} onClick={onEdit} style={{width:"100%"}}>Edit parts — add or remove</Btn>
-          <Btn variant="ghost" icon={Receipt} onClick={()=>setShowReceiptPrompt(true)} style={{width:"100%"}}>Make a receipt</Btn>
-          <Btn variant="ghost" icon={Undo2} onClick={onDissolve} style={{width:"100%"}}>Dissolve build — return parts to inventory</Btn>
-          <Btn variant="ghost" icon={ClipboardList} onClick={onCopySpecs} style={{width:"100%"}}>Copy specs for listing</Btn>
-          <div style={{paddingTop:6,borderTop:`1px solid ${t.border}`,marginTop:6}}>
-            <Btn variant="danger" icon={Trash2} onClick={onDelete} style={{width:"100%"}}>Delete build</Btn>
-          </div>
-        </div>
       </div>
       {showReceiptPrompt&&(
         <ReceiptPricePromptModal buildName={build.name} onCancel={()=>setShowReceiptPrompt(false)} onConfirm={generateBuildReceipt}/>
