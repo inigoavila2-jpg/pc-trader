@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { initialState, normalizeCategoryRegistry, recordNetWorthSnapshot, localISODate, SNAPSHOT_ACTIONS, PREMIUM_LIGHT_COLORS } from "./model.js";
+import { initialState, normalizeCategoryRegistry, recordNetWorthSnapshot, localISODate, SNAPSHOT_ACTIONS, LEGACY_PREMIUM_LIGHT_COLORS, PREMIUM_LIGHT_COLORS } from "./model.js";
 import { reducer } from "./reducer.js";
 
 export function useAppData() {
@@ -54,6 +54,13 @@ export function useAppData() {
           loadedState.activeThemeSlot=3;
           loadedState.themeMode="light";
           loadedState.premiumLightThemeSeeded=true;
+          themeWritePending.current=true;
+        }
+        const savedPremiumColors=loadedState.themePaletteSlots?.[3]?.colors;
+        if(loadedState.premiumLightThemeSeeded&&loadedState.themePaletteSlots?.[3]?.name==="Premium Light"
+          &&Object.keys(LEGACY_PREMIUM_LIGHT_COLORS).length===Object.keys(savedPremiumColors||{}).length
+          &&Object.entries(LEGACY_PREMIUM_LIGHT_COLORS).every(([key,color])=>savedPremiumColors?.[key]===color)){
+          loadedState.themePaletteSlots[3]={...loadedState.themePaletteSlots[3],colors:PREMIUM_LIGHT_COLORS};
           themeWritePending.current=true;
         }
         if(!json?.themeMode){
