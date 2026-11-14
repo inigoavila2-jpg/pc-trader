@@ -1,13 +1,16 @@
 import { useState, useEffect } from "react";
 
-import { Boxes, Wrench, Settings as SettingsIcon, Search, X, Trash2, PackageX } from "lucide-react";
+import { Boxes, Wrench, Settings as SettingsIcon, Search, X, Trash2, PackageX, SlidersHorizontal } from "lucide-react";
 import { fmt, today, uid } from "../data/model.js";
 import { FONT_DISPLAY, FONT_BODY, FONT_MONO, useTheme, STATUS_LABEL, StatusBadge, PhotoThumb, ConfirmModal, Card, Btn, IconBtn, Inp, Sel, PageHeader, DefectiveModal, QuickSellModal, EditPartModal, PartDetailSheet, PartGroupSheet } from "../components/index.js";
 import { CategoryManager } from "../components/CategoryManager.jsx";
 import { Builds } from "./Builds.jsx";
+import { useMediaQuery } from "../hooks/appHooks.js";
 
 export function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}) {
   const t=useTheme();
+  const isPhone=useMediaQuery("(max-width: 640px)");
+  const [filtersOpen,setFiltersOpen]=useState(false);
   const [categoryManagerOpen,setCategoryManagerOpen]=useState(false);
   const [statusFilter,setStatusFilter]=useState("all");
   const [catFilter,setCatFilter]=useState("all");
@@ -165,14 +168,14 @@ export function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}
       <div style={{display:"flex",justifyContent:"flex-end",marginTop:-8}}><Btn small variant="ghost" icon={SettingsIcon} onClick={()=>setCategoryManagerOpen(true)}>Manage categories</Btn></div>
 
       <Inp value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name or category…" icon={Search} aria-label="Search inventory"/>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,190px),1fr))",gap:10}}>
+      {!isPhone&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,190px),1fr))",gap:10}}>
         <Sel label="Sort inventory" value={sortBy} onChange={e=>setSortBy(e.target.value)} aria-label="Sort inventory">
           <option value="name">Name A–Z</option><option value="cost-high">Cost: high to low</option><option value="cost-low">Cost: low to high</option><option value="market-high">Market value: high to low</option><option value="status">Status</option>
         </Sel>
         {(search||catFilter!=="all"||statusFilter!=="all"||bundleView)&&<Btn variant="ghost" icon={X} onClick={()=>{setSearch("");setCatFilter("all");setStatusFilter("all");setBundleView(false);}}>Clear filters</Btn>}
-      </div>
+      </div>}
 
-      {categoriesPresent.length>0&&(
+      {(!isPhone||filtersOpen)&&categoriesPresent.length>0&&(
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
           <Btn small variant={catFilter==="all"?"primary":"ghost"} onClick={()=>setCatFilter("all")}>All categories</Btn>
           {categoriesPresent.map(c=>(
@@ -181,7 +184,7 @@ export function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}
         </div>
       )}
 
-      <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+      {(!isPhone||filtersOpen)&&<div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
         {["all","available","in_build","sold","defective"].map(f=>{
           const active=!bundleView&&statusFilter===f;
           return (
@@ -194,7 +197,24 @@ export function Inventory({state,dispatch,toast,setTab,openLightbox,jumpRequest}
           );
         })}
         <Btn small variant={bundleView?"primary":"ghost"} icon={Boxes} onClick={()=>setBundleView(true)}>Bundles</Btn>
-      </div>
+      </div>}
+
+      {isPhone&&<div style={{display:"flex",gap:8,alignItems:"center"}}>
+        <Btn variant="ghost" icon={SlidersHorizontal} onClick={()=>setFiltersOpen(true)} style={{flex:1}}>Filters{(catFilter!=="all"||statusFilter!=="all"||bundleView)?" · Active":""}</Btn>
+        <Sel label="Sort inventory" value={sortBy} onChange={e=>setSortBy(e.target.value)} aria-label="Sort inventory">
+          <option value="name">Name A–Z</option><option value="cost-high">Cost: high to low</option><option value="cost-low">Cost: low to high</option><option value="market-high">Market value: high to low</option><option value="status">Status</option>
+        </Sel>
+        {filtersOpen&&<div style={{position:"fixed",inset:0,zIndex:1500,background:t.overlay,display:"flex",alignItems:"flex-end"}} onClick={()=>setFiltersOpen(false)}>
+          <div role="dialog" aria-modal="true" aria-label="Inventory filters" onClick={e=>e.stopPropagation()} style={{width:"100%",maxHeight:"85dvh",overflowY:"auto",overscrollBehaviorY:"contain",background:t.bgElevated,borderRadius:"18px 18px 0 0",padding:"20px 16px calc(20px + env(safe-area-inset-bottom))"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}><strong style={{color:t.text,fontSize:17}}>Filters</strong><IconBtn icon={X} label="Close filters" onClick={()=>setFiltersOpen(false)}/></div>
+            <div style={{color:t.textMuted,fontSize:12,fontWeight:600,marginBottom:8}}>Category</div>
+            <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:16}}><Btn small variant={catFilter==="all"?"primary":"ghost"} onClick={()=>setCatFilter("all")}>All categories</Btn>{categoriesPresent.map(c=><Btn key={c} small variant={catFilter===c?"primary":"ghost"} onClick={()=>setCatFilter(c)}>{c}</Btn>)}</div>
+            <div style={{color:t.textMuted,fontSize:12,fontWeight:600,marginBottom:8}}>Status</div>
+            <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:16}}>{["all","available","in_build","sold","defective"].map(f=><Btn key={f} small variant={!bundleView&&statusFilter===f?"primary":"ghost"} onClick={()=>{setStatusFilter(f);setBundleView(false);}}>{f==="all"?`All (${parts.length})`:`${f.replace("_"," ")} (${parts.filter(p=>p.status===f).length})`}</Btn>)}<Btn small variant={bundleView?"primary":"ghost"} icon={Boxes} onClick={()=>setBundleView(true)}>Bundles</Btn></div>
+            <div style={{display:"flex",gap:8}}><Btn onClick={()=>setFiltersOpen(false)} style={{flex:1}}>Show {bundleView?bundles.length:filtered.length} results</Btn>{(catFilter!=="all"||statusFilter!=="all"||bundleView||search)&&<Btn variant="ghost" onClick={()=>{setSearch("");setCatFilter("all");setStatusFilter("all");setBundleView(false);}}>Clear</Btn>}</div>
+          </div>
+        </div>}
+      </div>}
 
       {bundleView?(
         bundles.length===0?(
