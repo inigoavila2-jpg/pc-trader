@@ -8,7 +8,7 @@ function fullDate(row) {
   return Number.isNaN(date.getTime()) ? row.date : date.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
 }
 
-export function NetWorthHistoryChart({ rows }) {
+export function NetWorthHistoryChart({ rows, onSelect }) {
   const t = useTheme();
   const chartId = `nwh-${t.mode}-${useId().replace(/:/g, "")}`;
   const [hoverIndex, setHoverIndex] = useState(null);
@@ -33,6 +33,7 @@ export function NetWorthHistoryChart({ rows }) {
     const ratio = Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width));
     const index = Math.round(ratio * (rows.length - 1));
     setHoverIndex(index);
+    onSelect?.(rows[index]);
     return index;
   };
   const handleKeyDown = (event) => {
@@ -42,6 +43,7 @@ export function NetWorthHistoryChart({ rows }) {
       : Math.min(rows.length - 1, Math.max(0, activeIndex + (event.key === "ArrowRight" ? 1 : -1)));
     setPinnedIndex(next);
     setHoverIndex(null);
+    onSelect?.(rows[next]);
   };
 
   return (
@@ -55,9 +57,9 @@ export function NetWorthHistoryChart({ rows }) {
         role="slider" aria-label="Net worth history. Use left and right arrow keys to inspect values."
         aria-valuemin={0} aria-valuemax={rows.length - 1} aria-valuenow={activeIndex}
         aria-valuetext={`${fullDate(rows[activeIndex])}: ${fmt(values[activeIndex])}`} tabIndex={0}
-        onPointerMove={selectFromPointer} onPointerLeave={() => setHoverIndex(null)}
+        onPointerMove={selectFromPointer} onPointerLeave={() => { setHoverIndex(null); onSelect?.(rows[pinnedIndex ?? rows.length - 1]); }}
         onPointerDown={(event) => { if (event.pointerType === "touch") setPinnedIndex(selectFromPointer(event)); }}
-        onClick={(event) => setPinnedIndex(selectFromPointer(event))} onKeyDown={handleKeyDown}>
+        onClick={(event) => { const index=selectFromPointer(event);setPinnedIndex(index);onSelect?.(rows[index]); }} onKeyDown={handleKeyDown}>
         <defs><linearGradient id={chartId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity="0.24"/><stop offset="100%" stopColor={color} stopOpacity="0"/></linearGradient></defs>
         {[7, 14, 21, 28, 35].map((y) => <line key={y} x1="0" y1={y} x2="100" y2={y} stroke={t.border} strokeWidth="0.4"/>)}
         <path d={`M0,33 ${path.replace(/^M/, "L")} L100,33 Z`} fill={`url(#${chartId})`} stroke="none"/>
