@@ -1,6 +1,106 @@
 const { supabase } = require("./config");
 const { defaultState, normalizeDate, toCurrencyNumber, mapBundleRow, mapPartRow, mapBuildRow, mapSaleRow, mapExpenseRow, mapTransactionRow, mapQuickNoteRow, mapCategoryRow } = require("./stateMappers");
 
+function restoreLegacyTransactions(transactions, sales, expenses, bundles, parts) {
+  const existing = transactions || [];
+  const restored = [...existing];
+  const matched = new Set();
+  const existingPurchaseDates = new Set(
+    existing
+      .filter((transaction) => transaction.type === "PURCHASE" && transaction.wallet !== "personal")
+      .map((transaction) => transaction.date)
+      .filter(Boolean)
+  );
+
+  const addIfMissing = (candidate, compareAccount = true) => {
+    const index = existing.findIndex((transaction, i) =>
+      !matched.has(i) &&
+      transaction.type === candidate.type &&
+      transaction.date === candidate.date &&
+      Number(transaction.amount || 0) === candidate.amount &&
+      (transaction.description || "") === candidate.description &&
+      (transaction.wallet || "business") === candidate.wallet &&
+      (!compareAccount || (transaction.account || "bank") === candidate.account)
+    );
+
+    if (index >= 0) {
+      matched.add(index);
+      return;
+    }
+
+    restored.push(candidate);
+  };
+
+  // Older records predate the unified ledger, so reconstruct their cash activity from source tables.
+  for (const sale of sales || []) {
+    const amount = Number(sale.salePrice || 0);
+    if (sale.returned || sale.writeOff || amount <= 0 || !sale.date) continue;
+
+    addIfMissing({
+      id: `legacy-sale-${sale.id}`,
+      type: "SALE",
+      amount,
+      description: `Sold ${sale.name}${sale.buyerName ? ` to ${sale.buyerName}` : ""}`,
+      wallet: "business",
+      account: sale.paymentAccount || sale.account || "bank",
+      date: sale.date,
+    });
+  }
+
+  for (const expense of expenses || []) {
+    const amount = Number(expense.amount || 0);
+    if (expense.type !== "business" || expense.wallet !== "business" || amount <= 0 || !expense.date) continue;
+
+    addIfMissing({
+      id: `legacy-expense-${expense.id}`,
+      type: "EXPENSE",
+      amount,
+      description: expense.description || "",
+      wallet: "business",
+      account: expense.account || "bank",
+      date: expense.date,
+    });
+  }
+
+  for (const bundle of bundles || []) {
+    const amount = Number(bundle.purchasePrice || 0);
+    if (amount <= 0 || !bundle.date) continue;
+
+    addIfMissing({
+      id: `legacy-bundle-${bundle.id}`,
+      type: "PURCHASE",
+      amount,
+      description: `Bought bundle: ${bundle.name || "Untitled bundle"}`,
+      wallet: "business",
+      account: "bank",
+      date: bundle.date,
+    }, false);
+  }
+
+  for (const part of parts || []) {
+    const amount = Number(part.allocatedCost || 0);
+    if (
+      part.bundleId ||
+      String(part.source || "").startsWith("Untracked (bundle deleted)") ||
+      amount <= 0 ||
+      !part.date ||
+      existingPurchaseDates.has(part.date)
+    ) continue;
+
+    addIfMissing({
+      id: `legacy-part-${part.id}`,
+      type: "PURCHASE",
+      amount,
+      description: `Bought ${part.name}`,
+      wallet: "business",
+      account: "bank",
+      date: part.date,
+    }, false);
+  }
+
+  return restored;
+}
+
 async function loadStateFromSupabase() {
   if (!supabase) {
     throw new Error("Supabase is not configured.");
@@ -62,7 +162,13 @@ async function loadStateFromSupabase() {
     parts: (partsRes.data || []).map(mapPartRow),
     sales: (salesRes.data || []).map(mapSaleRow),
     expenses: (expensesRes.data || []).map(mapExpenseRow),
-    transactions: (transactionsRes.data || []).map(mapTransactionRow),
+    transactions: restoreLegacyTransactions(
+      (transactionsRes.data || []).map(mapTransactionRow),
+      (salesRes.data || []).map(mapSaleRow),
+      (expensesRes.data || []).map(mapExpenseRow),
+      (bundlesRes.data || []).map(mapBundleRow),
+      (partsRes.data || []).map(mapPartRow)
+    ),
     customCategories: (categoriesRes.data || []).map(mapCategoryRow),
     quickNotes: (quickNotesRes.data || []).map(mapQuickNoteRow),
 
@@ -176,4 +282,4 @@ async function loadThemeFromSupabase() {
 
 // ---------------- SAVE APPLICATION DATA ----------------
 
-module.exports = { loadStateFromSupabase, loadThemeFromSupabase };
+module.exports = { loadStateFromSupabase, loadThemeFromSupabase, restoreLegacyTransactions };
