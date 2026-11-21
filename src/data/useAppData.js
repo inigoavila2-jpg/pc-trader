@@ -57,9 +57,11 @@ export function useAppData() {
           themeWritePending.current=true;
         }
         const savedPremiumColors=loadedState.themePaletteSlots?.[3]?.colors;
+        const previousPremiumColors={...PREMIUM_LIGHT_COLORS,positive:"#23734D"};
+        const matchesPreset=expectedColors=>Object.keys(expectedColors).length===Object.keys(savedPremiumColors||{}).length
+          &&Object.entries(expectedColors).every(([key,color])=>savedPremiumColors?.[key]===color);
         if(loadedState.premiumLightThemeSeeded&&loadedState.themePaletteSlots?.[3]?.name==="Premium Light"
-          &&Object.keys(LEGACY_PREMIUM_LIGHT_COLORS).length===Object.keys(savedPremiumColors||{}).length
-          &&Object.entries(LEGACY_PREMIUM_LIGHT_COLORS).every(([key,color])=>savedPremiumColors?.[key]===color)){
+          &&(matchesPreset(LEGACY_PREMIUM_LIGHT_COLORS)||matchesPreset(previousPremiumColors))){
           loadedState.themePaletteSlots[3]={...loadedState.themePaletteSlots[3],colors:PREMIUM_LIGHT_COLORS};
           themeWritePending.current=true;
         }

@@ -35,7 +35,7 @@ export function DashboardBottom({model}) {
           )}
           {writeOffCount>0&&(
             <div style={{fontSize:11.5,color:t.textFaint,marginTop:14,paddingTop:12,borderTop:`1px solid ${t.border}`}}>
-              {writeOffCount} write-off{writeOffCount===1?"":"s"} recorded · <span style={{color:t.negative,fontFamily:FONT_MONO}}>{fmt(-writeOffLoss)}</span> lifetime loss
+              {writeOffCount} write-off{writeOffCount===1?"":"s"} recorded · <span style={{color:t.warning,fontFamily:FONT_MONO}}>{fmt(-writeOffLoss)}</span> lifetime loss
             </div>
           )}
         </Card>
@@ -43,7 +43,7 @@ export function DashboardBottom({model}) {
         <Card>
           <SectionHeader icon={TrendingUp} title="Profit analytics"
             sub={`Running profit across ${sales.length} sale${sales.length===1?"":"s"} in the selected period`}
-            action={<div style={{fontSize:12,color:totalProfit>=0?t.positive:t.negative,fontFamily:FONT_MONO,fontWeight:600}}>{totalProfit>=0?"+":""}{fmt(totalProfit)}</div>}/>
+            action={<div style={{fontSize:12,color:totalProfit>=0?t.positive:t.warning,fontFamily:FONT_MONO,fontWeight:600}}>{totalProfit>=0?"+":""}{fmt(totalProfit)}</div>}/>
           {cumPoints.length>1
             ? <ProfitAreaChart points={cumPoints} positive={totalProfit>=0}/>
             : <div style={{fontSize:12.5,color:t.textFaint,padding:"20px 0",textAlign:"center"}}>Need at least 2 sales in this period to plot a trend.</div>}
@@ -51,22 +51,22 @@ export function DashboardBottom({model}) {
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginTop:20,paddingTop:16,borderTop:`1px solid ${t.border}`}}>
             <div>
               <div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Monthly profit</div>
-              <div style={{fontSize:16,fontWeight:700,color:thisMonthProfit>=0?t.positive:t.negative,fontFamily:FONT_MONO}}>{thisMonthProfit>=0?"+":""}{fmt(thisMonthProfit)}</div>
+              <div style={{fontSize:16,fontWeight:700,color:thisMonthProfit>=0?t.positive:t.warning,fontFamily:FONT_MONO}}>{thisMonthProfit>=0?"+":""}{fmt(thisMonthProfit)}</div>
               <div style={{fontSize:10,color:t.textFaint,marginTop:3}}>current calendar month, always</div>
             </div>
             <div>
               <div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Best month ever</div>
-              <div style={{fontSize:16,fontWeight:700,color:t.positive,fontFamily:FONT_MONO}}>{bestMonth?fmt(bestMonth.profit):"—"}</div>
+              <div style={{fontSize:16,fontWeight:700,color:bestMonth?(bestMonth.profit>=0?t.positive:t.warning):t.textMuted,fontFamily:FONT_MONO}}>{bestMonth?fmt(bestMonth.profit):"—"}</div>
               <div style={{fontSize:10,color:t.textFaint,marginTop:3}}>{bestMonth?bestMonth.label:"not enough data yet"}</div>
             </div>
             <div>
               <div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Avg. profit / sale</div>
-              <div style={{fontSize:16,fontWeight:700,color:avgProfitPerSale>=0?t.positive:t.negative,fontFamily:FONT_MONO}}>{sales.length?`${avgProfitPerSale>=0?"+":""}${fmt(Math.round(avgProfitPerSale))}`:"—"}</div>
+              <div style={{fontSize:16,fontWeight:700,color:avgProfitPerSale>=0?t.positive:t.warning,fontFamily:FONT_MONO}}>{sales.length?`${avgProfitPerSale>=0?"+":""}${fmt(Math.round(avgProfitPerSale))}`:"—"}</div>
               <div style={{fontSize:10,color:t.textFaint,marginTop:3}}>{periodLabel}</div>
             </div>
             <div>
               <div style={{fontSize:11,color:t.textMuted,marginBottom:3}}>Highest profit sale</div>
-              <div style={{fontSize:16,fontWeight:700,color:t.positive,fontFamily:FONT_MONO}}>{highestProfitSale?`+${fmt(highestProfitSale.profit)}`:"—"}</div>
+              <div style={{fontSize:16,fontWeight:700,color:highestProfitSale?(highestProfitSale.profit>=0?t.positive:t.warning):t.textMuted,fontFamily:FONT_MONO}}>{highestProfitSale?`${highestProfitSale.profit>=0?"+":""}${fmt(highestProfitSale.profit)}`:"—"}</div>
               <div style={{fontSize:10,color:t.textFaint,marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{highestProfitSale?highestProfitSale.name:periodLabel}</div>
             </div>
           </div>
@@ -83,10 +83,10 @@ export function DashboardBottom({model}) {
                   <div key={cat}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
                       <span style={{fontSize:12.5,color:t.text}}>{cat} <span style={{color:t.textFaint}}>({v.count} sold)</span></span>
-                      <span style={{fontSize:12.5,fontFamily:FONT_MONO,fontWeight:700,color:positive?t.positive:t.negative}}>{positive?"+":""}{fmt(v.profit)}</span>
+                      <span style={{fontSize:12.5,fontFamily:FONT_MONO,fontWeight:700,color:positive?t.positive:t.warning}}>{positive?"+":""}{fmt(v.profit)}</span>
                     </div>
                     <div style={{height:5,background:t.surfaceSunken,borderRadius:99}}>
-                      <div style={{height:"100%",width:`${w}%`,background:positive?t.positive:t.negative,borderRadius:99,transition:"width 0.7s cubic-bezier(0.34,1.2,0.64,1)"}}/>
+                    <div style={{height:"100%",width:`${w}%`,background:positive?t.positive:t.warning,borderRadius:99,transition:"width 0.7s cubic-bezier(0.34,1.2,0.64,1)"}}/>
                     </div>
                   </div>
                 );
@@ -138,8 +138,8 @@ export function DashboardBottom({model}) {
                       <td style={{padding:"10px",color:t.text,maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name}</td>
                       <td style={{padding:"10px",textAlign:"right",color:t.textMuted,fontFamily:FONT_MONO}}>{fmt(r.cost)}</td>
                       <td style={{padding:"10px",textAlign:"right",color:t.text,fontFamily:FONT_MONO}}>{fmt(r.salePrice)}</td>
-                      <td style={{padding:"10px",textAlign:"right",color:r.profit>=0?t.positive:t.negative,fontFamily:FONT_MONO,fontWeight:700}}>{r.profit>=0?"+":""}{fmt(r.profit)}</td>
-                      <td style={{padding:"10px",textAlign:"right",color:r.roi>=0?t.positive:t.negative,fontFamily:FONT_MONO}}>{pct(r.roi)}</td>
+                      <td style={{padding:"10px",textAlign:"right",color:r.profit>=0?t.positive:t.warning,fontFamily:FONT_MONO,fontWeight:700}}>{r.profit>=0?"+":""}{fmt(r.profit)}</td>
+                      <td style={{padding:"10px",textAlign:"right",color:r.roi>=0?t.positive:t.warning,fontFamily:FONT_MONO}}>{pct(r.roi)}</td>
                       <td style={{padding:"10px",textAlign:"right",color:t.textFaint,fontFamily:FONT_MONO}}>{r.days!==null?`${r.days}d`:"—"}</td>
                     </tr>
                   ))}

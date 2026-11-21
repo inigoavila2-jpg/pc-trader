@@ -163,7 +163,7 @@ export function useDashboardModel(props) {
   const healthScore=Math.round(roiScore*25+turnoverScore*25+cashScore*25+growthScore*25);
   const healthTier=healthScore>=90?{label:"Excellent",color:t.positive}
     :healthScore>=70?{label:"Good",color:t.warning}
-    :{label:"Needs attention",color:t.negative};
+    :{label:"Needs attention",color:t.warning};
 
   // ── Recent transactions table (period-scoped, sortable) ──
   const getDaysHeld=(sale)=>{

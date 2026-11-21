@@ -17,7 +17,7 @@ export function ProfitAreaChart({points,positive}) {
   const [firstX]=toXY(points[0],0);
   const [lastX]=toXY(points[points.length-1],points.length-1);
   const areaPath=`M${firstX},32 ${linePath.replace(/^M/,"L")} L${lastX},32 Z`;
-  const color=positive?t.positive:t.negative;
+  const color=positive?t.positive:t.warning;
   const gradId=`pg-${positive?"pos":"neg"}-${t.mode}`;
   return (
     <svg viewBox="0 0 100 40" style={{width:"100%",height:96,display:"block"}} preserveAspectRatio="none" aria-hidden="true">

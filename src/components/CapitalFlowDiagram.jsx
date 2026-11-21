@@ -11,7 +11,7 @@ export function CapitalFlowDiagram({invested,inventoryVal,recovered,profit}) {
     {label:"Cash in",sub:"capital deployed",value:invested,color:t.info},
     {label:"Inventory",sub:"held at market value",value:inventoryVal,color:t.accent},
     {label:"Sales",sub:"revenue collected",value:recovered,color:t.positive},
-    {label:"Profit",sub:profit>=0?"net gain":"net loss",value:profit,color:profit>=0?t.positive:t.negative},
+    {label:"Profit",sub:profit>=0?"net gain":"net loss",value:profit,color:profit>=0?t.positive:t.warning},
   ];
   return (
     <div style={{display:"flex",alignItems:"center",gap:0,overflowX:"auto",paddingBottom:4}}>

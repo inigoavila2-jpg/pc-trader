@@ -161,7 +161,7 @@ export default function App() {
                 </div>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:11.5}}>
                   <span style={{color:t.textMuted}}>Profit</span>
-                  <span style={{fontFamily:FONT_MONO,fontWeight:700,color:t.positive}}>{fmt(totalProfit)}</span>
+                  <span style={{fontFamily:FONT_MONO,fontWeight:700,color:totalProfit>=0?t.positive:t.warning}}>{fmt(totalProfit)}</span>
                 </div>
                 <SyncStatus saveStatus={saveStatus} t={t}/>
               </div>
@@ -187,7 +187,7 @@ export default function App() {
                   </div>}
                   {!isSmallScreen&&<div style={{textAlign:"center"}}>
                     <div style={{fontSize:9.5,color:t.textFaint,fontWeight:600}}>Profit</div>
-                    <div style={{fontFamily:FONT_MONO,fontWeight:700,color:t.positive,fontSize:13}}>{fmt(totalProfit)}</div>
+                    <div style={{fontFamily:FONT_MONO,fontWeight:700,color:totalProfit>=0?t.positive:t.warning,fontSize:13}}>{fmt(totalProfit)}</div>
                   </div>}
                   <SyncStatus saveStatus={saveStatus} t={t} compact/>
                 </div>

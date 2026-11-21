@@ -15,7 +15,7 @@ export const PREMIUM_LIGHT_COLORS = {
   bg:"#F4F6F8", bgElevated:"#FFFFFF", surface:"#FFFFFF", surfaceSunken:"#F1F3F5", surfaceHover:"#E9EDF2",
   border:"#DCE2E8", borderStrong:"#BBC5D0", text:"#18212B", textMuted:"#4B5867", textFaint:"#596777",
   accent:"#252A31", accentStrong:"#15191F", accentContrast:"#FFFFFF", info:"#46505D", infoStrong:"#333B45",
-  positive:"#23734D", positiveStrong:"#18583A", negative:"#B4423C", negativeStrong:"#91322E", warning:"#94611F",
+  positive:"#1F7A4D", positiveStrong:"#18583A", negative:"#B4423C", negativeStrong:"#91322E", warning:"#94611F",
 };
 let _id = Date.now();
 export const uid = () => `id_${_id++}`;

@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import { fmt } from "../data/model.js";
+import { isNetWorthNegative } from "./netWorthTone.mjs";
 import { FONT_MONO, useTheme } from "./theme.js";
 
 function fullDate(row) {
@@ -23,7 +24,9 @@ export function NetWorthHistoryChart({ rows, onSelect }) {
     return `${index === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
   }).join(" ");
   const trend = values[values.length - 1] - values[0];
-  const color = trend >= 0 ? t.positive : t.negative;
+  const netWorthNegative = isNetWorthNegative(values[values.length - 1]);
+  const color = netWorthNegative ? t.negative : t.info;
+  const trendColor = trend < 0 && !netWorthNegative ? t.textMuted : color;
   const activeIndex = hoverIndex ?? pinnedIndex ?? rows.length - 1;
   const [activeX, activeY] = toXY(values[activeIndex], activeIndex);
   const labels = [...new Map([rows[0], rows[Math.floor((rows.length - 1) / 2)], rows[rows.length - 1]].map((row) => [row.key, row])).values()];
@@ -76,7 +79,7 @@ export function NetWorthHistoryChart({ rows, onSelect }) {
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 10 }}>
         <span style={{ fontSize: 11, color: t.textFaint }}>First → latest saved value</span>
-        <span style={{ fontSize: 12, fontFamily: FONT_MONO, fontWeight: 700, color }}>{trend >= 0 ? "+" : "−"}{fmt(Math.abs(trend))}</span>
+        <span style={{ fontSize: 12, fontFamily: FONT_MONO, fontWeight: 700, color: trendColor }}>{trend >= 0 ? "+" : "−"}{fmt(Math.abs(trend))}</span>
       </div>
     </div>
   );
